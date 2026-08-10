@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=9"></script>
+<script src="photos/list.js?v=10"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -248,7 +248,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="9 · 10.08.2026 22:41";
+const APP_VERSION="10 · 10.08.2026 23:46";
 
 let toastTimer=null;
 function toast(text){
@@ -721,29 +721,21 @@ function renderTotem(){
 
   document.getElementById("totem").innerHTML=s;
 
-  if(!hasData()){
-    document.getElementById("totem-state").innerHTML=
-      `<div class="lead">Начало</div>
-       <div class="fname">Здесь будет твой зверь</div>
-       <div class="why">Он собирается из двенадцати сторон твоей жизни: корпус — здоровье,
-         уши — друзья, хвост — деньги, рога — карьера. Чем ровнее живёшь, тем он целее.
-         Пока пусто: запиши первый день, это полминуты.</div>
-       <button class="btn" onclick="go('checkin')">Записать день</button>
-       <button class="btn ghost" onclick="showDemo(true)">Посмотреть на примере</button>`;
-    renderPuzzle();
-    return;
-  }
+  // Порядок для нового человека: сначала знакомство — оценить двенадцать сфер
+  // и увидеть, как проявляется зверь, — и только потом первый чек-ин.
+  // Наоборот не годится: чек-ин без зверя выглядит как анкета непонятно зачем.
   const сколько=rated().length;
   if(!сколько){
     document.getElementById("totem-state").innerHTML=
       `<div class="lead">Знакомство</div>
-       <div class="fname">Зверя ещё нет — собери его</div>
+       <div class="fname">Здесь будет твой зверь</div>
        <div class="why">Он складывается из двенадцати сторон твоей жизни: корпус — здоровье,
-         уши — друзья, хвост — деньги, рога — карьера. Пока ни одна не оценена, поэтому
-         силуэт едва виден.</div>
+         уши — друзья, хвост — деньги, рога — карьера. Чем ровнее живёшь, тем он целее.
+         Пока ни одна сторона не оценена, поэтому силуэт едва виден.</div>
        <div class="dim" style="margin-top:10px">Оцени каждую сферу от 1 до 10: насколько
          эта часть жизни тебя сейчас держит. Займёт минуту, и зверь проявится на глазах.</div>
-       <button class="btn" onclick="startRating()">Оценить сферы</button>`;
+       <button class="btn" onclick="startRating()">Собрать зверя</button>
+       ${hasData()?"":`<button class="btn ghost" onclick="showDemo(true)">Посмотреть на примере</button>`}`;
     renderPuzzle();
     return;
   }
@@ -959,6 +951,7 @@ function pills(box,values,cur,key,labels,subs){
 function sparkHint(){
   const cold=SPHERES.filter(s=>dormant(s.code)>=3&&!edit.touched.includes(s.code));
   const box=document.getElementById("spark-hint");
+  if(!hasData()){box.innerHTML=`<div class="dim">Первый день. Отметь всё, где сегодня сделал хотя бы минимум — этого достаточно.</div>`;return;}
   if(!cold.length){box.innerHTML=`<div class="dim">Все сферы горели на этой неделе. Держи так.</div>`;return;}
   const s=cold.sort((a,b)=>dormant(b.code)-dormant(a.code))[0];
   box.innerHTML=`<div class="lead">Чем разжечь «${s.name}»</div>`+
@@ -1075,29 +1068,22 @@ const PERIODS={week:{n:"Неделя",days:7},month:{n:"Месяц",days:30},yea
 let picked=null;
 function renderWheel(){
   applyTheme();
-  if(!hasData()){
-    document.getElementById("wheel-sub").textContent="Пока пусто";
-    document.getElementById("wheel").innerHTML="";
-    document.getElementById("period").innerHTML="";
-    document.getElementById("wheel-detail").innerHTML=
-      `<div class="fname" style="margin-top:0">Колесо соберётся из твоих дней</div>
-       <div class="why">Каждый чек-ин добавляет в него сектор. Через неделю будет видно форму,
-         через месяц — куда всё едет.</div>
-       <button class="btn" onclick="go('checkin')">Записать первый день</button>`;
-    return;
-  }
+  // Колесо живёт от оценок, а не от прожитых дней: оно должно работать
+  // с первой минуты, иначе знакомству негде происходить.
   const need=PERIODS[period].days;
   const slice=DAYS.slice(-need);
-  document.getElementById("period").innerHTML=Object.keys(PERIODS)
-    .map(k=>`<div class="${k===period?"on":""}" data-p="${k}">${PERIODS[k].n}</div>`).join("");
+  document.getElementById("period").innerHTML=hasData()?Object.keys(PERIODS)
+    .map(k=>`<div class="${k===period?"on":""}" data-p="${k}">${PERIODS[k].n}</div>`).join(""):"";
   document.querySelectorAll("#period div").forEach(el=>el.onclick=()=>{
     period=el.dataset.p;renderWheel();});
   const оценено=rated().length;
   document.getElementById("wheel-sub").textContent=
     оценено<SPHERES.length
       ? `Оценено ${оценено} из ${SPHERES.length}. Ткни в пустой сектор и поставь оценку`
-      : `Данных за ${slice.length} ${plural(slice.length,"день","дня","дней")}`
-        +(slice.length<need?` из ${need} — копим дальше`:"");
+      : !hasData()
+        ? "Все сферы оценены. Осталось записать первый день"
+        : `Данных за ${slice.length} ${plural(slice.length,"день","дня","дней")}`
+          +(slice.length<need?` из ${need} — копим дальше`:"");
 
   const cx=165,cy=163,R=112,n=SPHERES.length,st=2*Math.PI/n;
   const arc=(i,r)=>{const a0=-Math.PI/2+i*st,a1=a0+st;
@@ -1132,7 +1118,7 @@ function renderWheel(){
      <div class="lead" style="margin-top:16px">Чем разжечь</div>
      ${d.spark.map(a=>`<div class="spark"><span class="d"></span><span>${a}</span></div>`).join("")}
      <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--brd)">
-       <div class="dim" style="flex:1">${dm===0?"сегодня уже задета":dm===1?"не трогал вчера":"не трогал "+dm+" "+plural(dm,"день","дня","дней")}</div>
+       <div class="dim" style="flex:1">${!hasData()?"дней ещё не записано":dm===0?"сегодня уже задета":dm===1?"не трогал вчера":"не трогал "+dm+" "+plural(dm,"день","дня","дней")}</div>
        <div class="pts">+${ptsFor(d.code)}</div></div>
      <div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
      <div class="dim" style="margin-top:4px">Из этой оценки растёт ${BODY[d.code]} зверя</div>
