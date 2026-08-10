@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Баланс</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="photos/list.js?v=7"></script>
+<style>
+:root{
+  --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
+  --fu:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --ink:#17231d; --ink2:rgba(23,35,29,.58); --card:rgba(255,255,255,.6);
+  --brd:rgba(23,35,29,.1); --accent:#4e8a6b; --aink:#fff; --nav:rgba(255,255,255,.72);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{color:var(--ink);font:16px/1.55 var(--fu);padding-bottom:92px}
+#bg{position:fixed;inset:0;z-index:-2;background-size:cover;background-position:center}
+/* Размытие фотографии: текст поверх читается, а снимок остаётся узнаваемым.
+   Небольшое увеличение — чтобы по краям не лезла кайма от размытия. */
+#bg.photo{filter:blur(16px) saturate(1.05);transform:scale(1.12)}
+#bg.photo.gray{filter:blur(16px) grayscale(1) contrast(1.08) brightness(.92)}
+#scrim{position:fixed;inset:0;z-index:-1;pointer-events:none}
+
+.wrap{max-width:520px;margin:0 auto;padding:16px 15px}
+h1{font:600 25px/1.2 var(--fd);margin:0;letter-spacing:-.01em}
+h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
+  text-transform:uppercase;letter-spacing:.14em}
+.sub{font-size:13px;color:var(--ink2);margin-top:4px}
+.head{margin-bottom:14px}
+
+.themes{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px}
+.th{font-size:11.5px;padding:7px 12px;border-radius:20px;border:1px solid var(--brd);
+  background:var(--card);cursor:pointer;white-space:nowrap;color:var(--ink2)}
+.th.on{background:var(--accent);color:var(--aink);border-color:transparent;font-weight:600}
+
+.g{background:var(--card);backdrop-filter:blur(24px) saturate(1.25);
+  -webkit-backdrop-filter:blur(24px) saturate(1.25);
+  border:1px solid var(--brd);border-radius:20px;padding:17px}
+.quote{margin-bottom:12px}
+.quote .q{font:400 18.5px/1.45 var(--fd)}
+.quote .a{font-size:12.5px;color:var(--ink2);margin-top:9px}
+.quote .tag{font-size:11px;color:var(--ink2);opacity:.8;margin-top:11px}
+
+.lead{font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink2)}
+.fname{font:600 21px/1.25 var(--fd);margin:7px 0 5px}
+.why{font-size:13.5px;color:var(--ink2);line-height:1.5}
+
+.task{display:flex;align-items:flex-start;gap:11px;padding:12px 0;border-top:1px solid var(--brd);cursor:pointer}
+.task:first-of-type{border-top:none;padding-top:6px}
+.box{width:21px;height:21px;border-radius:7px;border:1.5px solid var(--brd);flex:none;margin-top:1px;
+  display:flex;align-items:center;justify-content:center;font-size:12px;transition:.15s}
+.task.done .box{background:var(--accent);border-color:var(--accent);color:var(--aink)}
+.task.done .tt{opacity:.45;text-decoration:line-through}
+.tt{flex:1;font-size:14.5px}
+.pts{font-size:11px;font-weight:700;padding:5px 9px;border-radius:10px;white-space:nowrap;
+  background:var(--accent);color:var(--aink)}
+
+.spheres{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.sp{border-radius:15px;padding:10px 3px;text-align:center;cursor:pointer;user-select:none;
+  background:var(--card);border:1px solid var(--brd);transition:.15s}
+.sp.on{border-color:var(--accent);border-width:2px;padding:9px 2px}
+.sp .ic{font-size:19px;line-height:1.35}
+.sp .nm{font-size:9.5px;font-weight:500;line-height:1.2;margin-top:2px}
+.sp .bonus{font-size:9px;font-weight:700;margin-top:2px;color:var(--accent)}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.stat{border-radius:16px;padding:13px 6px;text-align:center;background:var(--card);border:1px solid var(--brd)}
+.stat b{display:block;font:600 23px/1.2 var(--fd)}
+.stat span{font-size:10.5px;color:var(--ink2)}
+
+.pills{display:flex;gap:6px}
+.pill{flex:1;text-align:center;padding:14px 2px;border-radius:14px;cursor:pointer;user-select:none;
+  background:var(--card);border:1px solid var(--brd);font-size:13px;font-weight:500;line-height:1.2}
+.pill small{display:block;font-size:9.5px;color:var(--ink2);margin-top:2px;font-weight:400}
+.pill.sel{background:var(--accent);color:var(--aink);border-color:transparent}
+.pill.sel small{color:var(--aink);opacity:.75}
+
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.field{border-radius:14px;padding:10px 12px;background:var(--card);border:1px solid var(--brd)}
+.field label{display:block;font-size:10px;color:var(--ink2);letter-spacing:.05em}
+.field input{width:100%;border:none;background:transparent;color:inherit;font:600 18px var(--fd);outline:none;padding:0}
+.field input::placeholder{color:var(--ink2);opacity:.5;font-weight:400}
+textarea{width:100%;border:1px solid var(--brd);border-radius:14px;padding:12px;font:15px/1.4 var(--fu);
+  resize:none;outline:none;background:var(--card);color:inherit}
+.btn{display:block;width:100%;border:none;padding:16px;border-radius:15px;margin-top:14px;cursor:pointer;
+  font:600 15.5px var(--fu);background:var(--accent);color:var(--aink)}
+.btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--brd);font-weight:500;margin-top:8px}
+.btn:disabled{opacity:.4;cursor:default}
+.pair{display:flex;gap:8px;margin-top:14px}
+.pair .btn{margin-top:0}
+.pair .back{flex:0 0 34%}
+
+.row{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.rlabel{width:98px;font-size:12.5px;flex:none}
+.track{flex:1;height:6px;background:var(--brd);border-radius:4px;overflow:hidden}
+.fill{height:100%;border-radius:4px}
+.rval{width:48px;text-align:right;font-size:11px;color:var(--ink2);flex:none}
+
+.note{border-left:2px solid var(--accent);padding:1px 0 1px 13px;margin:12px 0;font-size:14px}
+.note b{display:block;margin-bottom:5px;font-family:var(--fd);font-size:15px}
+.dim{color:var(--ink2);font-size:13.5px;line-height:1.5}
+.plan{display:flex;gap:11px;margin-top:12px;font-size:14px}
+.plan .n{width:21px;height:21px;border-radius:50%;font-size:11px;font-weight:700;flex:none;margin-top:2px;
+  display:flex;align-items:center;justify-content:center;background:var(--accent);color:var(--aink)}
+.chart{border-radius:16px;padding:13px 11px 6px;margin-bottom:9px;background:var(--card);border:1px solid var(--brd)}
+.ctitle{font-size:11.5px;color:var(--ink2);padding:0 3px 5px;display:flex;justify-content:space-between}
+.parts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.part{font-size:11.5px;padding:5px 10px;border-radius:11px;background:var(--brd)}
+.spark{display:flex;gap:9px;align-items:flex-start;margin-top:9px;font-size:13.5px}
+.spark .d{width:5px;height:5px;border-radius:50%;background:var(--accent);margin-top:8px;flex:none}
+
+.days{display:flex;gap:6px;overflow-x:auto;margin-bottom:16px;padding-bottom:2px}
+.day{flex:none;min-width:52px;text-align:center;padding:8px 6px;border-radius:13px;cursor:pointer;
+  background:var(--card);border:1px solid var(--brd);font-size:11px;color:var(--ink2);line-height:1.25}
+.day b{display:block;font:600 15px var(--fd);color:var(--ink)}
+.day .dot{display:block;width:5px;height:5px;border-radius:50%;margin:4px auto 0;background:var(--accent)}
+.day .dot.no{background:var(--brd)}
+.day.sel{background:var(--accent);border-color:transparent}
+.day.sel b,.day.sel{color:var(--aink)}
+.day.sel .dot{background:var(--aink)}
+
+.scale{display:flex;gap:4px;margin-top:10px}
+.sn{flex:1;text-align:center;padding:10px 0;border-radius:11px;background:var(--card);
+  border:1px solid var(--brd);font-size:13px;cursor:pointer}
+.sn.on{background:var(--accent);color:var(--aink);border-color:transparent;font-weight:600}
+
+.seg{display:flex;gap:6px;margin-bottom:12px}
+.seg div{flex:1;text-align:center;padding:9px 0;border-radius:12px;background:var(--card);
+  border:1px solid var(--brd);font-size:12.5px;cursor:pointer;color:var(--ink2)}
+.seg div.on{background:var(--accent);color:var(--aink);border-color:transparent;font-weight:600}
+
+.shop{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.item{border-radius:15px;padding:12px 11px;background:var(--card);border:1px solid var(--brd);cursor:pointer}
+.item.locked{opacity:.4}
+.item .t{font-size:13px;font-weight:500}
+.item .p{font-size:11px;color:var(--ink2);margin-top:3px}
+.opts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.opt{padding:14px 4px;border-radius:14px;text-align:center;background:var(--card);border:1px solid var(--brd);
+  font:600 17px var(--fd);cursor:pointer}
+.opt.ok{background:var(--accent);color:var(--aink)}
+.opt.no{opacity:.35}
+
+.steps{display:flex;gap:4px;margin-bottom:14px}
+.steps i{flex:1;height:3px;border-radius:2px;background:var(--brd);font-style:normal}
+.steps i.on{background:var(--accent)}
+
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;padding-bottom:env(safe-area-inset-bottom);
+  background:var(--nav);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border-top:1px solid var(--brd)}
+nav div{flex:1;text-align:center;padding:10px 0 12px;font-size:10px;color:var(--ink2);cursor:pointer}
+nav div.act2{color:var(--accent);font-weight:600}
+nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
+.hidden{display:none}
+
+/* Подтверждение действием, а не окном: всплывает и само уходит */
+#toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);
+  bottom:calc(72px + env(safe-area-inset-bottom));z-index:99;
+  background:var(--accent);color:var(--aink);padding:11px 18px;border-radius:14px;
+  font:500 14px var(--fu);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;
+  box-shadow:0 6px 24px rgba(0,0,0,.28);max-width:86vw;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="bg"></div><div id="scrim"></div>
+<div id="toast"></div>
+<div class="wrap">
+
+<section id="v-totem">
+  <div class="head"><h1 id="hello"></h1><div class="sub" id="totem-date"></div></div>
+  <div class="themes" id="themes"></div>
+  <div class="g" style="text-align:center;padding:8px">
+    <svg id="totem" viewBox="0 0 320 320" width="100%" style="max-width:340px"></svg>
+  </div>
+  <div class="g" id="totem-state" style="margin-top:12px"></div>
+  <button class="btn" onclick="go('today')">Что сегодня</button>
+  <h2 id="puzzle-title">Задачка дня</h2>
+  <div class="g" id="puzzle"></div>
+</section>
+
+<section id="v-today" class="hidden">
+  <div class="head"><h1>Сегодня</h1><div class="sub" id="today-date"></div></div>
+  <div class="g quote" id="quote"></div>
+  <div id="today-body"></div>
+  <div class="stats" id="today-stats"></div>
+  <button class="btn" onclick="go('checkin')">Записать день</button>
+</section>
+
+<section id="v-checkin" class="hidden">
+  <div class="head"><h1>Чек-ин</h1><div class="sub" id="checkin-sub">Полминуты, и день записан</div></div>
+  <div class="days" id="daybar"></div>
+
+  <h2>Сколько спал</h2><div class="pills" id="p-sleep"></div>
+  <h2>Настроение</h2><div class="pills" id="p-mood"></div>
+  <h2>Энергия</h2><div class="pills" id="p-energy"></div>
+
+  <h2>Тело — вписываешь сам</h2>
+  <div class="fields">
+    <div class="field"><label>пульс покоя</label><input id="f-pulse" type="number" inputmode="numeric"></div>
+    <div class="field"><label>вес, кг</label><input id="f-weight" type="number" inputmode="decimal" step="0.1"></div>
+    <div class="field"><label>шаги</label><input id="f-steps" type="number" inputmode="numeric"></div>
+    <div class="field"><label>дистанция, км</label><input id="f-dist" type="number" inputmode="decimal" step="0.1"></div>
+  </div>
+  <div class="sub" style="margin-top:8px">Бледным — вчерашние. Не мерил — оставь пустым</div>
+
+  <h2>Тренировка</h2><div class="pills" id="p-train"></div>
+
+  <h2>Что сегодня горело</h2>
+  <div class="sub" style="margin-bottom:10px">Отметь, где сделал хотя бы минимум — сфера считается зажжённой</div>
+  <div class="spheres" id="sp-edit"></div>
+  <div class="g" id="spark-hint" style="margin-top:12px"></div>
+
+  <h2>Строка про день</h2>
+  <textarea id="note" rows="2" placeholder="Необязательно"></textarea>
+
+  <div class="g" id="summary" style="margin-top:14px"></div>
+  <button class="btn" onclick="save()">Сохранить и закрыть</button>
+  <button class="btn ghost" onclick="go('totem')">Отмена</button>
+</section>
+
+<section id="v-wheel" class="hidden">
+  <div class="head"><h1>Колесо</h1><div class="sub" id="wheel-sub"></div></div>
+  <div class="seg" id="period"></div>
+  <div style="text-align:center;margin:6px 0 2px">
+    <svg id="wheel" viewBox="0 0 330 330" width="100%" style="max-width:350px"></svg></div>
+  <div class="g" id="wheel-detail"></div>
+</section>
+
+<section id="v-trend" class="hidden">
+  <div class="head"><h1>Динамика</h1><div class="sub" id="trend-sub"></div></div>
+  <h2>Мои цели</h2>
+  <div class="g" id="goals"></div>
+  <div id="charts" style="margin-top:16px"></div>
+</section>
+
+</div>
+
+<nav>
+  <div id="n-totem" onclick="go('totem')"><i>❖</i>Тотем</div>
+  <div id="n-today" onclick="go('today')"><i>☀</i>Сегодня</div>
+  <div id="n-checkin" onclick="go('checkin')"><i>✎</i>Чек-ин</div>
+  <div id="n-wheel" onclick="go('wheel')"><i>◎</i>Колесо</div>
+  <div id="n-trend" onclick="go('trend')"><i>◈</i>Динамика</div>
+</nav>
+
+<script>
+// Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
+// доехало обновление или телеграм показывает старое из кэша.
+const APP_VERSION="7 · 10.08.2026 21:25";
+
+let toastTimer=null;
+function toast(text){
+  const el=document.getElementById("toast");
+  el.textContent=text; el.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove("on"),2600);
+}
+
+const tg=window.Telegram&&window.Telegram.WebApp;
+// Скрипт телеграма грузится и в обычном браузере, поэтому само наличие tg
+// ничего не доказывает. Настоящий телеграм отдаёт initData — по нему и отличаем.
+// Без этой проверки кнопка «Сохранить» в браузере молча не делала ничего.
+const inTelegram=!!(tg&&tg.initData&&tg.initData.length>0);
+if(tg&&inTelegram){tg.ready();tg.expand();}
+
+const THEMES={
+ air:{n:"Воздух",light:1,ink:"#17231d",ink2:"rgba(23,35,29,.58)",card:"rgba(255,255,255,.6)",
+   brd:"rgba(23,35,29,.11)",accent:"#4e8a6b",aink:"#fff",nav:"rgba(238,245,240,.8)",
+   page:"linear-gradient(168deg,#eef5f0 0%,#dfece4 52%,#cde1d5 100%)"},
+ sand:{n:"Песок",light:1,ink:"#2b2118",ink2:"rgba(43,33,24,.56)",card:"rgba(255,252,247,.62)",
+   brd:"rgba(43,33,24,.12)",accent:"#a8703e",aink:"#fff",nav:"rgba(247,240,231,.82)",
+   page:"linear-gradient(168deg,#f8f2e9 0%,#efe1cf 54%,#e3cfb5 100%)"},
+ bw:{n:"ЧБ",light:0,ink:"#f4f5f6",ink2:"rgba(244,245,246,.6)",card:"rgba(255,255,255,.09)",
+   brd:"rgba(255,255,255,.16)",accent:"#e8eaec",aink:"#14161a",nav:"rgba(12,14,17,.7)",
+   photo:1,gray:1,
+   page:"radial-gradient(120% 90% at 50% 0%,#26292e 0%,#191b1f 50%,#0f1113 100%)"},
+ night:{n:"Ночь",light:0,ink:"#e9eef0",ink2:"rgba(233,238,240,.55)",card:"rgba(255,255,255,.07)",
+   brd:"rgba(255,255,255,.13)",accent:"#7fc0a4",aink:"#0f1714",nav:"rgba(14,18,22,.76)",
+   page:"radial-gradient(120% 90% at 50% 0%,#1d262b 0%,#141a1f 48%,#0d1114 100%)"},
+ photo:{n:"Фото",light:0,ink:"#f2f5f7",ink2:"rgba(242,245,247,.62)",card:"rgba(255,255,255,.1)",
+   brd:"rgba(255,255,255,.16)",accent:"#8fd3b6",aink:"#0f1714",nav:"rgba(10,14,18,.66)",page:null}
+};
+const PH=window.PHOTOS||{};
+const hasPhotos=Object.values(PH).some(a=>a&&a.length);
+const usesPhoto=k=>!!THEMES[k]&&(k==="photo"||THEMES[k].photo);
+let theme=localStorage.getItem("theme")||"bw";
+if(!THEMES[theme]) theme="bw";
+
+function timeKey(){const h=new Date().getHours();
+  return h<5?"night":h<9?"dawn":h<17?"day":h<21?"sunset":"night";}
+function pickPhoto(){
+  const k=timeKey(), list=(PH[k]&&PH[k].length?PH[k]:PH.any)||[];
+  return list.length?list[new Date().getDate()%list.length]:null;
+}
+function applyTheme(){
+  const t=THEMES[theme],r=document.documentElement.style;
+  ["ink","ink2","card","brd","accent","aink","nav"].forEach(k=>r.setProperty("--"+k,t[k]));
+  const bg=document.getElementById("bg"),sc=document.getElementById("scrim");
+  const ph=usesPhoto(theme)?pickPhoto():null;
+  if(ph){
+    bg.style.background=`url("${ph}") center/cover no-repeat`;
+    bg.classList.add("photo");
+    bg.classList.toggle("gray",!!t.gray);      // ЧБ — то же фото, но без цвета
+    sc.style.background="linear-gradient(180deg,rgba(6,10,14,.3) 0%,rgba(6,10,14,.55) 45%,rgba(6,10,14,.85) 100%)";
+  } else {
+    bg.classList.remove("photo","gray");
+    bg.style.background=t.page||THEMES.night.page;
+    sc.style.background=t.light
+      ?"linear-gradient(180deg,rgba(255,255,255,.28) 0%,rgba(255,255,255,0) 40%)"
+      :"linear-gradient(180deg,rgba(255,255,255,.04) 0%,rgba(0,0,0,.2) 100%)";
+  }
+  document.getElementById("themes").innerHTML=Object.keys(THEMES)
+    .filter(k=>k!=="photo"||hasPhotos)
+    .map(k=>`<div class="th ${k===theme?"on":""}" data-t="${k}">${THEMES[k].n}</div>`).join("");
+  document.querySelectorAll(".th[data-t]").forEach(el=>el.onclick=()=>{
+    theme=el.dataset.t;localStorage.setItem("theme",theme);applyTheme();renderTotem();});
+}
+
+const SPHERES=[
+ {code:"health",name:"Здоровье",ic:"🫀",min:"10 минут движения",
+  parts:["гигиена","питание","фитнес","сон","ментальное здоровье"],
+  spark:["Выйти на улицу и пройти один круг","Выпить воды и нормально поесть","Лечь на полчаса раньше"]},
+ {code:"look",name:"Внешность",ic:"✨",min:"побриться, душ, чистая рубашка",
+  parts:["уход за кожей","волосы","мода","эстетика","любовь к себе"],
+  spark:["Побриться или подстричься","Разобрать шкаф, убрать лишнее","Погладить рубашку на завтра"]},
+ {code:"love",name:"Любовь",ic:"❤️",min:"тёплое слово близкому",
+  parts:["отношения","партнёрство","свидания","близость"],
+  spark:["Сказать вслух, за что благодарен","Договориться о свидании на неделе","Убрать телефон на весь вечер"]},
+ {code:"family",name:"Семья",ic:"🏠",min:"полчаса вместе без телефонов",
+  parts:["совместное время","ответственность","стабильность","традиции"],
+  spark:["Позвонить родителям","Поужинать вместе без экранов","Сделать что-то по дому без просьбы"]},
+ {code:"friends",name:"Друзья",ic:"🤝",min:"написать другу",
+  parts:["поддержка","совместные события","общий опыт","окружение"],
+  spark:["Написать тому, о ком вспомнил","Позвать кого-нибудь на выходных","Ответить на висящее сообщение"]},
+ {code:"career",name:"Карьера",ic:"💼",min:"25 минут над главной задачей",
+  parts:["образование","навыки","обучение","связи","баланс"],
+  spark:["25 минут над самой важной задачей","Написать письмо, которое откладывал","Составить список на завтра"]},
+ {code:"money",name:"Деньги",ic:"💰",min:"записать траты",
+  parts:["доход","сбережения","инвестиции","бюджет","независимость"],
+  spark:["Записать вчерашние траты","Посмотреть, сколько ушло за неделю","Отложить любую сумму"]},
+ {code:"self",name:"Саморазвитие",ic:"🌱",min:"10 минут учёбы",
+  parts:["шаги к цели","привычки","осознанность","самоанализ","увлечения"],
+  spark:["10 минут по этому проекту","Прочитать пять страниц","Выписать, что тревожит, списком"]},
+ {code:"spirit",name:"Духовность",ic:"🕊️",min:"5 минут тишины",
+  parts:["внутренний покой","убеждения","сострадание","связь с природой"],
+  spark:["Пять минут сидеть без телефона","Дойти до воды или деревьев","Записать три вещи, за которые благодарен"]},
+ {code:"rest",name:"Отдых",ic:"🎧",min:"полчаса на то, что просто нравится",
+  parts:["хобби","развлечения","удовольствие","спорт","путешествия"],
+  spark:["Час без экрана","Включить музыку и ничего не делать","Заняться тем, что просто нравится"]},
+ {code:"env",name:"Дом",ic:"🪴",min:"разобрать один угол",
+  parts:["организация","чистота","комфорт","эстетика","быт"],
+  spark:["Разобрать один угол, не всю квартиру","Выкинуть три ненужные вещи","Помыть окно или полить цветы"]},
+ {code:"comm",name:"Общение",ic:"💬",min:"помочь одному человеку",
+  parts:["связи","ответственность","помощь другим","события","волонтёрство"],
+  spark:["Помочь одному человеку","Поблагодарить кого-то вслух","Сходить туда, где живые люди"]}
+];
+SPHERES.forEach((s,i)=>s.color=`hsl(${Math.round(i*30)},48%,52%)`);
+
+// Тело зверя собирается из двенадцати сфер: каждая владеет своей частью.
+// Развитость части — это оценка сферы в колесе, а не сумма баллов.
+// Поэтому перекос виден силуэтом, а вырасти за счёт одной сильной стороны нельзя.
+const BODY={
+  health:"корпус", look:"окрас", love:"метка на груди", family:"лапы",
+  friends:"уши", career:"рога", money:"хвост", self:"грива",
+  spirit:"свечение", rest:"глаза", env:"земля под лапами", comm:"усы"
+};
+const byCode=c=>SPHERES.find(s=>s.code===c);
+
+const QUOTES={
+ health:[{t:"Заботься о своём теле. Это единственное место, где тебе приходится жить.",a:"Джим Рон"},
+         {t:"Тело не просит многого. Оно просит регулярно."}],
+ look:[{t:"Как ты обходишься с собой, так учишь обходиться с собой других."},
+       {t:"Приведёшь себя в порядок — день пойдёт иначе."},
+       {t:"Побриться и переодеться — самое дешёвое, что меняет день."}],
+ love:[{t:"Любовь — не то, что чувствуешь. Это то, что делаешь, когда чувствовать лень."},
+       {t:"Близость держится на мелочах, сказанных вовремя, а не на больших словах однажды."},
+       {t:"Убранный на вечер телефон замечают сильнее подарка."}],
+ family:[{t:"Семья — это те, кто останется, когда закончатся поводы."},
+         {t:"Позвонить родителям — пять минут и одна галочка."},
+         {t:"Домашние дела важнее домашних разговоров о делах."}],
+ friends:[{t:"Напиши тому, о ком сегодня подумал. Дружба — не чувства, а сообщения."},
+          {t:"Позвать первым — не унижение, а работа, которую кто-то должен делать."}],
+ career:[{t:"Двадцать пять минут над главным делают больше, чем весь день над мелким."},
+         {t:"Работа не кончается. Кончается день — и это нормальная граница."}],
+ money:[{t:"Деньги любят, когда их считают, а не когда о них тревожатся."},
+        {t:"Записанная трата перестаёт быть случайной."},
+        {t:"Спокойствие покупается не суммой, а тем, что ты знаешь свои цифры."}],
+ self:[{t:"Мы есть то, что делаем постоянно. Совершенство — не действие, а привычка.",a:"Уилл Дюрант"},
+       {t:"Час в день — пятнадцать полных суток в год."}],
+ spirit:[{t:"У кого есть «зачем» жить, тот выдержит почти любое «как».",a:"Фридрих Ницше"},
+         {t:"У тебя есть власть над своим умом, а не над внешними событиями.",a:"Марк Аврелий"},
+         {t:"Мы страдаем чаще в воображении, чем в реальности.",a:"Сенека"}],
+ rest:[{t:"Отдых — не награда за работу. Это её условие."},
+       {t:"Час, потраченный ни на что, тоже считается прожитым."}],
+ env:[{t:"Внешний порядок — самый дешёвый способ починить внутренний."},
+      {t:"Разбери один угол. Вся квартира — это отговорка, чтобы не начинать."},
+      {t:"Вещь, которой ты не пользуешься, всё равно берёт с тебя понемногу каждый день."}],
+ comm:[{t:"Помочь одному человеку сегодня — надёжнее, чем собираться помогать многим."},
+       {t:"Сказанное вслух «спасибо» стоит дешевле всего и работает дольше всего."}]
+};
+
+function demo(){
+  const days=[],t=new Date();let w=84,seed=11,prev=7;
+  const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};
+  for(let i=20;i>=0;i--){
+    const d=new Date(t);d.setDate(d.getDate()-i);
+    const sleep=rnd()<.3?[5,5.5,6][Math.floor(rnd()*3)]:[7,7.5,8][Math.floor(rnd()*3)];
+    const mood=Math.max(1,Math.min(10,Math.round(6+(prev-6.5)*1.2+(rnd()*2.4-1.2))));
+    const energy=Math.max(1,Math.min(10,Math.round(mood+(rnd()*3-1.5))));
+    const pool=["health","career","rest","self","family","love","friends","env","comm","money"];
+    const n=Math.max(1,Math.round(mood*.55)),touched=[];
+    while(touched.length<n){const c=pool[Math.floor(rnd()*pool.length)];if(!touched.includes(c))touched.push(c);}
+    w-=rnd()*.12;
+    days.push({date:d,sleep,mood,energy,touched,pulse:Math.round(58+rnd()*10),
+      weight:+w.toFixed(1),steps:Math.round(3000+rnd()*9000),dist:+(rnd()*8).toFixed(1)});
+    prev=sleep;}
+  return days;
+}
+// Демо показываем только по кнопке. Иначе новый человек увидит чужой вес,
+// чужой пульс и чужую слабую сферу — и не поймёт, каким цифрам верить.
+let DEMO_ON=localStorage.getItem("demo")==="1";
+let DAYS=DEMO_ON?demo():[];
+// Ноль означает «сферу ещё не оценивали». Зверь проявляется по мере
+// того, как человек выставляет оценки, а не выдаётся готовым.
+const NEUTRAL={};SPHERES.forEach(s=>NEUTRAL[s.code]=0);
+let DATA={today:{sleep:null,mood:null,energy:null,touched:[],note:"",
+  pulse:null,weight:null,steps:null,dist:null,train:"нет"},
+ wheel:DEMO_ON?{health:6,look:5,love:7,family:8,friends:4,career:6,money:5,self:3,spirit:2,rest:6,env:5,comm:4}:{...NEUTRAL},
+ goals:{weight:78,sleep:7.5},spent:0};
+
+let IS_DEMO=DEMO_ON, CONFIRM=null;
+function showDemo(on){
+  if(on) localStorage.setItem("demo","1"); else localStorage.removeItem("demo");
+  location.reload();
+}
+// Есть ли вообще что показывать
+const hasData=()=>DAYS.length>0;
+function decode(raw){
+  const p=decodeURIComponent(raw).split("|");
+  if(p[0]!=="1"||p.length<6)return null;
+  const num=s=>(s===""||s===undefined)?null:parseFloat(s);
+  const bits=m=>SPHERES.filter((s,i)=>(m>>i)&1).map(s=>s.code);
+  const wheel={};(p[1].split(",")).forEach((v,i)=>{if(SPHERES[i])wheel[SPHERES[i].code]=+v||0;});
+  const t=p[2].split(",");
+  const today={sleep:num(t[0])??7,mood:num(t[1])??5,energy:num(t[2])??5,
+    touched:bits(+t[3]||0),pulse:num(t[4]),weight:num(t[5]),steps:num(t[6]),dist:num(t[7]),
+    note:"",train:"нет"};
+  const g=p[3].split(",");
+  const base=new Date(),list=p[5].split(";");
+  const days=list.map((s,i)=>{
+    if(!s)return null;
+    const a=s.split(","),d=new Date(base);
+    d.setDate(d.getDate()-(list.length-1-i));
+    return {date:d,sleep:num(a[0])??7,mood:num(a[1])??5,energy:num(a[2])??5,
+      pulse:num(a[3])??60,weight:num(a[4])??0,steps:num(a[5])??0,dist:num(a[6])??0,
+      touched:bits(+a[7]||0)};
+  }).filter(Boolean);
+  return {wheel,today,goals:{weight:+g[0]||78,sleep:+g[1]||7.5},spent:+p[4]||0,days};
+}
+if(location.hash.length>2){
+  try{
+    const p=decode(location.hash.slice(1));
+    if(p&&p.days.length>=1){
+      DATA={...DATA,wheel:p.wheel,today:p.today,goals:p.goals,spent:p.spent};
+      DAYS=p.days;IS_DEMO=false;
+      CONFIRM=p.days;                       // эти дни у бота уже есть
+    }
+  }catch(e){console.warn("Не разобрал данные из бота",e);}
+}
+
+function keyOf(d){const p=n=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());}
+const todayKey=()=>keyOf(new Date());
+
+// ── Память приложения ────────────────────────────────────────────────
+// Чек-ины хранятся прямо в телефоне и уезжают боту, когда он на связи.
+const LOG_DAYS=30, LOG_LIMIT=3600;
+function loadLog(){try{return JSON.parse(localStorage.getItem("log")||"{}");}catch(e){return {};}}
+let LOG=loadLog();
+const saveLog=()=>localStorage.setItem("log",JSON.stringify(LOG));
+
+function logPacket(){
+  const size=days=>JSON.stringify({type:"log",days}).length;
+  const готов=e=>e&&e.s!=null&&e.m!=null&&e.e!=null;   // черновик от галочек не шлём
+  const today=готов(LOG[todayKey()])?LOG[todayKey()]:null;
+  let days=today?[today]:[];
+  // Только то, что ещё не уезжало. Повторная отправка старой копии
+  // затирала бы более свежую запись, сделанную через бота.
+  const waiting=Object.keys(LOG).sort().filter(k=>k!==todayKey()&&!LOG[k].ok&&готов(LOG[k]));
+  for(const k of waiting){
+    const test=[...days,LOG[k]].sort((a,b)=>a.d<b.d?-1:1);
+    if(size(test)>LOG_LIMIT) break;
+    days=test;
+  }
+  return {packet:JSON.stringify({type:"log",days,wheel:DATA.wheel}),days};
+}
+// Раньше день помечался отправленным ДО отправки, а подтверждения не было:
+// не доехало — потерялось навсегда. Теперь подтверждение приходит от самого
+// бота: в его данных день есть — значит дошёл.
+function confirmFromBot(days){
+  let n=0;
+  days.forEach(d=>{const k=keyOf(d.date); if(LOG[k]&&!LOG[k].ok){LOG[k].ok=true;n++;}});
+  if(n) saveLog();
+  return n;
+}
+// Чистим только то, что точно доехало. Неотправленное храним, сколько бы ни было.
+function prune(){
+  const old=Object.keys(LOG).sort().slice(0,-LOG_DAYS).filter(k=>LOG[k].ok);
+  if(old.length){old.forEach(k=>delete LOG[k]);saveLog();}
+}
+function mergeLog(){
+  const keys=Object.keys(LOG).sort();
+  if(!keys.length) return;
+  const make=e=>({date:new Date(e.d+"T12:00:00"),sleep:e.s??7,mood:e.m??5,energy:e.e??5,
+    touched:e.t||[],pulse:e.p??null,weight:e.w??null,steps:e.st??0,dist:e.di??0});
+  if(!DEMO_ON){
+    DAYS=keys.slice(-LOG_DAYS).map(k=>make(LOG[k]));
+    IS_DEMO=false;
+  } else if(keys.length>=2){
+    DAYS=keys.slice(-LOG_DAYS).map(k=>make(LOG[k]));
+    IS_DEMO=false;
+  } else {
+    const byDate={};
+    DAYS.forEach(d=>byDate[keyOf(d.date)]=d);
+    keys.forEach(k=>byDate[k]=make(LOG[k]));
+    DAYS=Object.keys(byDate).sort().slice(-21).map(k=>byDate[k]);
+  }
+  let p=null,w=null;
+  DAYS.forEach(d=>{if(d.pulse!=null)p=d.pulse;else d.pulse=p; if(d.weight)w=d.weight;else d.weight=w;});
+  for(let i=DAYS.length-1;i>=0;i--){
+    if(DAYS[i].pulse!=null)p=DAYS[i].pulse;else DAYS[i].pulse=p??60;
+    if(DAYS[i].weight)w=DAYS[i].weight;else DAYS[i].weight=w??0;
+  }
+}
+
+// Пустой день. Вчерашние числа сюда не переносим: иначе в базу попадёт
+// вес, который никто не мерил.
+const EMPTY_DAY=()=>({sleep:null,mood:null,energy:null,touched:[],note:"",
+  pulse:null,weight:null,steps:null,dist:null,train:"нет"});
+// Что показываем за сегодня: свою запись, если она есть, иначе чистый лист
+let editDay=null;                      // какой день сейчас заполняем
+const dayKey=()=>editDay||todayKey();
+function dayState(key){
+  const t=LOG[key];
+  return t?{sleep:t.s,mood:t.m,energy:t.e,touched:[...(t.t||[])],note:t.n||"",
+    pulse:t.p,weight:t.w,steps:t.st,dist:t.di,train:t.tr||"нет"}:EMPTY_DAY();
+}
+function todayState(){
+  const t=LOG[todayKey()];
+  return t?{sleep:t.s,mood:t.m,energy:t.e,touched:[...(t.t||[])],note:t.n||"",
+    pulse:t.p,weight:t.w,steps:t.st,dist:t.di,train:t.tr||"нет"}:EMPTY_DAY();
+}
+
+// Цели живут в памяти приложения — их задаёт человек, а не код
+const savedGoals=(()=>{try{return JSON.parse(localStorage.getItem("goals")||"null");}catch(e){return null;}})();
+if(savedGoals) DATA.goals={...DATA.goals,...savedGoals};
+// Оценки, выставленные руками, сильнее автоматических — так записано в ПРАВИЛАх
+const savedWheel=(()=>{try{return JSON.parse(localStorage.getItem("wheel")||"null");}catch(e){return null;}})();
+if(savedWheel) DATA.wheel={...DATA.wheel,...savedWheel};
+
+const LS=JSON.parse(localStorage.getItem("pet")||"{}");
+let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
+         days:LS.days||{}, spent:LS.spent||0,
+         doneTasks:(LS.tasksOn===todayKey()?LS.doneTasks:[])||[], tasksOn:todayKey()};
+const savePet=()=>localStorage.setItem("pet",JSON.stringify(PET));
+
+// Переезд со старой версии: баллы раньше считались по окну, теперь копятся.
+// Восстанавливаем их из уже записанных дней, иначе зверь обнулится.
+if(!Object.keys(PET.days||{}).length&&Object.keys(LOG).length){
+  PET.days={};
+  Object.values(LOG).forEach(e=>{if(e&&e.d) PET.days[e.d]=e.pt||0;});
+  savePet();
+}
+
+let edit={...DATA.today,touched:[...DATA.today.touched]};
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+function plural(n,o,f,m){const a=Math.abs(n)%100,b=a%10;
+  return a>10&&a<20?m:b>1&&b<5?f:b===1?o:m;}
+const weakest=()=>{
+  const оценённые=SPHERES.filter(s=>(DATA.wheel[s.code]||0)>0);
+  const из=оценённые.length?оценённые:SPHERES;
+  return из.reduce((m,s)=>(DATA.wheel[s.code]||0)<(DATA.wheel[m.code]||0)?s:m,из[0]);
+};
+const strongest=()=>SPHERES.reduce((m,s)=>DATA.wheel[s.code]>DATA.wheel[m.code]?s:m,SPHERES[0]);
+function dormant(c){let n=0;for(let i=DAYS.length-1;i>=0;i--){if(DAYS[i].touched.includes(c))break;n++;}return n;}
+const BASE=10,BONUS=30;
+const ptsFor=c=>dormant(c)>=3?BONUS:BASE;
+const dayPoints=l=>l.reduce((s,c)=>s+ptsFor(c),0);
+// Баллы копятся за всё время и хранятся у себя. Раньше считались по окну
+// в 30 дней — на тридцатый день старые дни выпадали, и рост вставал навсегда.
+const earned=()=>Object.values(PET.days||{}).reduce((s,v)=>s+v,0)+(PET.bonus||0);
+// Единственное место, где начисляются баллы за день: и из чек-ина, и из галочек
+function creditDay(key,touched){
+  PET.days=PET.days||{};
+  PET.days[key]=dayPoints(touched);
+  savePet();
+}
+const balance=()=>earned()-(PET.spent||0);
+
+// Режим — не светофор, а состояние зверя. Считается по последним дням.
+function mode(){
+  const moods=DAYS.slice(-3).map(d=>d.mood).filter(v=>v!=null);
+  if(!moods.length) return "green";
+  const a=moods.reduce((x,y)=>x+y,0)/moods.length;
+  // «тяжело» пишет 4, и раньше красный не включался никогда.
+  if(a<=4||(moods.length>=2&&moods.slice(-2).every(m=>m<=4))) return "red";
+  if(a<=6||(moods.length>=2&&moods.slice(-2).every(m=>m<=6))) return "yellow";
+  return "green";
+}
+// Сколько дней подряд тяжело. Считаем по календарю: пропущенные дни
+// не обрывают счёт, иначе после паузы он всегда обнулялся бы.
+function hardDays(){
+  let n=0;
+  for(let i=DAYS.length-1;i>=0;i--){
+    if(DAYS[i].mood!=null&&DAYS[i].mood<=4) n++; else break;
+  }
+  return n;
+}
+const HELP="Экстренная психологическая помощь МЧС: <b>+7 (495) 989-50-50</b>, круглосуточно";
+const BASICS=["Встать с кровати","Выпить воды и поесть","Выйти на улицу на десять минут",
+              "Написать одному живому человеку","Лечь спать вовремя"];
+
+// ── Тотем ────────────────────────────────────────────────────────────
+const SHOP=[{t:"Горсть ягод",p:50,k:"еда"},{t:"Речная рыба",p:120,k:"еда"},{t:"Тёплый мех",p:300,k:"шкура"},
+  {t:"Плащ из тумана",p:600,k:"шкура"},{t:"Ручей на поляне",p:800,k:"территория"},
+  {t:"Поле цветов",p:1200,k:"территория"},{t:"Звёздный камень",p:2000,k:"территория"}];
+// Сытость и кормёжка убраны намеренно: шкала, падающая по таймеру, — это
+// тот же «не разорви цепочку», только в костюме заботы о звере.
+
+// Уровней и очков опыта больше нет: зверь — это и есть твоё колесо.
+// Зрелость — среднее по двенадцати сферам, слабейшая показывает, куда расти.
+const scores=()=>SPHERES.map(s=>DATA.wheel[s.code]||0);
+const rated=()=>scores().filter(v=>v>0);                 // сколько сфер оценено
+const maturity=()=>{const v=rated();return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;};
+const allRated=()=>rated().length===SPHERES.length;
+
+function renderTotem(){
+  applyTheme();
+  const h=new Date().getHours(),m=mode();
+  document.getElementById("hello").textContent=
+    h<6?"Доброй ночи":h<12?"Доброе утро":h<18?"Добрый день":"Добрый вечер";
+  const names={dawn:"Рассвет",day:"День",sunset:"Закат",night:"Ночь"};
+  document.getElementById("totem-date").textContent=
+    names[timeKey()]+" · "+new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"})
+    +(IS_DEMO?" · демо-данные":"")
+    +` · версия ${APP_VERSION}`;
+
+  const cx=160,cy=168,step=2*Math.PI/12;
+  const gl=getComputedStyle(document.documentElement).getPropertyValue("--brd");
+  const dim=m==="red"?.4:m==="yellow"?.7:1;        // мир тускнеет вместе с тобой
+  const curl=m==="red"?.86:1;                      // в красном зверь сворачивается
+  const v=c=>(DATA.wheel[c]||0)/10;                // 0..1 — насколько выросла часть
+  const op=c=>(.12+v(c)*.88)*dim;                  // слабая часть полупрозрачна, не уродлива
+
+  let s="";
+  // Земля под лапами — сфера «Среда»
+  s+=`<ellipse cx="${cx}" cy="${cy+66}" rx="${52+v("env")*46}" ry="${9+v("env")*7}"
+      fill="currentColor" opacity="${op("env")*.28}"/>`;
+  // Свечение — «Духовность»
+  s+=`<circle cx="${cx}" cy="${cy-6}" r="${74+v("spirit")*40}" fill="currentColor"
+      opacity="${op("spirit")*.1}"/>`;
+
+  const проявлен=0.18+0.82*(rated().length/SPHERES.length);   // силуэт наливается по мере оценок
+  s+=`<g transform="translate(${cx},${cy}) scale(${curl})" opacity="${проявлен}">`;
+  // Хвост — «Деньги»: чем больше, тем пышнее
+  s+=`<path d="M30 12 Q${60+v("money")*40} ${4-v("money")*20} ${58+v("money")*26} ${-24-v("money")*26}
+      Q${86+v("money")*30} ${2-v("money")*10} ${58+v("money")*12} 36 Q44 44 30 34 Z"
+      fill="currentColor" opacity="${op("money")*.6}"/>`;
+  // Лапы — «Семья»: опора
+  s+=`<ellipse cx="-20" cy="${44+v("family")*8}" rx="${9+v("family")*5}" ry="${6+v("family")*3}"
+      fill="currentColor" opacity="${op("family")}"/>
+      <ellipse cx="20" cy="${44+v("family")*8}" rx="${9+v("family")*5}" ry="${6+v("family")*3}"
+      fill="currentColor" opacity="${op("family")}"/>`;
+  // Корпус — «Здоровье»
+  s+=`<ellipse cx="0" cy="16" rx="${26+v("health")*16}" ry="${24+v("health")*14}"
+      fill="currentColor" opacity="${op("health")}"/>`;
+  // Окрас — «Внешность»: светлая грудь
+  s+=`<ellipse cx="0" cy="30" rx="${14+v("look")*12}" ry="${9+v("look")*8}"
+      fill="currentColor" opacity="${op("look")*.35}"/>`;
+  // Метка на груди — «Любовь»
+  s+=`<path d="M0 ${22+8} C -6 ${14+8}, -12 ${20+8}, 0 ${30+8} C 12 ${20+8}, 6 ${14+8}, 0 ${22+8} Z"
+      transform="scale(${.5+v("love")*.9})" fill="currentColor" opacity="${op("love")*.5}"/>`;
+  // Грива — «Саморазвитие»
+  s+=`<ellipse cx="0" cy="-14" rx="${24+v("self")*16}" ry="${16+v("self")*12}"
+      fill="currentColor" opacity="${op("self")*.4}"/>`;
+  // Рога — «Карьера»: то, что делает зверя не лисой, а химерой
+  if(v("career")>0.05) s+=`<path d="M-14 -46 Q${-22-v("career")*16} ${-62-v("career")*30} ${-8-v("career")*10} ${-72-v("career")*34}"
+      stroke="currentColor" stroke-width="${2+v("career")*4}" fill="none" stroke-linecap="round" opacity="${op("career")}"/>
+      <path d="M14 -46 Q${22+v("career")*16} ${-62-v("career")*30} ${8+v("career")*10} ${-72-v("career")*34}"
+      stroke="currentColor" stroke-width="${2+v("career")*4}" fill="none" stroke-linecap="round" opacity="${op("career")}"/>`;
+  // Уши — «Друзья»
+  s+=`<path d="M-24 -40 L${-28-v("friends")*10} ${-64-v("friends")*30} L-6 -52 Z"
+      fill="currentColor" opacity="${op("friends")}"/>
+      <path d="M24 -40 L${28+v("friends")*10} ${-64-v("friends")*30} L6 -52 Z"
+      fill="currentColor" opacity="${op("friends")}"/>`;
+  // Голова
+  s+=`<ellipse cx="0" cy="-30" rx="26" ry="23" fill="currentColor" opacity="${.55+dim*.45}"/>`;
+  // Глаза — «Отдых»: чем меньше отдыха, тем уже
+  const eye=m==="red"?1.6:2+v("rest")*3.4;
+  s+=`<ellipse cx="-10" cy="-34" rx="3.6" ry="${eye}" fill="#0d1014"/>
+      <ellipse cx="10" cy="-34" rx="3.6" ry="${eye}" fill="#0d1014"/>`;
+  if(m!=="red"&&v("rest")>.4) s+=`<circle cx="-8.8" cy="-35.4" r="1.3" fill="#fff" opacity=".9"/>
+      <circle cx="11.2" cy="-35.4" r="1.3" fill="#fff" opacity=".9"/>`;
+  s+=`<path d="M-5 -20 L5 -20 L0 -15 Z" fill="#0d1014" opacity=".85"/>`;
+  // Усы — «Общение»
+  if(v("comm")>0.05){
+    const w=18+v("comm")*26;
+    s+=`<path d="M-26 -24 L${-26-w} -28 M-26 -19 L${-27-w} -17" stroke="#0d1014"
+        stroke-width="1.3" opacity="${op("comm")*.45}" stroke-linecap="round"/>
+        <path d="M26 -24 L${26+w} -28 M26 -19 L${27+w} -17" stroke="#0d1014"
+        stroke-width="1.3" opacity="${op("comm")*.45}" stroke-linecap="round"/>`;
+  }
+  s+=`</g>`;
+
+  // Подписи сфер по кругу — какая часть чья
+  SPHERES.forEach((d,i)=>{const a=-Math.PI/2+i*step+step/2;
+    s+=`<text x="${cx+140*Math.cos(a)}" y="${cy-12+140*Math.sin(a)}" font-size="8" fill="currentColor"
+      opacity="${(.25+v(d.code)*.5)*dim}" text-anchor="middle" dominant-baseline="middle">${d.name}</text>`;});
+
+  document.getElementById("totem").innerHTML=s;
+
+  if(!hasData()){
+    document.getElementById("totem-state").innerHTML=
+      `<div class="lead">Начало</div>
+       <div class="fname">Здесь будет твой зверь</div>
+       <div class="why">Он собирается из двенадцати сторон твоей жизни: корпус — здоровье,
+         уши — друзья, хвост — деньги, рога — карьера. Чем ровнее живёшь, тем он целее.
+         Пока пусто: запиши первый день, это полминуты.</div>
+       <button class="btn" onclick="go('checkin')">Записать день</button>
+       <button class="btn ghost" onclick="showDemo(true)">Посмотреть на примере</button>`;
+    renderPuzzle();
+    return;
+  }
+  const сколько=rated().length;
+  if(!сколько){
+    document.getElementById("totem-state").innerHTML=
+      `<div class="lead">Знакомство</div>
+       <div class="fname">Зверя ещё нет — собери его</div>
+       <div class="why">Он складывается из двенадцати сторон твоей жизни: корпус — здоровье,
+         уши — друзья, хвост — деньги, рога — карьера. Пока ни одна не оценена, поэтому
+         силуэт едва виден.</div>
+       <div class="dim" style="margin-top:10px">Оцени каждую сферу от 1 до 10: насколько
+         эта часть жизни тебя сейчас держит. Займёт минуту, и зверь проявится на глазах.</div>
+       <button class="btn" onclick="startRating()">Оценить сферы</button>`;
+    renderPuzzle();
+    return;
+  }
+  const low=Math.min(...rated()),w=weakest(),str=strongest();
+  const слабые=SPHERES.filter(x=>(DATA.wheel[x.code]||0)<=3).map(x=>BODY[x.code]);
+  const state=m==="red"?"Свернулся рядом с тобой"
+            :m==="yellow"?"Притих, но с ним всё хорошо"
+            :"Бодр и спокоен";
+
+  document.getElementById("totem-state").innerHTML=
+    `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div><div class="lead">Зрелость ${maturity().toFixed(1)} из 10</div>
+        <div class="fname" style="margin:5px 0 0">${state}</div></div>
+      <div class="pts">${balance()} ${plural(balance(),"балл","балла","баллов")}</div></div>
+     ${сколько<SPHERES.length
+       ? `<div class="dim" style="margin-top:12px">Оценено ${сколько} из ${SPHERES.length}.
+            Неоценённые части ещё не проросли — зверь проявится целиком, когда пройдёшь все.</div>
+          <button class="btn ghost" onclick="startRating()">Дооценить сферы</button>`
+       : ""}
+     ${Math.max(...rated())===low
+       ? `<div class="dim" style="margin-top:12px">Все двенадцать сфер пока на ${low} — колесо ровное.
+            Оценки ставятся на вкладке «Колесо», от них и растут части зверя.</div>`
+       : `<div class="row" style="margin-top:14px"><div class="rlabel">Слабее всего</div>
+       <div class="track"><div class="fill" style="width:${low*10}%;background:var(--accent)"></div></div>
+       <div class="rval">${w.name} ${low}</div></div>
+     <div class="row"><div class="rlabel">Сильнее всего</div>
+       <div class="track"><div class="fill" style="width:${(DATA.wheel[str.code]||0)*10}%;background:var(--accent)"></div></div>
+       <div class="rval">${str.name} ${DATA.wheel[str.code]||0}</div></div>`}
+     ${DEMO_ON?`<button class="btn ghost" onclick="showDemo(false)">Это пример. Убрать и начать своё</button>`:""}
+     <div class="dim" style="margin-top:12px">${m==="red"
+       ? "Сейчас он ничего от тебя не хочет. Просто побудьте рядом."
+       : слабые.length
+         ? `Зверь собран из твоих двенадцати сфер. Пока не проросли: ${слабые.join(", ")}. Поднимешь сферу — вырастет её часть.`
+         : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`;
+
+  renderPuzzle();
+}
+
+// ── Задачка дня ──────────────────────────────────────────────────────
+// Задачка каждый раз новая: шесть видов, числа случайные.
+// Баллы дают один раз в день, но решать можно сколько хочется.
+const KINDS=["ряд","удвоение","фибоначчи","лишнее","сумма","зеркало"];
+function makePuzzle(){
+  const R=n=>Math.floor(Math.random()*n);
+  const mix=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=R(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;};
+  const uniq=(ans,alt)=>{const s=new Set([ans]);alt.forEach(v=>{if(v!==ans&&v>0)s.add(v);});
+    const out=[...s].slice(0,4);
+    while(out.length<4){const v=ans+1+R(9);if(!out.includes(v))out.push(v);}
+    return mix(out);};
+  switch(KINDS[R(KINDS.length)]){
+    case "ряд":{const a=2+R(9),d=2+R(8),ans=a+4*d;
+      return {q:`Продолжи ряд: ${a}, ${a+d}, ${a+2*d}, ${a+3*d}, ?`,ans,opts:uniq(ans,[ans+d,ans-d,ans+1])};}
+    case "удвоение":{const b=2+R(5),ans=b*16;
+      return {q:`Продолжи ряд: ${b}, ${b*2}, ${b*4}, ${b*8}, ?`,ans,opts:uniq(ans,[ans+b,ans-b,ans*2])};}
+    case "фибоначчи":{const a=1+R(5),b=a+1+R(4),s=[a,b,a+b,a+2*b,2*a+3*b],ans=3*a+5*b;
+      return {q:`Продолжи ряд: ${s.join(", ")}, ?`,ans,opts:uniq(ans,[ans+1,ans-2,ans+b])};}
+    case "лишнее":{const base=2+R(6),arr=[base*2,base*4,base*6,base*8],odd=base*5+1;
+      arr[R(4)]=odd;
+      return {q:`Что здесь лишнее: ${arr.join(", ")}?`,ans:odd,opts:mix(arr)};}
+    case "сумма":{const a=11+R(60),b=11+R(60),ans=a+b;
+      return {q:`Сколько будет ${a} + ${b}?`,ans,opts:uniq(ans,[ans+9,ans-10,ans+1])};}
+    default:{const n=100+R(800),ans=+String(n).split("").reverse().join("");
+      return {q:`Прочитай число задом наперёд: ${n}`,ans,opts:uniq(ans,[ans+11,ans-9,n])};}
+  }
+}
+let PZ=null;
+function nextPuzzle(){PZ=makePuzzle();renderPuzzle();}
+function renderPuzzle(){
+  const box=document.getElementById("puzzle"),title=document.getElementById("puzzle-title");
+  if(mode()==="red"){                      // в тяжёлые дни ничего не просим
+    box.style.display="none"; if(title) title.style.display="none"; return;
+  }
+  box.style.display=""; if(title) title.style.display="";
+  const paid=PET.puzzleOn===todayKey();
+  PZ=PZ||makePuzzle();
+  box.innerHTML=`<div class="lead">Внимание и логика${paid?"":" · +20 баллов"}</div>
+    <div style="font:600 18px var(--fd);margin-top:8px">${PZ.q}</div>
+    <div class="opts">${PZ.opts.map(o=>`<div class="opt" data-v="${o}">${o}</div>`).join("")}</div>
+    <div class="dim" style="margin-top:12px">${paid
+      ? "Баллы за сегодня получены — эти просто для головы."
+      : "Ошибся — не страшно, попробуй ещё."}</div>
+    <button class="btn ghost" onclick="nextPuzzle()">Другая задачка</button>`;
+  box.querySelectorAll(".opt").forEach(el=>el.onclick=()=>{
+    const ok=+el.dataset.v===PZ.ans;
+    el.classList.add(ok?"ok":"no");
+    if(ok&&!paid){PET.puzzleOn=todayKey();PET.bonus+=20;savePet();}
+    if(ok)setTimeout(nextPuzzle,700);
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred(ok?"success":"error");});
+}
+
+// ── Сегодня ──────────────────────────────────────────────────────────
+function spheresGrid(box,list,editable,showBonus){
+  box.innerHTML=SPHERES.map(s=>{
+    const on=list.includes(s.code),b=showBonus&&dormant(s.code)>=3;
+    return `<div class="sp ${on?"on":""}" data-c="${s.code}"><div class="ic">${s.ic}</div>
+      <div class="nm">${s.name}</div>${b?`<div class="bonus">+${BONUS}</div>`:""}</div>`;}).join("");
+  if(!editable)return;
+  box.querySelectorAll(".sp").forEach(el=>el.onclick=()=>{
+    const c=el.dataset.c,i=edit.touched.indexOf(c);
+    i<0?edit.touched.push(c):edit.touched.splice(i,1);
+    spheresGrid(box,edit.touched,true,showBonus);
+    sparkHint(); renderSummary();
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
+}
+function tasksToday(){
+  // Пока колесо ровное (данных нет), «самая слабая» выбирается наугад —
+  // и человек получал бы три задачи из одной сферы. Даём разные.
+  const vals=SPHERES.map(s=>DATA.wheel[s.code]||0);
+  if(!hasData()||Math.max(...vals)===Math.min(...vals)){
+    const d=new Date().getDate();
+    return [0,1,2,3,4].map(i=>{
+      const s=SPHERES[(d*3+i*5)%SPHERES.length];
+      return {s,a:s.spark[(d+i)%s.spark.length]};
+    });
+  }
+  const w=weakest(),list=w.spark.map(a=>({s:w,a}));
+  SPHERES.filter(s=>s.code!==w.code&&dormant(s.code)>=3)
+    .sort((a,b)=>dormant(b.code)-dormant(a.code)).slice(0,2)
+    .forEach(s=>list.push({s,a:s.spark[0]}));
+  return list;
+}
+function renderToday(){
+  applyTheme();
+  document.getElementById("today-date").textContent=
+    new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"});
+  // Раньше цитата подбиралась по самой слабой сфере — то есть била в больное.
+  // Теперь просто хорошая мысль дня, а в тяжёлые дни её нет совсем.
+  const w=weakest(),box=document.getElementById("quote");
+  if(mode()==="red"){ box.style.display="none"; }
+  else {
+    box.style.display="";
+    const all=Object.values(QUOTES).flat();
+    const q=all[(new Date().getDate()*7+new Date().getMonth())%all.length];
+    box.innerHTML=`<div class="q">${q.t}</div>${q.a?`<div class="a">— ${q.a}</div>`:""}`;
+  }
+
+  const body=document.getElementById("today-body");
+  if(mode()==="red"){
+    const d=hardDays();
+    const помощь=`<div class="g" style="margin-bottom:12px;border-color:var(--accent)">
+      <div class="why">Вторую неделю подряд. Это не лень.
+      Живой человек здесь поможет больше, чем приложение.</div>
+      <div style="margin-top:10px">${HELP}</div></div>`;
+    body.innerHTML=(d>=10?помощь:"")+
+      `<div class="g"><div class="lead">Тяжёлые дни</div>
+      <div class="fname">Планы отменяются</div>
+      <div class="why">Ничего делать не надо. Вот всё, что сегодня считается:</div>
+      ${BASICS.map(b=>`<div class="spark"><span class="d"></span><span>${b}</span></div>`).join("")}
+      <div class="dim" style="margin-top:12px">Задачи и баллы вернутся сами, когда станет полегче.</div></div>`
+      +(d>=10?"":`<div class="dim" style="margin-top:12px">${HELP}</div>`);
+    document.getElementById("today-stats").innerHTML="";
+    return;
+  }
+
+  const list=tasksToday();
+  const шапка=hasData()
+    ? `<div class="g" style="margin-bottom:12px">
+        <div class="lead">Фокус недели</div><div class="fname">${w.ic} ${w.name}</div>
+        <div class="why">Оценка ${DATA.wheel[w.code]} из 10 — ниже всех.
+          На этой неделе смотрим сюда.</div></div>`
+    : `<div class="g" style="margin-bottom:12px">
+        <div class="lead">Фокус недели</div><div class="fname">Появится после первого чек-ина</div>
+        <div class="why">Система сама найдёт сторону, которой достаётся меньше всего,
+          и будет тянуть внимание туда. Пока просто выбери, чем заняться.</div></div>`;
+  body.innerHTML=шапка+`
+    <h2>Задачи на сегодня</h2>
+    <div class="g" id="tasks"></div>`;
+  const tb=document.getElementById("tasks");
+  tb.innerHTML=list.map((t,i)=>{
+    const done=PET.doneTasks.includes(i);
+    const counted=DATA.today.touched.includes(t.s.code);
+    const tag=done||!counted?`<div class="pts">+${ptsFor(t.s.code)}</div>`
+      :`<div class="dim" style="font-size:11px;white-space:nowrap">уже горит</div>`;
+    return `<div class="task ${done?"done":""}" data-i="${i}" data-c="${t.s.code}">
+      <div class="box">${done?"✓":""}</div>
+      <div class="tt">${t.a}<br><span class="dim" style="font-size:11.5px">${t.s.ic} ${t.s.name}</span></div>
+      ${tag}</div>`;}).join("")+
+    `<div class="dim" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--brd)">
+      Это минимумы, а не программа. Сделал любое — сфера засчитана.</div>`;
+  tb.querySelectorAll(".task").forEach(el=>el.onclick=()=>{
+    const i=+el.dataset.i,c=el.dataset.c,k=PET.doneTasks.indexOf(i);
+    if(k<0){PET.doneTasks.push(i);if(!DATA.today.touched.includes(c))DATA.today.touched.push(c);}
+    else PET.doneTasks.splice(k,1);
+    // Отмеченная задача — это задетая сфера. Записываем её сразу,
+    // иначе экран обещает баллы, которых нет, и чек-ин про неё не знает.
+    const rec=LOG[todayKey()]||{d:todayKey()};
+    rec.t=[...DATA.today.touched];
+    rec.pt=dayPoints(rec.t); rec.ok=false;
+    LOG[todayKey()]=rec; saveLog();
+    creditDay(todayKey(),rec.t);
+    renderToday();
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred("light");});
+
+  const t=DATA.today;
+  document.getElementById("today-stats").innerHTML=`
+    <div class="stat"><b>${dayPoints(t.touched)}</b><span>баллов сегодня</span></div>
+    <div class="stat"><b>${t.touched.length}/12</b><span>сфер горело</span></div>
+    <div class="stat"><b>${PET.doneTasks.length}/${list.length}</b><span>задач сделано</span></div>`;
+}
+
+// ── Чек-ин по шагам ──────────────────────────────────────────────────
+function pills(box,values,cur,key,labels,subs){
+  box.innerHTML=values.map((v,i)=>
+    `<div class="pill ${v===cur?"sel":""}" data-v="${v}">${labels?labels[i]:v}${subs?`<small>${subs[i]}</small>`:""}</div>`).join("");
+  box.querySelectorAll(".pill").forEach(el=>el.onclick=()=>{
+    const r=el.dataset.v;edit[key]=isNaN(parseFloat(r))?r:parseFloat(r);
+    box.querySelectorAll(".pill").forEach(p=>p.classList.remove("sel"));
+    el.classList.add("sel");
+    renderSummary();
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+  });
+}
+function sparkHint(){
+  const cold=SPHERES.filter(s=>dormant(s.code)>=3&&!edit.touched.includes(s.code));
+  const box=document.getElementById("spark-hint");
+  if(!cold.length){box.innerHTML=`<div class="dim">Все сферы горели на этой неделе. Держи так.</div>`;return;}
+  const s=cold.sort((a,b)=>dormant(b.code)-dormant(a.code))[0];
+  box.innerHTML=`<div class="lead">Чем разжечь «${s.name}»</div>`+
+    s.spark.map(a=>`<div class="spark"><span class="d"></span><span>${a}</span></div>`).join("")+
+    `<div class="dim" style="margin-top:10px">Любое из трёх — сфера засчитана. ${BONUS} баллов: не горела ${dormant(s.code)} ${plural(dormant(s.code),"день","дня","дней")}.</div>`;
+}
+function lastKnown(field){
+  for(let i=DAYS.length-1;i>=0;i--){const v=DAYS[i][field];if(v)return v;}
+  return null;
+}
+function renderDays(){
+  const box=document.getElementById("daybar"),now=new Date();
+  const назад=Object.keys(LOG).length?6:0;   // нет записей — не показываем неделю пустых кружков
+  let html="";
+  for(let i=назад;i>=0;i--){
+    const d=new Date(now);d.setDate(d.getDate()-i);
+    const k=keyOf(d),есть=!!LOG[k];
+    const имя=i===0?"сегодня":i===1?"вчера":d.toLocaleDateString("ru-RU",{weekday:"short"});
+    html+=`<div class="day ${k===dayKey()?"sel":""}" data-k="${k}">
+      ${имя}<b>${d.getDate()}</b><span class="dot ${есть?"":"no"}"></span></div>`;
+  }
+  box.innerHTML=html;
+  box.querySelectorAll(".day").forEach(el=>el.onclick=()=>{
+    editDay=el.dataset.k===todayKey()?null:el.dataset.k;
+    openCheckin();
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
+  const прошлый=dayKey()!==todayKey();
+  const выбран=new Date(dayKey()+"T12:00:00");
+  document.getElementById("checkin-sub").textContent=прошлый
+    ? "Заполняем "+выбран.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})
+    : "Полминуты, и день записан";
+  const b=document.querySelector('#v-checkin .btn');
+  if(b) b.textContent=прошлый||!inTelegram?"Сохранить день":"Сохранить и закрыть";
+}
+function openCheckin(){
+  edit=dayState(dayKey());
+  renderDays();
+  step=0;
+  pills(document.getElementById("p-sleep"),[4,5.5,7.5,9],edit.sleep,"sleep",
+    ["мало","так себе","норм","много"],["до 5 ч","5–6 ч","7–8 ч","9+ ч"]);
+  pills(document.getElementById("p-mood"),[2,4,7,10],edit.mood,"mood",
+    ["дно","тяжело","ровно","отлично"],["1–2","3–5","6–8","9–10"]);
+  pills(document.getElementById("p-energy"),[2,5,7,10],edit.energy,"energy",
+    ["выжат","мало","средне","полный бак"],["1–2","3–5","6–8","9–10"]);
+  pills(document.getElementById("p-train"),["нет","зал","кардио","игра","другое"],edit.train,"train");
+  spheresGrid(document.getElementById("sp-edit"),edit.touched,true,true);
+  sparkHint();
+  [["pulse","f-pulse"],["weight","f-weight"],["steps","f-steps"],["dist","f-dist"]].forEach(([k,id])=>{
+    const el=document.getElementById(id);
+    el.value=edit[k]??"";
+    const prev=hasData()&&!IS_DEMO?lastKnown(k):null;
+    el.placeholder=prev?`вчера ${prev}`:"—";   // подсказка, а не готовый ответ
+  });
+  document.getElementById("note").value=edit.note||"";
+  renderSummary();
+}
+function renderSummary(){
+  const got=dayPoints(edit.touched);
+  const names=edit.touched.map(c=>byCode(c)?.name).filter(Boolean).join(", ")||"—";
+  const v=x=>x==null?"—":x;
+  document.getElementById("summary").innerHTML=
+    `<div class="lead">Что запишем</div>
+     <div class="dim" style="margin-top:8px">Сон ${v(edit.sleep)} ч · настроение ${v(edit.mood)} · энергия ${v(edit.energy)}</div>
+     <div class="dim">Сферы: ${names}</div>
+     <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+       <span class="dim">За день</span><span class="pts">+${got} ${plural(got,"балл","балла","баллов")}</span></div>`;
+}
+function readBody(){
+  [["pulse","f-pulse"],["weight","f-weight"],["steps","f-steps"],["dist","f-dist"]].forEach(([k,id])=>{
+    const v=document.getElementById(id).value.trim();
+    edit[k]=v===""?null:parseFloat(v);
+  });
+}
+function save(){
+  if(edit.mood==null||edit.sleep==null||edit.energy==null){
+    toast("Нужны сон, настроение и энергия");
+    return;
+  }
+  readBody();
+  edit.note=document.getElementById("note").value.trim();
+  const got=dayPoints(edit.touched);
+  const key=dayKey();
+  LOG[key]={d:key,s:edit.sleep,m:edit.mood,e:edit.energy,
+    t:[...edit.touched],p:edit.pulse,w:edit.weight,st:edit.steps,di:edit.dist,
+    tr:edit.train,n:(edit.note||"").slice(0,120),pt:got};
+  creditDay(key,edit.touched);   // сколько показали, столько и начислили
+  saveLog();
+  mergeLog();
+  DATA.today=todayState();
+  // Пропущенный день сохраняем к себе и остаёмся — вдруг надо заполнить ещё
+  if(key!==todayKey()){
+    editDay=null;openCheckin();renderDays();
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+    return;
+  }
+  const out=logPacket();
+  if(inTelegram){tg.sendData(out.packet);return;}
+  renderTotem();go("totem");
+  toast("День записан · +"+got+" "+plural(got,"балл","балла","баллов"));
+}
+
+// ── Колесо: неделя / месяц / год ─────────────────────────────────────
+// Знакомство начинается с первой неоценённой сферы, а не с общего вида колеса
+function startRating(){
+  const первая=SPHERES.find(s=>!(DATA.wheel[s.code]||0));
+  picked=первая?первая.code:null;
+  go("wheel");
+  if(первая) setTimeout(()=>document.getElementById("wheel-detail")
+    .scrollIntoView({behavior:"smooth",block:"center"}),60);
+}
+
+let period="week";
+const PERIODS={week:{n:"Неделя",days:7},month:{n:"Месяц",days:30},year:{n:"Год",days:365}};
+let picked=null;
+function renderWheel(){
+  applyTheme();
+  if(!hasData()){
+    document.getElementById("wheel-sub").textContent="Пока пусто";
+    document.getElementById("wheel").innerHTML="";
+    document.getElementById("period").innerHTML="";
+    document.getElementById("wheel-detail").innerHTML=
+      `<div class="fname" style="margin-top:0">Колесо соберётся из твоих дней</div>
+       <div class="why">Каждый чек-ин добавляет в него сектор. Через неделю будет видно форму,
+         через месяц — куда всё едет.</div>
+       <button class="btn" onclick="go('checkin')">Записать первый день</button>`;
+    return;
+  }
+  const need=PERIODS[period].days;
+  const slice=DAYS.slice(-need);
+  document.getElementById("period").innerHTML=Object.keys(PERIODS)
+    .map(k=>`<div class="${k===period?"on":""}" data-p="${k}">${PERIODS[k].n}</div>`).join("");
+  document.querySelectorAll("#period div").forEach(el=>el.onclick=()=>{
+    period=el.dataset.p;renderWheel();});
+  const оценено=rated().length;
+  document.getElementById("wheel-sub").textContent=
+    оценено<SPHERES.length
+      ? `Оценено ${оценено} из ${SPHERES.length}. Ткни в пустой сектор и поставь оценку`
+      : `Данных за ${slice.length} ${plural(slice.length,"день","дня","дней")}`
+        +(slice.length<need?` из ${need} — копим дальше`:"");
+
+  const cx=165,cy=163,R=112,n=SPHERES.length,st=2*Math.PI/n;
+  const arc=(i,r)=>{const a0=-Math.PI/2+i*st,a1=a0+st;
+    return `M${cx},${cy} L${cx+r*Math.cos(a0)},${cy+r*Math.sin(a0)} A${r},${r} 0 0 1 ${cx+r*Math.cos(a1)},${cy+r*Math.sin(a1)} Z`;};
+  const gl=getComputedStyle(document.documentElement).getPropertyValue("--brd");
+  let s="";
+  [.25,.5,.75,1].forEach(k=>s+=`<circle cx="${cx}" cy="${cy}" r="${R*k}" fill="none" stroke="${gl}"/>`);
+  SPHERES.forEach((d,i)=>s+=`<path d="${arc(i,R)}" fill="none" stroke="${gl}"/>`);
+  SPHERES.forEach((d,i)=>{const v=DATA.wheel[d.code]||0;
+    // Неоценённая сфера — тонкий контур целого сектора: видно, что её ждут
+    if(!v){ s+=`<path d="${arc(i,R)}" fill="${d.color}" fill-opacity="${picked===d.code?".18":".06"}"
+      stroke="${d.color}" stroke-width="${picked===d.code?2:.8}" stroke-dasharray="3 3"
+      data-c="${d.code}" style="cursor:pointer"/>`; return; }
+    s+=`<path d="${arc(i,R*v/10)}" fill="${d.color}" fill-opacity="${picked===d.code?".95":".6"}"
+      stroke="${d.color}" stroke-width="${picked===d.code?2:.8}" data-c="${d.code}" style="cursor:pointer"/>`;});
+  SPHERES.forEach((d,i)=>{const a=-Math.PI/2+i*st+st/2,v=DATA.wheel[d.code]||0;
+    s+=`<text x="${cx+(R+20)*Math.cos(a)}" y="${cy+(R+20)*Math.sin(a)}" font-size="9.5"
+      text-anchor="middle" dominant-baseline="middle" fill="currentColor" opacity=".65">${d.name}</text>`;
+    if(v>=3)s+=`<text x="${cx+(R*v/10-12)*Math.cos(a)}" y="${cy+(R*v/10-12)*Math.sin(a)}" font-size="10.5"
+      font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="middle">${v}</text>`;});
+  const el=document.getElementById("wheel");el.innerHTML=s;
+  el.querySelectorAll("path[data-c]").forEach(p=>p.onclick=()=>{picked=p.dataset.c;renderWheel();
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
+
+  const d=byCode(picked)||weakest(),v=DATA.wheel[d.code]||0,dm=dormant(d.code);
+  document.getElementById("wheel-detail").innerHTML=
+    `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="fname" style="margin:0">${d.ic} ${d.name}</div>
+      <div style="font:600 28px var(--fd);color:${d.color}">${v||"—"}</div></div>
+     <div class="dim" style="margin-top:7px">Что сюда входит</div>
+     <div class="parts">${d.parts.map(p=>`<span class="part">${p}</span>`).join("")}</div>
+     <div class="lead" style="margin-top:16px">Чем разжечь</div>
+     ${d.spark.map(a=>`<div class="spark"><span class="d"></span><span>${a}</span></div>`).join("")}
+     <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--brd)">
+       <div class="dim" style="flex:1">${dm===0?"сегодня уже задета":dm===1?"не трогал вчера":"не трогал "+dm+" "+plural(dm,"день","дня","дней")}</div>
+       <div class="pts">+${ptsFor(d.code)}</div></div>
+     <div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
+     <div class="dim" style="margin-top:4px">Из этой оценки растёт ${BODY[d.code]} зверя</div>
+     <div class="scale" id="wheel-scale"></div>`;
+  // Оценки ставятся здесь: без этого телу зверя нечем меняться
+  const sc=document.getElementById("wheel-scale");
+  sc.innerHTML=[1,2,3,4,5,6,7,8,9,10].map(n=>
+    `<div class="sn ${n===v?"on":""}" data-n="${n}">${n}</div>`).join("");
+  sc.querySelectorAll(".sn").forEach(el=>el.onclick=()=>{
+    const знакомство=rated().length<SPHERES.length;      // ещё не все сферы оценены
+    DATA.wheel[d.code]=+el.dataset.n;
+    localStorage.setItem("wheel",JSON.stringify(DATA.wheel));
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+
+    if(!знакомство){ renderWheel(); return; }            // правим оценку задним числом — не прыгаем
+
+    const следующая=SPHERES.find(s=>!(DATA.wheel[s.code]||0));
+    if(следующая){
+      picked=следующая.code;
+      renderWheel();
+      document.getElementById("wheel-detail").scrollIntoView({behavior:"smooth",block:"center"});
+      return;
+    }
+    // Оценены все двенадцать — зверь собран, дальше первый чек-ин
+    picked=null;
+    renderWheel();
+    document.getElementById("wheel-detail").innerHTML=
+      `<div class="lead">Знакомство пройдено</div>
+       <div class="fname">Зверь собран</div>
+       <div class="why">Все двенадцать сфер оценены. Теперь он выглядит ровно так,
+         как сейчас устроена твоя жизнь. Осталось записать сегодняшний день.</div>`;
+    document.getElementById("wheel-detail").scrollIntoView({behavior:"smooth",block:"center"});
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+    setTimeout(()=>go("checkin"),1600);
+  });
+}
+
+// ── Динамика ─────────────────────────────────────────────────────────
+function spark2(vals,color,goal,h=56){
+  const w=280,all=goal?vals.concat([goal]):vals,mn=Math.min(...all),mx=Math.max(...all),rng=(mx-mn)||1;
+  const y=v=>h-8-((v-mn)/rng)*(h-18);
+  const pts=vals.map((v,i)=>[8+i*(w-16)/(Math.max(1,vals.length-1)),y(v)]);
+  const line=pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">
+    ${goal?`<line x1="8" y1="${y(goal).toFixed(1)}" x2="${w-8}" y2="${y(goal).toFixed(1)}" stroke="${color}"
+      stroke-width="1" stroke-dasharray="4 4" opacity=".55"/>`:""}
+    <polygon points="8,${h-4} ${line} ${w-8},${h-4}" fill="${color}" fill-opacity=".14"/>
+    <polyline points="${line}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="3" fill="${color}"/></svg>`;
+}
+function setGoal(key,el){
+  const v=parseFloat(String(el.value).replace(",","."));
+  if(!isNaN(v)&&v>0){DATA.goals[key]=v;localStorage.setItem("goals",JSON.stringify(DATA.goals));}
+  renderTrend();
+}
+function renderTrend(){
+  applyTheme();
+  if(!hasData()){
+    document.getElementById("trend-sub").textContent="Пока пусто";
+    document.getElementById("goals").innerHTML=
+      `<div class="why">Графики появятся, когда наберётся неделя записей.
+        Цели тоже — сначала нужно, с чем сравнивать.</div>`;
+    document.getElementById("charts").innerHTML="";
+    return;
+  }
+  const g=DATA.goals,wl=DAYS.map(d=>d.weight).filter(v=>v),cur=wl.length?wl[wl.length-1]:0;
+  const first=wl.length>=7?avg(wl.slice(0,7)):cur,perWeek=wl.length>=14?(first-avg(wl.slice(-7)))/2:0;
+  const left=cur-g.weight,weeks=perWeek>.05?Math.ceil(left/perWeek):null;
+  const nights=DAYS.filter(d=>d.sleep>=g.sleep).length;
+  document.getElementById("trend-sub").textContent=
+    `${DAYS.length} ${plural(DAYS.length,"день","дня","дней")} истории. Неделя врёт, месяц — нет`;
+  document.getElementById("goals").innerHTML=`
+    <div class="fields">
+      <div class="field"><label>цель по весу, кг</label>
+        <input id="g-weight" type="number" inputmode="decimal" step="0.1" value="${g.weight}"></div>
+      <div class="field"><label>цель по сну, ч</label>
+        <input id="g-sleep" type="number" inputmode="decimal" step="0.5" value="${g.sleep}"></div>
+    </div>
+    <div class="row" style="margin-top:14px"><div class="rlabel">Вес</div>
+      <div class="track"><div class="fill" style="width:${Math.max(0,Math.min(100,cur?(first-cur)/Math.max(.1,first-g.weight)*100:0))}%;background:var(--accent)"></div></div>
+      <div class="rval">${cur?cur.toFixed(1):"—"}</div></div>
+    <div class="dim">${cur?`Осталось ${left.toFixed(1)} кг. ${weeks?`Уходит ${perWeek.toFixed(2)} кг в неделю — при таком темпе цель примерно через ${weeks} ${plural(weeks,"неделю","недели","недель")}.`:"Темп пока не набрался, копим данные."}`:"Веса ещё не было — впиши его в чек-ине."}</div>
+    <div class="row" style="margin-top:14px"><div class="rlabel">Сон</div>
+      <div class="track"><div class="fill" style="width:${DAYS.length?nights/DAYS.length*100:0}%;background:var(--accent)"></div></div>
+      <div class="rval">${nights}/${DAYS.length}</div></div>
+    <div class="dim">Ночей по твоей мерке: ${nights} из ${DAYS.length}.</div>`;
+  document.getElementById("g-weight").onchange=e=>setGoal("weight",e.target);
+  document.getElementById("g-sleep").onchange=e=>setGoal("sleep",e.target);
+
+  const ac=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  const series=[{l:"Настроение",k:"mood",f:1},{l:"Сон, ч",k:"sleep",f:1,goal:g.sleep},
+    {l:"Пульс покоя",k:"pulse",f:0},{l:"Вес, кг",k:"weight",f:1,goal:g.weight},{l:"Шаги",k:"steps",f:0}];
+  document.getElementById("charts").innerHTML=series.map(s=>{
+    const v=DAYS.map(d=>d[s.k]||0);
+    if(v.length<2) return "";
+    const diff=avg(v.slice(-7))-avg(v.slice(0,7));
+    return `<div class="chart"><div class="ctitle"><span>${s.l}</span>
+      <span>сейчас ${v[v.length-1].toLocaleString("ru-RU")} · сдвиг ${diff>=0?"+":""}${diff.toFixed(s.f)}</span></div>
+      ${spark2(v,ac,s.goal)}</div>`;}).join("")
+    ||`<div class="dim">Графики появятся, когда наберётся два дня.</div>`;
+
+}
+
+// ── Навигация ────────────────────────────────────────────────────────
+function go(v){
+  ["totem","today","checkin","wheel","trend"].forEach(x=>{
+    document.getElementById("v-"+x).classList.toggle("hidden",x!==v);
+    document.getElementById("n-"+x).classList.toggle("act2",x===v);});
+  window.scrollTo(0,0);
+  if(v==="totem")renderTotem();
+  if(v==="today")renderToday();
+  if(v==="checkin")openCheckin();
+  if(v==="wheel")renderWheel();
+  if(v==="trend")renderTrend();
+}
+
+if(CONFIRM) confirmFromBot(CONFIRM);   // что дошло до бота — помечаем и чистим
+prune();
+mergeLog();
+DATA.today=todayState();     // новый день начинается с чистого листа
+go("totem");
+setInterval(applyTheme,60000);
+</script>
+</body>
+</html>
