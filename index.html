@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=22"></script>
+<script src="photos/list.js?v=23"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -300,7 +300,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="22 · 12.08.2026 08:42";
+const APP_VERSION="23 · 12.08.2026 08:56";
 
 let toastTimer=null;
 function toast(text){
@@ -741,18 +741,18 @@ function previewGrowth(day){
 // на зверя больше не влияют, это теперь только колесо; рост тут только по
 // времени (те же 30 дней), фото просто сменяют друг друга плавным кроссфейдом.
 const PHOTO_FRAMES=10;
-let PHOTO_MODE=false, photoStageShown=0, photoActiveLayer="a";
+let PHOTO_MODE=false, photoKeyShown="", photoActiveLayer="a", photoBaseKey="";
 (function detectPhotoMode(){
   const img=new Image();
-  img.onload=()=>{ PHOTO_MODE=true; document.getElementById("totem-photos").classList.remove("hidden"); renderTotem(); };
+  img.onload=()=>{ PHOTO_MODE=true; document.getElementById("totem-photos").classList.remove("hidden"); renderTotem(); startBlinkLoop(); };
   img.onerror=()=>{ PHOTO_MODE=false; };
   img.src="pet/1.jpg";
 })();
-function updatePhoto(){
-  if(!PHOTO_MODE) return;
-  const stage=Math.min(PHOTO_FRAMES,Math.max(1,Math.ceil(growthStepsPassed()/GROWTH_STEPS*PHOTO_FRAMES)||1));
-  if(stage===photoStageShown) return;
-  photoStageShown=stage;
+// Кроссфейд на файл `pet/${key}.jpg`. Общая функция и для роста стадий,
+// и для моргания/тычка — они все просто просят показать другой кадр.
+function showPhoto(key){
+  if(key===photoKeyShown) return;
+  photoKeyShown=key;
   const showing=document.getElementById("photo-"+photoActiveLayer);
   const nextLayer=photoActiveLayer==="a"?"b":"a";
   const incoming=document.getElementById("photo-"+nextLayer);
@@ -761,7 +761,31 @@ function updatePhoto(){
     showing.style.opacity="0";
     photoActiveLayer=nextLayer;
   };
-  incoming.src=`pet/${stage}.jpg`;
+  incoming.src=`pet/${key}.jpg`;
+}
+// Стадии 1..9 — просто рост. Стадия 10 (взрослая) умеет ещё и выражение —
+// снимки эмоций сняты только для неё, для младших стадий пока нет.
+// «Сердитая» и «грустная» специально не подключены: пет не должен
+// осуждать за плохой день, это противоречит духу проекта.
+function currentPhotoKey(){
+  const stage=Math.min(PHOTO_FRAMES,Math.max(1,Math.ceil(growthStepsPassed()/GROWTH_STEPS*PHOTO_FRAMES)||1));
+  if(stage<PHOTO_FRAMES) return String(stage);
+  const m=mode();
+  return m==="red"?"10-sleepy":m==="yellow"?"10-curious":"10-happy";
+}
+function updatePhoto(){
+  if(!PHOTO_MODE) return;
+  photoBaseKey=currentPhotoKey();
+  showPhoto(photoBaseKey);
+}
+// Раз в 7-10 секунд, если сейчас показана взрослая стадия — моргает и
+// возвращается к тому выражению, что было. Не мешает росту/смене настроения.
+function startBlinkLoop(){
+  setInterval(()=>{
+    if(!PHOTO_MODE||!photoBaseKey.startsWith("10")) return;
+    showPhoto("10-blink");
+    setTimeout(()=>showPhoto(photoBaseKey),220);
+  }, 8000+Math.random()*4000);
 }
 
 function renderTotem(){
@@ -946,6 +970,10 @@ function pokeTotem(){
   wrap.classList.remove("poked"); void wrap.offsetWidth; wrap.classList.add("poked");
   if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred("light");
   setTimeout(()=>wrap.classList.remove("poked"),500);
+  if(PHOTO_MODE&&photoBaseKey.startsWith("10")){
+    showPhoto("10-surprised");
+    setTimeout(()=>showPhoto(photoBaseKey),900);
+  }
 }
 
 // ── Задачка дня ──────────────────────────────────────────────────────
