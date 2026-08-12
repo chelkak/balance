@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=12"></script>
+<script src="photos/list.js?v=13"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -185,10 +185,13 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   </div>
   <div class="g" id="totem-state" style="margin-top:12px"></div>
   <button class="btn" onclick="go('today')">Что сегодня</button>
-  <h2>Мир вокруг зверя</h2>
-  <div class="g" id="world-shop"></div>
   <h2 id="puzzle-title">Задачка дня</h2>
   <div class="g" id="puzzle"></div>
+</section>
+
+<section id="v-world" class="hidden">
+  <div class="head"><h1>Мир зверя</h1><div class="sub">Всё, что растёт вокруг него — отдельно от чек-инов</div></div>
+  <div class="g" id="world-shop"></div>
 </section>
 
 <section id="v-today" class="hidden">
@@ -254,12 +257,13 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div id="n-checkin" onclick="go('checkin')"><i>✎</i>Чек-ин</div>
   <div id="n-wheel" onclick="go('wheel')"><i>◎</i>Колесо</div>
   <div id="n-trend" onclick="go('trend')"><i>◈</i>Динамика</div>
+  <div id="n-world" onclick="go('world')"><i>❁</i>Мир</div>
 </nav>
 
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="12 · 12.08.2026 04:59";
+const APP_VERSION="13 · 12.08.2026 05:11";
 
 let toastTimer=null;
 function toast(text){
@@ -363,7 +367,7 @@ const SPHERES=[
  {code:"env",name:"Дом",ic:"🪴",min:"разобрать один угол",
   parts:["организация","чистота","комфорт","эстетика","быт"],
   spark:["Разобрать один угол, не всю квартиру","Выкинуть три ненужные вещи","Помыть окно или полить цветы"]},
- {code:"comm",name:"Общение",ic:"💬",min:"помочь одному человеку",
+ {code:"comm",name:"Помощь другим",ic:"🤲",min:"помочь одному человеку",
   parts:["связи","ответственность","помощь другим","события","волонтёрство"],
   spark:["Помочь одному человеку","Поблагодарить кого-то вслух","Сходить туда, где живые люди"]}
 ];
@@ -660,6 +664,7 @@ function buyItem(id){
   savePet();
   toast(it.t+" теперь в мире зверя");
   renderTotem();
+  renderWorldShop();
 }
 function renderWorldShop(){
   const box=document.getElementById("world-shop");
@@ -828,7 +833,6 @@ function renderTotem(){
        <button class="btn" onclick="startRating()">Собрать зверя</button>
        ${hasData()?"":`<button class="btn ghost" onclick="showDemo(true)">Посмотреть на примере</button>`}`;
     renderPuzzle();
-    renderWorldShop();
     return;
   }
   const low=Math.min(...rated()),w=weakest(),str=strongest();
@@ -864,7 +868,6 @@ function renderTotem(){
          : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`;
 
   renderPuzzle();
-  renderWorldShop();
 }
 
 // ── Задачка дня ──────────────────────────────────────────────────────
@@ -1316,8 +1319,11 @@ function renderTrend(){
 }
 
 // ── Навигация ────────────────────────────────────────────────────────
+// «Мир зверя» — отдельный модуль, не в нижней навигации: открывается кнопкой
+// с тотема, закрывается назад. Логика магазина не смешивается с тем, что уже
+// внутри пятиэкранного go().
 function go(v){
-  ["totem","today","checkin","wheel","trend"].forEach(x=>{
+  ["totem","today","checkin","wheel","trend","world"].forEach(x=>{
     document.getElementById("v-"+x).classList.toggle("hidden",x!==v);
     document.getElementById("n-"+x).classList.toggle("act2",x===v);});
   window.scrollTo(0,0);
@@ -1326,6 +1332,7 @@ function go(v){
   if(v==="checkin")openCheckin();
   if(v==="wheel")renderWheel();
   if(v==="trend")renderTrend();
+  if(v==="world")renderWorldShop();
 }
 
 if(CONFIRM) confirmFromBot(CONFIRM);   // что дошло до бота — помечаем и чистим
