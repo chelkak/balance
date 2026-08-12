@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=18"></script>
+<script src="photos/list.js?v=19"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -189,12 +189,13 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
    смотрит на нас. Не мультик на весь экран, а редкий момент, который ловишь боковым зрением */
 #totem .idle-play{animation:idlePlay 14s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
 @keyframes idlePlay{
-  0%,72%{transform:translateX(0) scaleX(1) rotate(0deg)}
-  76%{transform:translateX(-6px) scaleX(1) rotate(-4deg)}
-  80%{transform:translateX(6px) scaleX(1) rotate(4deg)}
-  84%{transform:translateX(0) scaleX(.15) rotate(0deg)}
-  88%{transform:translateX(0) scaleX(1) rotate(0deg)}
-  100%{transform:translateX(0) scaleX(1) rotate(0deg)}
+  0%,68%{transform:translate(0,0)}
+  75%{transform:translate(9px,-7px)}
+  81%{transform:translate(12px,5px)}
+  87%{transform:translate(0,12px)}
+  93%{transform:translate(-12px,5px)}
+  97%{transform:translate(-9px,-7px)}
+  100%{transform:translate(0,0)}
 }
 @media (prefers-reduced-motion:reduce){#totem .idle-play{animation:none}}
 </style>
@@ -295,7 +296,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="18 · 12.08.2026 07:34";
+const APP_VERSION="19 · 12.08.2026 07:40";
 
 let toastTimer=null;
 function toast(text){
