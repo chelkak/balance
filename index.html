@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=16"></script>
+<script src="photos/list.js?v=17"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -275,7 +275,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="16 · 12.08.2026 07:09";
+const APP_VERSION="17 · 12.08.2026 07:13";
 
 let toastTimer=null;
 function toast(text){
@@ -589,9 +589,10 @@ if(savedWheel) DATA.wheel={...DATA.wheel,...savedWheel};
 
 const LS=JSON.parse(localStorage.getItem("pet")||"{}");
 let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
-         days:LS.days||{}, spent:LS.spent||0, owned:LS.owned||[],
+         days:LS.days||{}, spent:LS.spent||0, owned:LS.owned||[], bornAt:LS.bornAt||Date.now(),
          doneTasks:(LS.tasksOn===todayKey()?LS.doneTasks:[])||[], tasksOn:todayKey()};
 const savePet=()=>localStorage.setItem("pet",JSON.stringify(PET));
+if(!LS.bornAt) savePet();   // фиксируем момент рождения зверя раз и навсегда
 
 // Переезд со старой версии: баллы раньше считались по окну, теперь копятся.
 // Восстанавливаем их из уже записанных дней, иначе зверь обнулится.
@@ -765,6 +766,18 @@ function milestonesSVG(cx,cy){
   }).join("");
 }
 
+// Рост по времени — раз в 6 часов, 30 дней, только вверх. Считается от
+// момента создания зверя (PET.bornAt), не от чек-инов: растёт с первого
+// открытия, даже до первой оценки сфер. Пропуски не откатывают назад —
+// это и есть разница между «растёт» и «наказывает за паузу». Обсуждали
+// это трижды — решение Александра, зафиксировано в мое_сердце.md.
+const GROWTH_STEP_H=6, GROWTH_STEPS=30*24/6;   // 120 шагов за 30 дней
+function growthStepsPassed(){
+  const hours=(Date.now()-(PET.bornAt||Date.now()))/3600000;
+  return Math.max(0,Math.min(GROWTH_STEPS,Math.floor(hours/GROWTH_STEP_H)));
+}
+const growthScale=()=>0.55+0.45*(growthStepsPassed()/GROWTH_STEPS);
+
 function renderTotem(){
   applyTheme();
   const h=new Date().getHours(),m=mode();
@@ -796,7 +809,7 @@ function renderTotem(){
       opacity="${op("spirit")*.1}"/></g>`;
 
   const проявлен=0.18+0.82*(rated().length/SPHERES.length);   // силуэт наливается по мере оценок
-  s+=`<g transform="translate(${cx},${cy}) scale(${curl})" opacity="${проявлен}"><g class="breathe">`;
+  s+=`<g transform="translate(${cx},${cy}) scale(${curl*growthScale()})" opacity="${проявлен}"><g class="breathe">`;
   // Сплошная база тела — зверь всегда целый, даже если все сферы слабые.
   // Раньше части тела гасли по отдельности при низких оценках, и вместо
   // целого зверя было видно голову с полупрозрачными обрывками — «конструктор».
@@ -926,9 +939,12 @@ function renderTotem(){
          ? `Зверь собран из твоих двенадцати сфер. Пока не проросли: ${слабые.join(", ")}. Поднимешь сферу — вырастет её часть.`
          : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`;
 
-  if(daysWithMe()>0){
+  {
+    const done=growthStepsPassed(), hoursLeft=GROWTH_STEP_H-((Date.now()-(PET.bornAt||Date.now()))/3600000%GROWTH_STEP_H);
     document.getElementById("totem-state").innerHTML+=
-      `<div class="dim" style="margin-top:8px">С тобой уже ${daysWithMe()} ${plural(daysWithMe(),"день","дня","дней")}</div>`;
+      `<div class="dim" style="margin-top:8px">${done>=GROWTH_STEPS
+        ? "Вырос полностью — тридцать дней позади"
+        : `Растёт сам: шаг ${done} из ${GROWTH_STEPS} · следующий примерно через ${Math.ceil(hoursLeft)} ч`}</div>`;
   }
 }
 
