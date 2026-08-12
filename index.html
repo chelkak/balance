@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=26"></script>
+<script src="photos/list.js?v=27"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -203,6 +203,14 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <body>
 <div id="bg"></div><div id="scrim"></div>
 <div id="toast"></div>
+<div id="story-modal" class="hidden" style="position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(8,10,14,.6)" onclick="if(event.target===this)closeStory()">
+  <div class="g" style="max-width:360px;padding:22px" onclick="event.stopPropagation()">
+    <div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Кто-то уже прошёл через это</div>
+    <div class="fname" id="story-name" style="margin-top:6px"></div>
+    <div class="why" id="story-text" style="margin-top:10px"></div>
+    <button class="btn" style="margin-top:16px" onclick="closeStory()">Хорошо</button>
+  </div>
+</div>
 <div class="wrap">
 
 <section id="v-totem">
@@ -302,7 +310,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="26 · 12.08.2026 17:36";
+const APP_VERSION="27 · 12.08.2026 21:15";
 
 let toastTimer=null;
 function toast(text){
@@ -454,6 +462,42 @@ const QUOTES={
  comm:[{t:"Помочь одному человеку сегодня — надёжнее, чем собираться помогать многим."},
        {t:"Сказанное вслух «спасибо» стоит дешевле всего и работает дольше всего."}]
 };
+
+// Редкая находка после закрытого дня — не рубрика, не мотиватор дня.
+// Привязана к самой слабой сфере недели, когда получается совпасть;
+// если истории под эту сферу нет — берётся любая. Шанс и момент срабатывания
+// нарочно нигде не объявлены пользователю — см. save().
+const STORIES=[
+  {sphere:"health",name:"Стивен Хокинг",
+   text:"В 21 год ему сказали, что жить осталось два года — боковой амиотрофический склероз. Прожил больше полувека и написал главные свои работы уже после того, как перестал говорить и ходить сам."},
+  {sphere:"career",name:"Авраам Линкольн",
+   text:"До Белого дома — провалившийся бизнес и несколько подряд проигранных выборов. Ни одно поражение не стало последней точкой в его истории."},
+  {sphere:"money",name:"Уолт Дисней",
+   text:"Его первая студия обанкротилась. Когда искал деньги на парк аттракционов, отказали больше трёхсот раз подряд. Ни один отказ не был окончательным."},
+  {sphere:"spirit",name:"Виктор Франкл",
+   text:"Три года в концлагерях, почти вся семья погибла. Он написал потом, что смысл можно найти даже там, где не осталось никакой свободы, кроме внутренней."},
+  {sphere:"self",name:"Софья Ковалевская",
+   text:"Женщин не пускали в университеты — пришлось вступить в фиктивный брак, чтобы уехать учиться. Стала первой женщиной-профессором математики в Европе."},
+  {sphere:"family",name:"Мария Кюри",
+   text:"Осталась одна с двумя дочерьми после смерти мужа. Работу не остановила — и стала единственным человеком, получившим Нобелевскую премию в двух разных науках."},
+  {sphere:"friends",name:"Хелен Келлер и Энн Салливан",
+   text:"Хелен потеряла зрение и слух в полтора года и была почти неуправляема. Учительница не сдавалась месяцами, пока не достучалась — через воду, льющуюся на руку."},
+  {sphere:"look",name:"Фрида Кало",
+   text:"После аварии врачи не были уверены, что она выживет — десятки операций, инвалидное кресло, боль на всю жизнь. Рисовала лёжа, глядя в зеркало над кроватью, и не спрятала ни одного шрама на холсте."},
+  {sphere:"comm",name:"Флоренс Найтингейл",
+   text:"В разгар Крымской войны организовала уход за ранеными там, где до неё почти никто не пытался. Позже, уже тяжело больная сама, из постели продолжала менять принципы медицины на десятилетия вперёд."},
+  {sphere:"rest",name:"Чарльз Дарвин",
+   text:"Десятилетиями боролся с загадочной хронической болезнью и мог работать лишь короткими промежутками. Построил вокруг этого весь день — и написал «Происхождение видов», редко работая больше часа подряд."}
+];
+function showStory(s){
+  document.getElementById("story-name").textContent=s.name;
+  document.getElementById("story-text").textContent=s.text;
+  document.getElementById("story-modal").classList.remove("hidden");
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+}
+function closeStory(){
+  document.getElementById("story-modal").classList.add("hidden");
+}
 
 function demo(){
   const days=[],t=new Date();let w=84,seed=11,prev=7;
@@ -813,6 +857,16 @@ function startBlinkLoop(){
 
 function renderTotem(){
   applyTheme();
+  // Показываем находку, если она выпала при вчерашнем/сегодняшнем закрытии
+  // дня — мини-апп в Телеграме закрывается сразу после сохранения (sendData),
+  // так что показать её тогда же не получится, только при следующем заходе.
+  // Проверяем в самом начале — иначе ветка «Знакомство» ниже выходит раньше.
+  if(PET.pendingStory){
+    const _s=PET.pendingStory;
+    PET.pendingStory=null;
+    savePet();
+    setTimeout(()=>showStory(_s),500);
+  }
   const h=new Date().getHours(),m=mode();
   document.getElementById("hello").textContent=
     h<6?"Доброй ночи":h<12?"Доброе утро":h<18?"Добрый день":"Добрый вечер";
@@ -1286,6 +1340,12 @@ function save(){
     editDay=null;openCheckin();renderDays();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
     return;
+  }
+  if(Math.random()<0.15){
+    const matched=STORIES.filter(s=>s.sphere===weakest().code);
+    const pool=matched.length?matched:STORIES;
+    PET.pendingStory=pool[Math.floor(Math.random()*pool.length)];
+    savePet();
   }
   const out=logPacket();
   if(inTelegram){tg.sendData(out.packet);return;}
