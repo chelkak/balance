@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=29"></script>
+<script src="photos/list.js?v=30"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -162,6 +162,13 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   box-shadow:0 6px 24px rgba(0,0,0,.28);max-width:86vw;text-align:center}
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* Окно с находкой. display держим в классе, а не в теге: инлайновый стиль
+   сильнее класса, и «hidden» его не перебивал — окно висело поверх всего
+   с самого запуска и съедало все нажатия. */
+#story-modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;
+  justify-content:center;padding:20px;background:rgba(8,10,14,.6)}
+#story-modal.on{display:flex}
+
 /* Зверь живой: едва заметно дышит сам по себе */
 #totem-wrap .breathe{animation:breathe 4.6s ease-in-out infinite;transform-origin:center;width:100%;height:100%}
 @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.015)}}
@@ -203,7 +210,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <body>
 <div id="bg"></div><div id="scrim"></div>
 <div id="toast"></div>
-<div id="story-modal" class="hidden" style="position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(8,10,14,.6)" onclick="if(event.target===this)closeStory()">
+<div id="story-modal" onclick="if(event.target===this)closeStory()">
   <div class="g" style="max-width:360px;padding:22px" onclick="event.stopPropagation()">
     <div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Кто-то уже прошёл через это</div>
     <div class="fname" id="story-name" style="margin-top:6px"></div>
@@ -310,7 +317,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="29 · 12.08.2026 21:35";
+const APP_VERSION="30 · 12.08.2026 22:39";
 
 let toastTimer=null;
 function toast(text){
@@ -490,13 +497,14 @@ const STORIES=[
    text:"Десятилетиями боролся с загадочной хронической болезнью и мог работать лишь короткими промежутками. Построил вокруг этого весь день — и написал «Происхождение видов», редко работая больше часа подряд."}
 ];
 function showStory(s){
+  if(!s||!s.name||!s.text) return;      // пустое окно показывать нечего
   document.getElementById("story-name").textContent=s.name;
   document.getElementById("story-text").textContent=s.text;
-  document.getElementById("story-modal").classList.remove("hidden");
+  document.getElementById("story-modal").classList.add("on");
   if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
 }
 function closeStory(){
-  document.getElementById("story-modal").classList.add("hidden");
+  document.getElementById("story-modal").classList.remove("on");
 }
 
 function demo(){
@@ -846,6 +854,20 @@ function growthStepsPassed(){
   return Math.max(0,Math.min(GROWTH_STEPS,Math.floor(hours/GROWTH_STEP_H)));
 }
 const growthScale=()=>0.55+0.45*(growthStepsPassed()/GROWTH_STEPS);
+// Одно фото держится три дня, а шаг роста идёт раз в 6 часов: без этого
+// надпись «шаг 40 из 120» тикает, а глазами три дня не меняется ничего.
+// Внутри стадии рысь подрастает плавно (1 → 1.06), на смене кадра счётчик
+// обнуляется — рывок назад не виден, его закрывает кроссфейд на снимок
+// уже подросшего зверя.
+function withinStageScale(){
+  const steps=growthStepsPassed(), perStage=GROWTH_STEPS/PHOTO_FRAMES;
+  if(steps>=GROWTH_STEPS) return 1.06;          // вырос полностью — не откатываем
+  // Смена кадра считается через ceil, поэтому шаг 12 — ещё первая стадия,
+  // а шаг 13 — уже вторая. Без этого сдвига масштаб обнулялся на шаг раньше
+  // снимка: рысь на глазах уменьшалась, и прикрыть это было нечем.
+  const pos=steps<=0?0:((steps-1)%perStage)+1;
+  return 1+0.06*(pos/perStage);
+}
 function previewGrowth(day){
   PREVIEW_DAY=(day===null||day==="")?null:+day;
   const lbl=document.getElementById("preview-label");
@@ -899,6 +921,13 @@ function updatePhoto(){
   preloadNextPhoto();
   const night=document.getElementById("totem-night");
   if(night) night.style.opacity=timeKey()==="night"?"1":"0";
+  // Масштаб вешаем на сами снимки, а не на обёртку: обёртку уже занимают
+  // дыхание и «прогулка», два transform на одном элементе затирают друг друга.
+  const sc=withinStageScale();
+  ["photo-a","photo-b"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.style.transform=`scale(${sc})`; el.style.transition="opacity .8s ease, transform 3s ease"; }
+  });
 }
 // Тихо прогревает кэш браузера: следующую стадию роста и кадр моргания
 // для текущего состояния. Без этого первая смена дёргается — картинка
