@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=15"></script>
+<script src="photos/list.js?v=16"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -275,7 +275,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="15 · 12.08.2026 07:02";
+const APP_VERSION="16 · 12.08.2026 07:09";
 
 let toastTimer=null;
 function toast(text){
@@ -797,6 +797,14 @@ function renderTotem(){
 
   const проявлен=0.18+0.82*(rated().length/SPHERES.length);   // силуэт наливается по мере оценок
   s+=`<g transform="translate(${cx},${cy}) scale(${curl})" opacity="${проявлен}"><g class="breathe">`;
+  // Сплошная база тела — зверь всегда целый, даже если все сферы слабые.
+  // Раньше части тела гасли по отдельности при низких оценках, и вместо
+  // целого зверя было видно голову с полупрозрачными обрывками — «конструктор».
+  // Теперь сферы добавляют размер и деталь поверх этой базы, а не решают,
+  // существует часть или нет.
+  s+=`<ellipse cx="0" cy="16" rx="26" ry="24" fill="currentColor" opacity="${.5+dim*.5}"/>
+      <ellipse cx="-20" cy="44" rx="9" ry="6" fill="currentColor" opacity="${.5+dim*.5}"/>
+      <ellipse cx="20" cy="44" rx="9" ry="6" fill="currentColor" opacity="${.5+dim*.5}"/>`;
   // Хвост — «Деньги»: чем больше, тем пышнее
   s+=`<g class="bp sway-tail" data-code="money"><path d="M30 12 Q${60+v("money")*40} ${4-v("money")*20} ${58+v("money")*26} ${-24-v("money")*26}
       Q${86+v("money")*30} ${2-v("money")*10} ${58+v("money")*12} 36 Q44 44 30 34 Z"
