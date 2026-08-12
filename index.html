@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=34"></script>
+<script src="photos/list.js?v=35"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -310,7 +310,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="34 · 12.08.2026 23:49";
+const APP_VERSION="35 · 13.08.2026 00:24";
 
 let toastTimer=null;
 function toast(text){
@@ -1424,7 +1424,7 @@ function renderSummary(){
      <div class="dim" style="margin-top:8px">Сон ${v(edit.sleep)} ч · настроение ${v(edit.mood)} · энергия ${v(edit.energy)}</div>
      <div class="dim">Сферы: ${names}</div>
      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
-       <span class="dim">За день</span><span class="pts">+${got} ${plural(got,"балл","балла","баллов")}</span></div>`;
+       <span class="dim">Сфер зажглось</span><span class="pts">${edit.touched.length} из 12</span></div>`;
 }
 function readBody(){
   [["pulse","f-pulse"],["weight","f-weight"],["steps","f-steps"],["dist","f-dist"]].forEach(([k,id])=>{
@@ -1463,7 +1463,7 @@ function save(){
   const out=logPacket();
   if(inTelegram){tg.sendData(out.packet);return;}
   renderTotem();go("totem");
-  toast("День записан · +"+got+" "+plural(got,"балл","балла","баллов"));
+  toast("День записан");
 }
 
 // ── Колесо: неделя / месяц / год ─────────────────────────────────────
