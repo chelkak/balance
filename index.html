@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=27"></script>
+<script src="photos/list.js?v=28"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -310,7 +310,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="27 · 12.08.2026 21:15";
+const APP_VERSION="28 · 12.08.2026 21:21";
 
 let toastTimer=null;
 function toast(text){
@@ -577,7 +577,77 @@ const todayKey=()=>keyOf(new Date());
 const LOG_DAYS=30, LOG_LIMIT=3600;
 function loadLog(){try{return JSON.parse(localStorage.getItem("log")||"{}");}catch(e){return {};}}
 let LOG=loadLog();
-const saveLog=()=>localStorage.setItem("log",JSON.stringify(LOG));
+const saveLog=()=>{localStorage.setItem("log",JSON.stringify(LOG));cloudSave();};
+
+// ── Облако Телеграма ─────────────────────────────────────────────────
+// localStorage живёт в одном браузере на одном устройстве: открыл на
+// компьютере — там пусто, потому что это другой браузер. CloudStorage
+// привязан к аккаунту Телеграма, а не к железу, и синхронизируется сам
+// между всеми устройствами, где ты вошёл. Работает только внутри
+// Телеграма; если открыть сайт в обычном браузере — тихо ничего не делает,
+// приложение продолжает работать на локальной памяти, как раньше.
+let CLOUD=(tg&&tg.CloudStorage&&inTelegram)?tg.CloudStorage:null;
+const CHUNK=3500;                      // у одного значения предел 4096 символов
+let cloudTimer=null, cloudReady=false;
+
+function cloudSave(){
+  if(!CLOUD||!cloudReady) return;
+  // Пишем не чаще раза в 2 секунды: чек-ин дёргает сохранение много раз подряд
+  clearTimeout(cloudTimer);
+  cloudTimer=setTimeout(()=>{
+    const log=JSON.stringify(LOG);
+    const parts=Math.max(1,Math.ceil(log.length/CHUNK));
+    CLOUD.setItem("log_n",String(parts),()=>{});
+    for(let i=0;i<parts;i++) CLOUD.setItem("log_"+i,log.slice(i*CHUNK,(i+1)*CHUNK),()=>{});
+    CLOUD.setItem("wheel",JSON.stringify(DATA.wheel),()=>{});
+    CLOUD.setItem("goals",JSON.stringify(DATA.goals),()=>{});
+    CLOUD.setItem("pet",JSON.stringify(PET),()=>{});
+  },2000);
+}
+
+function cloudLoad(done){
+  if(!CLOUD){done&&done(false);return;}
+  CLOUD.getItem("log_n",(err,n)=>{
+    if(err||!n){cloudReady=true;done&&done(false);return;}
+    const parts=+n||1, keys=[];
+    for(let i=0;i<parts;i++) keys.push("log_"+i);
+    CLOUD.getItems(keys.concat(["wheel","goals","pet"]),(e2,got)=>{
+      cloudReady=true;
+      if(e2||!got){done&&done(false);return;}
+      try{
+        let raw="";
+        for(let i=0;i<parts;i++) raw+=got["log_"+i]||"";
+        const cloudLog=raw?JSON.parse(raw):{};
+        // Дни объединяем по дате. При совпадении оставляем местную запись:
+        // её только что редактировали руками, она свежее облачной копии.
+        LOG={...cloudLog,...LOG};
+        localStorage.setItem("log",JSON.stringify(LOG));
+
+        if(got.wheel){
+          const cw=JSON.parse(got.wheel);
+          // Пустые оценки не должны затирать заполненные — на новом
+          // устройстве колесо пустое, и без этой проверки оно бы стёрло облачное.
+          SPHERES.forEach(s=>{ if(!(DATA.wheel[s.code]>0)&&cw[s.code]>0) DATA.wheel[s.code]=cw[s.code]; });
+          localStorage.setItem("wheel",JSON.stringify(DATA.wheel));
+        }
+        if(got.goals){DATA.goals={...JSON.parse(got.goals),...DATA.goals};
+          localStorage.setItem("goals",JSON.stringify(DATA.goals));}
+        if(got.pet){
+          const cp=JSON.parse(got.pet);
+          // Зверь родился однажды — берём самую раннюю дату из двух.
+          PET.bornAt=Math.min(PET.bornAt||Date.now(),cp.bornAt||Date.now());
+          PET.days={...(cp.days||{}),...(PET.days||{})};
+          PET.bonus=Math.max(PET.bonus||0,cp.bonus||0);
+          PET.spent=Math.max(PET.spent||0,cp.spent||0);
+          localStorage.setItem("pet",JSON.stringify(PET));
+        }
+        mergeLog();
+        DATA.today=todayState();
+        done&&done(true);
+      }catch(err){done&&done(false);}
+    });
+  });
+}
 
 function logPacket(){
   const size=days=>JSON.stringify({type:"log",days}).length;
@@ -662,7 +732,7 @@ const LS=JSON.parse(localStorage.getItem("pet")||"{}");
 let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          days:LS.days||{}, spent:LS.spent||0, owned:LS.owned||[], bornAt:LS.bornAt||Date.now(),
          doneTasks:(LS.tasksOn===todayKey()?LS.doneTasks:[])||[], tasksOn:todayKey()};
-const savePet=()=>localStorage.setItem("pet",JSON.stringify(PET));
+const savePet=()=>{localStorage.setItem("pet",JSON.stringify(PET));cloudSave();};
 if(!LS.bornAt) savePet();   // фиксируем момент рождения зверя раз и навсегда
 
 // Переезд со старой версии: баллы раньше считались по окну, теперь копятся.
@@ -1431,6 +1501,7 @@ function renderWheel(){
     const знакомство=rated().length<SPHERES.length;      // ещё не все сферы оценены
     DATA.wheel[d.code]=+el.dataset.n;
     localStorage.setItem("wheel",JSON.stringify(DATA.wheel));
+    cloudSave();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
 
     if(!знакомство){ renderWheel(); return; }            // правим оценку задним числом — не прыгаем
@@ -1544,6 +1615,13 @@ mergeLog();
 DATA.today=todayState();     // новый день начинается с чистого листа
 go("totem");
 setInterval(applyTheme,60000);
+
+// Подтягиваем облако уже после первой отрисовки: экран показывается сразу
+// на местных данных, а когда придёт ответ Телеграма — обновляем.
+cloudLoad(changed=>{
+  if(changed){ renderTotem(); toast("Данные подтянулись из твоего Телеграма"); }
+  cloudSave();               // первый заход на устройстве — заливаем своё в облако
+});
 </script>
 </body>
 </html>
