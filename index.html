@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=17"></script>
+<script src="photos/list.js?v=18"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -184,6 +184,19 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 /* Тыкнуть зверя — маленький живой отклик, без ухода и требований */
 #totem.poked .breathe{animation:poke .5s ease-out}
 @keyframes poke{0%{transform:scale(1)}30%{transform:scale(.96,1.05)}60%{transform:scale(1.03,.97)}100%{transform:scale(1)}}
+
+/* Раз в 14 секунд зверь оживает сам: шажок туда-сюда, крутанулся — и снова
+   смотрит на нас. Не мультик на весь экран, а редкий момент, который ловишь боковым зрением */
+#totem .idle-play{animation:idlePlay 14s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes idlePlay{
+  0%,72%{transform:translateX(0) scaleX(1) rotate(0deg)}
+  76%{transform:translateX(-6px) scaleX(1) rotate(-4deg)}
+  80%{transform:translateX(6px) scaleX(1) rotate(4deg)}
+  84%{transform:translateX(0) scaleX(.15) rotate(0deg)}
+  88%{transform:translateX(0) scaleX(1) rotate(0deg)}
+  100%{transform:translateX(0) scaleX(1) rotate(0deg)}
+}
+@media (prefers-reduced-motion:reduce){#totem .idle-play{animation:none}}
 </style>
 </head>
 <body>
@@ -198,6 +211,13 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <svg id="totem" viewBox="0 0 320 320" width="100%" style="max-width:340px;cursor:pointer" onclick="pokeTotem()"></svg>
   </div>
   <div class="g" id="totem-state" style="margin-top:12px"></div>
+  <div class="g" style="margin-top:12px">
+    <div class="lead" style="font-size:13px">Посмотреть рост наперёд</div>
+    <div class="dim" id="preview-label" style="margin:4px 0 8px">Сейчас, по-настоящему</div>
+    <input type="range" id="preview-slider" min="0" max="30" value="30" step="1"
+      style="width:100%" oninput="previewGrowth(this.value)">
+    <button class="btn ghost" style="margin-top:8px" onclick="previewGrowth(null)">Вернуть настоящий рост</button>
+  </div>
   <button class="btn" onclick="go('today')">Что сегодня</button>
 </section>
 
@@ -275,7 +295,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="17 · 12.08.2026 07:13";
+const APP_VERSION="18 · 12.08.2026 07:34";
 
 let toastTimer=null;
 function toast(text){
@@ -772,11 +792,21 @@ function milestonesSVG(cx,cy){
 // это и есть разница между «растёт» и «наказывает за паузу». Обсуждали
 // это трижды — решение Александра, зафиксировано в мое_сердце.md.
 const GROWTH_STEP_H=6, GROWTH_STEPS=30*24/6;   // 120 шагов за 30 дней
+// Слайдер на тотеме подставляет сюда день вместо настоящего времени —
+// чтобы можно было пролистать все 30 дней и увидеть рост сразу, не ждать.
+let PREVIEW_DAY=null;
 function growthStepsPassed(){
+  if(PREVIEW_DAY!=null) return Math.max(0,Math.min(GROWTH_STEPS,Math.round(PREVIEW_DAY*24/GROWTH_STEP_H)));
   const hours=(Date.now()-(PET.bornAt||Date.now()))/3600000;
   return Math.max(0,Math.min(GROWTH_STEPS,Math.floor(hours/GROWTH_STEP_H)));
 }
 const growthScale=()=>0.55+0.45*(growthStepsPassed()/GROWTH_STEPS);
+function previewGrowth(day){
+  PREVIEW_DAY=(day===null||day==="")?null:+day;
+  const lbl=document.getElementById("preview-label");
+  if(lbl) lbl.textContent=PREVIEW_DAY===null?"Сейчас, по-настоящему":`День ${PREVIEW_DAY} из 30`;
+  renderTotem();
+}
 
 function renderTotem(){
   applyTheme();
@@ -797,6 +827,13 @@ function renderTotem(){
   const op=c=>(.12+v(c)*.88)*dim;                  // слабая часть полупрозрачна, не уродлива
 
   let s="";
+  // Мягкая подсветка сверху-слева — даёт телу объём вместо плоской заливки.
+  // stop-opacity, не stop-color: остаётся в цвете темы, просто гуще к краю.
+  s+=`<defs><radialGradient id="furGrad" cx="38%" cy="30%" r="75%">
+    <stop offset="0%" stop-color="currentColor" stop-opacity="1"/>
+    <stop offset="65%" stop-color="currentColor" stop-opacity=".94"/>
+    <stop offset="100%" stop-color="currentColor" stop-opacity=".8"/>
+  </radialGradient></defs>`;
   // Земля под лапами — сфера «Дом»
   s+=`<g class="bp" data-code="env"><ellipse cx="${cx}" cy="${cy+66}" rx="${52+v("env")*46}" ry="${9+v("env")*7}"
       fill="currentColor" opacity="${op("env")*.28}"/></g>`;
@@ -809,15 +846,15 @@ function renderTotem(){
       opacity="${op("spirit")*.1}"/></g>`;
 
   const проявлен=0.18+0.82*(rated().length/SPHERES.length);   // силуэт наливается по мере оценок
-  s+=`<g transform="translate(${cx},${cy}) scale(${curl*growthScale()})" opacity="${проявлен}"><g class="breathe">`;
+  s+=`<g transform="translate(${cx},${cy}) scale(${curl*growthScale()})" opacity="${проявлен}"><g class="idle-play"><g class="breathe">`;
   // Сплошная база тела — зверь всегда целый, даже если все сферы слабые.
   // Раньше части тела гасли по отдельности при низких оценках, и вместо
   // целого зверя было видно голову с полупрозрачными обрывками — «конструктор».
   // Теперь сферы добавляют размер и деталь поверх этой базы, а не решают,
   // существует часть или нет.
-  s+=`<ellipse cx="0" cy="16" rx="26" ry="24" fill="currentColor" opacity="${.5+dim*.5}"/>
-      <ellipse cx="-20" cy="44" rx="9" ry="6" fill="currentColor" opacity="${.5+dim*.5}"/>
-      <ellipse cx="20" cy="44" rx="9" ry="6" fill="currentColor" opacity="${.5+dim*.5}"/>`;
+  s+=`<ellipse cx="0" cy="16" rx="26" ry="24" fill="url(#furGrad)" opacity="${.5+dim*.5}"/>
+      <ellipse cx="-20" cy="44" rx="9" ry="6" fill="url(#furGrad)" opacity="${.5+dim*.5}"/>
+      <ellipse cx="20" cy="44" rx="9" ry="6" fill="url(#furGrad)" opacity="${.5+dim*.5}"/>`;
   // Хвост — «Деньги»: чем больше, тем пышнее
   s+=`<g class="bp sway-tail" data-code="money"><path d="M30 12 Q${60+v("money")*40} ${4-v("money")*20} ${58+v("money")*26} ${-24-v("money")*26}
       Q${86+v("money")*30} ${2-v("money")*10} ${58+v("money")*12} 36 Q44 44 30 34 Z"
@@ -829,7 +866,7 @@ function renderTotem(){
       fill="currentColor" opacity="${op("family")}"/></g>`;
   // Корпус — «Здоровье»
   s+=`<g class="bp" data-code="health"><ellipse cx="0" cy="16" rx="${26+v("health")*16}" ry="${24+v("health")*14}"
-      fill="currentColor" opacity="${op("health")}"/></g>`;
+      fill="url(#furGrad)" opacity="${op("health")}"/></g>`;
   // Окрас — «Внешность»: светлая грудь
   s+=`<g class="bp" data-code="look"><ellipse cx="0" cy="30" rx="${14+v("look")*12}" ry="${9+v("look")*8}"
       fill="currentColor" opacity="${op("look")*.35}"/></g>`;
@@ -850,7 +887,7 @@ function renderTotem(){
       <path d="M24 -40 L${28+v("friends")*10} ${-64-v("friends")*30} L6 -52 Z"
       fill="currentColor" opacity="${op("friends")}"/></g>`;
   // Голова
-  s+=`<ellipse cx="0" cy="-30" rx="26" ry="23" fill="currentColor" opacity="${.55+dim*.45}"/>`;
+  s+=`<ellipse cx="0" cy="-30" rx="26" ry="23" fill="url(#furGrad)" opacity="${.55+dim*.45}"/>`;
   // Глаза — «Отдых»: чем меньше отдыха, тем уже
   const eye=m==="red"?1.6:2+v("rest")*3.4;
   s+=`<g class="bp eyes" data-code="rest"><ellipse cx="-10" cy="-34" rx="3.6" ry="${eye}" fill="#0d1014"/>
@@ -867,7 +904,7 @@ function renderTotem(){
         <path d="M26 -24 L${26+w} -28 M26 -19 L${27+w} -17" stroke="#0d1014"
         stroke-width="1.3" opacity="${op("comm")*.45}" stroke-linecap="round"/></g>`;
   }
-  s+=`</g></g>`;
+  s+=`</g></g></g>`;
 
   // Подписи сфер по кругу — какая часть чья
   SPHERES.forEach((d,i)=>{const a=-Math.PI/2+i*step+step/2;
