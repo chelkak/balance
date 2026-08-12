@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=31"></script>
+<script src="photos/list.js?v=32"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -310,7 +310,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="31 · 12.08.2026 23:17";
+const APP_VERSION="32 · 12.08.2026 23:26";
 
 let toastTimer=null;
 function toast(text){
@@ -1110,12 +1110,13 @@ function renderTotem(){
       :m==="yellow"?"Притих, но с ним всё хорошо"
       :"Бодр и спокоен");
 
+  // Копилку баллов не показываем: тратить их негде с тех пор, как убрали
+  // лавку. Число, которое только растёт и ничего не делает, — пустой шум.
+  // Само начисление осталось: оно уезжает боту в отчёте (поле pt).
   document.getElementById("totem-state").innerHTML=
-    `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div><div class="lead">Зрелость ${maturity().toFixed(1)} из 10</div>
+    `<div><div class="lead">Зрелость ${maturity().toFixed(1)} из 10</div>
         <div class="fname" style="margin:5px 0 0">${PET.name||state}</div>
         ${PET.name?`<div class="dim" style="margin-top:3px">${state}</div>`:""}</div>
-      <div class="pts">${balance()} ${plural(balance(),"балл","балла","баллов")}</div></div>
      ${nameBlock()}
      ${сколько<SPHERES.length
        ? `<div class="dim" style="margin-top:12px">Оценено ${сколько} из ${SPHERES.length}.${PHOTO_MODE?"":
