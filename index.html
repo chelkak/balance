@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=32"></script>
+<script src="photos/list.js?v=33"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -310,7 +310,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="32 · 12.08.2026 23:26";
+const APP_VERSION="33 · 12.08.2026 23:45";
 
 let toastTimer=null;
 function toast(text){
@@ -1223,12 +1223,10 @@ function renderPuzzle(){
   box.style.display=""; if(title) title.style.display="";
   const paid=PET.puzzleOn===todayKey();
   PZ=PZ||makePuzzle();
-  box.innerHTML=`<div class="lead">Внимание и логика${paid?"":" · +20 баллов"}</div>
+  box.innerHTML=`<div class="lead">Внимание и логика</div>
     <div style="font:600 18px var(--fd);margin-top:8px">${PZ.q}</div>
     <div class="opts">${PZ.opts.map(o=>`<div class="opt" data-v="${o}">${o}</div>`).join("")}</div>
-    <div class="dim" style="margin-top:12px">${paid
-      ? "Баллы за сегодня получены — эти просто для головы."
-      : "Ошибся — не страшно, попробуй ещё."}</div>
+    <div class="dim" style="margin-top:12px">Ошибся — не страшно, попробуй ещё.</div>
     <button class="btn ghost" onclick="nextPuzzle()">Другая задачка</button>`;
   box.querySelectorAll(".opt").forEach(el=>el.onclick=()=>{
     const ok=+el.dataset.v===PZ.ans;
