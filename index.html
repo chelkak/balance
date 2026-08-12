@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=30"></script>
+<script src="photos/list.js?v=31"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -238,13 +238,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     </div>
   </div>
   <div class="g" id="totem-state" style="margin-top:12px"></div>
-  <div class="g" style="margin-top:12px">
-    <div class="lead" style="font-size:13px">Посмотреть рост наперёд</div>
-    <div class="dim" id="preview-label" style="margin:4px 0 8px">Сейчас, по-настоящему</div>
-    <input type="range" id="preview-slider" min="0" max="30" value="30" step="1"
-      style="width:100%" oninput="previewGrowth(this.value)">
-    <button class="btn ghost" style="margin-top:8px" onclick="previewGrowth(null)">Вернуть настоящий рост</button>
-  </div>
   <button class="btn" onclick="go('today')">Что сегодня</button>
 </section>
 
@@ -317,7 +310,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="30 · 12.08.2026 22:39";
+const APP_VERSION="31 · 12.08.2026 23:17";
 
 let toastTimer=null;
 function toast(text){
@@ -845,11 +838,7 @@ function milestonesSVG(cx,cy){
 // это и есть разница между «растёт» и «наказывает за паузу». Обсуждали
 // это трижды — решение Александра, зафиксировано в мое_сердце.md.
 const GROWTH_STEP_H=6, GROWTH_STEPS=30*24/6;   // 120 шагов за 30 дней
-// Слайдер на тотеме подставляет сюда день вместо настоящего времени —
-// чтобы можно было пролистать все 30 дней и увидеть рост сразу, не ждать.
-let PREVIEW_DAY=null;
 function growthStepsPassed(){
-  if(PREVIEW_DAY!=null) return Math.max(0,Math.min(GROWTH_STEPS,Math.round(PREVIEW_DAY*24/GROWTH_STEP_H)));
   const hours=(Date.now()-(PET.bornAt||Date.now()))/3600000;
   return Math.max(0,Math.min(GROWTH_STEPS,Math.floor(hours/GROWTH_STEP_H)));
 }
@@ -868,13 +857,6 @@ function withinStageScale(){
   const pos=steps<=0?0:((steps-1)%perStage)+1;
   return 1+0.06*(pos/perStage);
 }
-function previewGrowth(day){
-  PREVIEW_DAY=(day===null||day==="")?null:+day;
-  const lbl=document.getElementById("preview-label");
-  if(lbl) lbl.textContent=PREVIEW_DAY===null?"Сейчас, по-настоящему":`День ${PREVIEW_DAY} из 30`;
-  renderTotem();
-}
-
 // Фото-режим: если в webapp/pet/ лежат 1.png..10.png — переключаемся на них
 // сами, без правки кода. Нет файлов — работает как раньше, вектор. Сферы
 // на зверя больше не влияют, это теперь только колесо; рост тут только по
@@ -1140,7 +1122,7 @@ function renderTotem(){
             " Неоценённые части ещё не проросли — зверь проявится целиком, когда пройдёшь все."}</div>
           <button class="btn ghost" onclick="startRating()">Дооценить сферы</button>`
        : ""}
-     ${Math.max(...rated())===low
+     ${allRated()&&Math.max(...rated())===low
        ? `<div class="dim" style="margin-top:12px">Все двенадцать сфер пока на ${low} — колесо ровное.
             Оценки ставятся на вкладке «Колесо»${PHOTO_MODE?"":", от них и растут части зверя"}.</div>`
        : `<div class="row" style="margin-top:14px"><div class="rlabel">Слабее всего</div>
