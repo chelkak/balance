@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=11"></script>
+<script src="photos/list.js?v=12"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -185,6 +185,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   </div>
   <div class="g" id="totem-state" style="margin-top:12px"></div>
   <button class="btn" onclick="go('today')">Что сегодня</button>
+  <h2>Мир вокруг зверя</h2>
+  <div class="g" id="world-shop"></div>
   <h2 id="puzzle-title">Задачка дня</h2>
   <div class="g" id="puzzle"></div>
 </section>
@@ -257,7 +259,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="11 · 12.08.2026 04:36";
+const APP_VERSION="12 · 12.08.2026 04:59";
 
 let toastTimer=null;
 function toast(text){
@@ -571,7 +573,7 @@ if(savedWheel) DATA.wheel={...DATA.wheel,...savedWheel};
 
 const LS=JSON.parse(localStorage.getItem("pet")||"{}");
 let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
-         days:LS.days||{}, spent:LS.spent||0,
+         days:LS.days||{}, spent:LS.spent||0, owned:LS.owned||[],
          doneTasks:(LS.tasksOn===todayKey()?LS.doneTasks:[])||[], tasksOn:todayKey()};
 const savePet=()=>localStorage.setItem("pet",JSON.stringify(PET));
 
@@ -634,9 +636,72 @@ const BASICS=["Встать с кровати","Выпить воды и пое�
 // ── Тотем ────────────────────────────────────────────────────────────
 // Сытость и кормёжка убраны намеренно: шкала, падающая по таймеру, — это
 // тот же «не разорви цепочку», только в костюме заботы о звере.
-// Лавка тоже убрана, и список товаров вместе с ней: покупка, которая ничего
-// не меняет, — это пустая кнопка. Вернётся, когда шкура будет видна
-// на звере, а территория — в его мире. Описание лежит в IDEAS.md.
+
+// Мир вокруг зверя — совет №3: баллы тратятся не на самого зверя (его нельзя
+// купить — он и есть колесо), а на поляну вокруг. Купленное остаётся навсегда,
+// ухода не требует. Цены и темп трат (≈510 баллов в неделю при горении 37 из 84)
+// уже проверены советом, специально не меняю.
+const ITEMS=[
+  {id:"flower",  t:"Полевой цветок",     p:50,   kind:"flower"},
+  {id:"pebbles", t:"Камешки на тропе",   p:150,  kind:"pebbles"},
+  {id:"lantern", t:"Фонарик у поляны",   p:350,  kind:"lantern"},
+  {id:"stream",  t:"Ручей на поляне",    p:800,  kind:"stream"},
+  {id:"meadow",  t:"Поле цветов",        p:1200, kind:"meadow"},
+  {id:"starstone",t:"Звёздный камень",   p:2000, kind:"starstone"},
+];
+function buyItem(id){
+  const it=ITEMS.find(x=>x.id===id);
+  if(!it) return;
+  PET.owned=PET.owned||[];
+  if(PET.owned.includes(id)) return;
+  if(balance()<it.p){toast("Не хватает баллов");return;}
+  PET.owned.push(id);
+  PET.spent=(PET.spent||0)+it.p;
+  savePet();
+  toast(it.t+" теперь в мире зверя");
+  renderTotem();
+}
+function renderWorldShop(){
+  const box=document.getElementById("world-shop");
+  if(!box) return;
+  const bal=balance(),owned=PET.owned||[];
+  box.innerHTML=`<div class="spheres">`+ITEMS.map(it=>{
+    const isOwned=owned.includes(it.id),can=!isOwned&&bal>=it.p;
+    return `<div class="item ${isOwned||can?"":"locked"}" ${isOwned?"":`onclick="buyItem('${it.id}')"`}>
+      <div class="t">${isOwned?"✓ ":""}${it.t}</div>
+      <div class="p">${isOwned?"уже в мире":it.p+" "+plural(it.p,"балл","балла","баллов")}</div>
+    </div>`;
+  }).join("")+`</div>
+  <div class="dim" style="margin-top:10px">Остаётся в мире зверя навсегда — ухода не требует. Самого зверя купить нельзя, он и есть твоё колесо.</div>`;
+}
+// Что нарисовать на поляне для купленного предмета. x,y — точка на земле.
+const WORLD_DRAW={
+  flower:(x,y)=>`<circle cx="${x}" cy="${y}" r="1.8" fill="#f2c14e"/>
+    <circle cx="${x-2.6}" cy="${y-1.6}" r="1.6" fill="#e78fb3"/><circle cx="${x+2.6}" cy="${y-1.6}" r="1.6" fill="#e78fb3"/>
+    <circle cx="${x}" cy="${y-3.4}" r="1.6" fill="#e78fb3"/><circle cx="${x}" cy="${y+1.2}" r="1.6" fill="#e78fb3"/>`,
+  pebbles:(x,y)=>`<ellipse cx="${x-4}" cy="${y}" rx="2.2" ry="1.3" fill="currentColor" opacity=".5"/>
+    <ellipse cx="${x+2}" cy="${y+1.2}" rx="2.6" ry="1.5" fill="currentColor" opacity=".42"/>
+    <ellipse cx="${x+6}" cy="${y-.6}" rx="1.7" ry="1.1" fill="currentColor" opacity=".48"/>`,
+  lantern:(x,y)=>`<line x1="${x}" y1="${y}" x2="${x}" y2="${y-13}" stroke="currentColor" stroke-width="1.3" opacity=".5"/>
+    <circle cx="${x}" cy="${y-15}" r="6" fill="#ffd27a" opacity=".22"/><circle cx="${x}" cy="${y-15}" r="3" fill="#ffd27a"/>`,
+  stream:(x,y)=>`<path d="M${x-24} ${y+3} Q${x-8} ${y-4} ${x+8} ${y+2} Q${x+20} ${y+7} ${x+30} ${y+1}"
+    stroke="#6fb3d9" stroke-width="4.5" fill="none" stroke-linecap="round" opacity=".55"/>`,
+  meadow:(x,y)=>[[-14,-2],[-6,2],[2,-3],[9,1],[15,-1]].map(([dx,dy])=>
+    `<circle cx="${x+dx}" cy="${y+dy}" r="1.3" fill="#f2c14e"/>
+     <circle cx="${x+dx-1.8}" cy="${y+dy-1.1}" r="1.1" fill="#e78fb3"/><circle cx="${x+dx+1.8}" cy="${y+dy-1.1}" r="1.1" fill="#e78fb3"/>
+     <circle cx="${x+dx}" cy="${y+dy-2.3}" r="1.1" fill="#e78fb3"/>`).join(""),
+  starstone:(x,y)=>`<circle cx="${x}" cy="${y-4}" r="9" fill="#b79af0" opacity=".22"/>
+    <polygon points="${x},${y-11} ${x+6},${y-3} ${x+3},${y+5} ${x-3},${y+5} ${x-6},${y-3}" fill="#b79af0"/>`,
+};
+const WORLD_X=[-55,-33,-11,11,33,55];
+function worldSVG(cx,cy){
+  const y=cy+62;
+  return (PET.owned||[]).map((id,i)=>{
+    const it=ITEMS.find(x=>x.id===id);
+    if(!it) return "";
+    return `<g class="world-item">${WORLD_DRAW[it.kind](cx+WORLD_X[i%WORLD_X.length],y)}</g>`;
+  }).join("");
+}
 
 // Уровней и очков опыта больше нет: зверь — это и есть твоё колесо.
 // Зрелость — среднее по двенадцати сферам, слабейшая показывает, куда расти.
@@ -667,6 +732,8 @@ function renderTotem(){
   // Земля под лапами — сфера «Дом»
   s+=`<g class="bp" data-code="env"><ellipse cx="${cx}" cy="${cy+66}" rx="${52+v("env")*46}" ry="${9+v("env")*7}"
       fill="currentColor" opacity="${op("env")*.28}"/></g>`;
+  // Купленный мир вокруг зверя — остаётся навсегда, не зависит от роста сфер
+  s+=worldSVG(cx,cy);
   // Свечение — «Духовность»
   s+=`<g class="bp" data-code="spirit"><circle cx="${cx}" cy="${cy-6}" r="${74+v("spirit")*40}" fill="currentColor"
       opacity="${op("spirit")*.1}"/></g>`;
@@ -761,6 +828,7 @@ function renderTotem(){
        <button class="btn" onclick="startRating()">Собрать зверя</button>
        ${hasData()?"":`<button class="btn ghost" onclick="showDemo(true)">Посмотреть на примере</button>`}`;
     renderPuzzle();
+    renderWorldShop();
     return;
   }
   const low=Math.min(...rated()),w=weakest(),str=strongest();
@@ -796,6 +864,7 @@ function renderTotem(){
          : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`;
 
   renderPuzzle();
+  renderWorldShop();
 }
 
 // ── Задачка дня ──────────────────────────────────────────────────────
