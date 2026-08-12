@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=14"></script>
+<script src="photos/list.js?v=15"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -170,6 +170,20 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 /* Части, которые выросли со вчера, тихо вспыхивают при заходе */
 #totem .bp.flash{animation:flash 2.8s ease-out}
 @keyframes flash{0%{filter:drop-shadow(0 0 0 transparent)}25%{filter:drop-shadow(0 0 7px var(--accent))}100%{filter:drop-shadow(0 0 0 transparent)}}
+
+/* Хвост и уши едва покачиваются — каждый в своём ритме, чтобы не выглядело роботом */
+#totem .sway-tail{animation:swayTail 3.6s ease-in-out infinite;transform-box:fill-box;transform-origin:15% 85%}
+@keyframes swayTail{0%,100%{transform:rotate(0deg)}50%{transform:rotate(4deg)}}
+#totem .sway-ears{animation:swayEars 5.2s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+@keyframes swayEars{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-2deg)}}
+/* Редкое моргание — не мультяшное подмигивание, а раз в несколько секунд */
+#totem .eyes{animation:blink 6.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.12)}}
+@media (prefers-reduced-motion:reduce){#totem .sway-tail,#totem .sway-ears,#totem .eyes{animation:none}}
+
+/* Тыкнуть зверя — маленький живой отклик, без ухода и требований */
+#totem.poked .breathe{animation:poke .5s ease-out}
+@keyframes poke{0%{transform:scale(1)}30%{transform:scale(.96,1.05)}60%{transform:scale(1.03,.97)}100%{transform:scale(1)}}
 </style>
 </head>
 <body>
@@ -181,7 +195,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="head"><h1 id="hello"></h1><div class="sub" id="totem-date"></div></div>
   <div class="themes" id="themes"></div>
   <div class="g" style="text-align:center;padding:8px">
-    <svg id="totem" viewBox="0 0 320 320" width="100%" style="max-width:340px"></svg>
+    <svg id="totem" viewBox="0 0 320 320" width="100%" style="max-width:340px;cursor:pointer" onclick="pokeTotem()"></svg>
   </div>
   <div class="g" id="totem-state" style="margin-top:12px"></div>
   <button class="btn" onclick="go('today')">Что сегодня</button>
@@ -196,7 +210,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="head"><h1>Сегодня</h1><div class="sub" id="today-date"></div></div>
   <div class="g quote" id="quote"></div>
   <div id="today-body"></div>
-  <div class="stats" id="today-stats"></div>
   <h2 id="puzzle-title">Задачка дня</h2>
   <div class="g" id="puzzle"></div>
 </section>
@@ -262,7 +275,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="14 · 12.08.2026 06:43";
+const APP_VERSION="15 · 12.08.2026 07:02";
 
 let toastTimer=null;
 function toast(text){
@@ -646,10 +659,14 @@ const BASICS=["Встать с кровати","Выпить воды и пое�
 // уже проверены советом, специально не меняю.
 const ITEMS=[
   {id:"flower",  t:"Полевой цветок",     p:50,   kind:"flower"},
+  {id:"mushroom",t:"Гриб-фонарик",       p:90,   kind:"mushroom"},
   {id:"pebbles", t:"Камешки на тропе",   p:150,  kind:"pebbles"},
   {id:"lantern", t:"Фонарик у поляны",   p:350,  kind:"lantern"},
+  {id:"swing",   t:"Качели из лозы",     p:450,  kind:"swing"},
+  {id:"campfire",t:"Костёр",             p:650,  kind:"campfire"},
   {id:"stream",  t:"Ручей на поляне",    p:800,  kind:"stream"},
   {id:"meadow",  t:"Поле цветов",        p:1200, kind:"meadow"},
+  {id:"rainbow", t:"Радуга после дождя", p:1600, kind:"rainbow"},
   {id:"starstone",t:"Звёздный камень",   p:2000, kind:"starstone"},
 ];
 function buyItem(id){
@@ -696,8 +713,18 @@ const WORLD_DRAW={
      <circle cx="${x+dx}" cy="${y+dy-2.3}" r="1.1" fill="#e78fb3"/>`).join(""),
   starstone:(x,y)=>`<circle cx="${x}" cy="${y-4}" r="9" fill="#b79af0" opacity=".22"/>
     <polygon points="${x},${y-11} ${x+6},${y-3} ${x+3},${y+5} ${x-3},${y+5} ${x-6},${y-3}" fill="#b79af0"/>`,
+  mushroom:(x,y)=>`<line x1="${x}" y1="${y}" x2="${x}" y2="${y-6}" stroke="#c9a876" stroke-width="1.6" opacity=".6"/>
+    <ellipse cx="${x}" cy="${y-8}" rx="4" ry="2.6" fill="#e0637a"/><circle cx="${x}" cy="${y-8}" r="5.5" fill="#ffd27a" opacity=".18"/>`,
+  swing:(x,y)=>`<line x1="${x-8}" y1="${y-20}" x2="${x-5}" y2="${y-2}" stroke="#8a6a4a" stroke-width="1.1" opacity=".55"/>
+    <line x1="${x+8}" y1="${y-20}" x2="${x+5}" y2="${y-2}" stroke="#8a6a4a" stroke-width="1.1" opacity=".55"/>
+    <rect x="${x-6}" y="${y-4}" width="12" height="3" rx="1.4" fill="#8a6a4a" opacity=".7"/>`,
+  campfire:(x,y)=>`<path d="M${x-6} ${y} L${x+6} ${y-2} M${x-5} ${y-1} L${x+5} ${y-3}" stroke="#6b4a34" stroke-width="2" opacity=".6"/>
+    <ellipse cx="${x}" cy="${y-6}" rx="3.2" ry="5" fill="#ff8a4a"/><ellipse cx="${x}" cy="${y-6}" rx="7" ry="9" fill="#ff8a4a" opacity=".2"/>`,
+  rainbow:(x,y)=>[0,-3,-6].map((dy,i)=>
+    `<path d="M${x-22} ${y+2+dy} A22 22 0 0 1 ${x+22} ${y+2+dy}" stroke="${["#e08a8a","#e0c86a","#7ab8a8"][i]}"
+      stroke-width="2.2" fill="none" opacity=".5"/>`).join(""),
 };
-const WORLD_X=[-55,-33,-11,11,33,55];
+const WORLD_X=[-63,-49,-35,-21,-7,7,21,35,49,63];
 function worldSVG(cx,cy){
   const y=cy+62;
   return (PET.owned||[]).map((id,i)=>{
@@ -713,6 +740,30 @@ const scores=()=>SPHERES.map(s=>DATA.wheel[s.code]||0);
 const rated=()=>scores().filter(v=>v>0);                 // сколько сфер оценено
 const maturity=()=>{const v=rated();return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;};
 const allRated=()=>rated().length===SPHERES.length;
+
+// «Путь с тобой» — сколько календарных дней прошло с первой записи, не больше
+// тридцати. Считаем по календарю, не по активности: пропуски не откатывают
+// назад. Это не таймер-рост (совет его отклонял) — просто тихая метка
+// «сколько мы вместе», ничего не требует и никогда не убывает.
+const MILESTONES=[7,14,21,30];
+function daysWithMe(){
+  if(!DAYS.length) return 0;
+  const first=DAYS[0].date;
+  const now=new Date(todayKey()+"T12:00:00");
+  return Math.max(0,Math.min(30,Math.round((now-first)/86400000)));
+}
+function milestonesSVG(cx,cy){
+  const reached=MILESTONES.filter(m=>daysWithMe()>=m);
+  if(!reached.length) return "";
+  const R=104;
+  return reached.map((m,i)=>{
+    const a=-Math.PI/2-0.55+i*0.3;
+    const x=cx+R*Math.cos(a),y=cy-30+R*Math.sin(a);
+    return `<path d="M${x} ${y-3.2} L${x+.9} ${y-.6} L${x+3.2} ${y-.6} L${x+1.3} ${y+1}
+      L${x+2} ${y+3.4} L${x} ${y+2} L${x-2} ${y+3.4} L${x-1.3} ${y+1} L${x-3.2} ${y-.6} L${x-.9} ${y-.6} Z"
+      fill="#ffd27a" opacity=".65"/>`;
+  }).join("");
+}
 
 function renderTotem(){
   applyTheme();
@@ -738,6 +789,8 @@ function renderTotem(){
       fill="currentColor" opacity="${op("env")*.28}"/></g>`;
   // Купленный мир вокруг зверя — остаётся навсегда, не зависит от роста сфер
   s+=worldSVG(cx,cy);
+  // Звёзды-вехи: сколько календарных дней вы вместе — растут молча, назад не откатываются
+  s+=milestonesSVG(cx,cy);
   // Свечение — «Духовность»
   s+=`<g class="bp" data-code="spirit"><circle cx="${cx}" cy="${cy-6}" r="${74+v("spirit")*40}" fill="currentColor"
       opacity="${op("spirit")*.1}"/></g>`;
@@ -745,7 +798,7 @@ function renderTotem(){
   const проявлен=0.18+0.82*(rated().length/SPHERES.length);   // силуэт наливается по мере оценок
   s+=`<g transform="translate(${cx},${cy}) scale(${curl})" opacity="${проявлен}"><g class="breathe">`;
   // Хвост — «Деньги»: чем больше, тем пышнее
-  s+=`<g class="bp" data-code="money"><path d="M30 12 Q${60+v("money")*40} ${4-v("money")*20} ${58+v("money")*26} ${-24-v("money")*26}
+  s+=`<g class="bp sway-tail" data-code="money"><path d="M30 12 Q${60+v("money")*40} ${4-v("money")*20} ${58+v("money")*26} ${-24-v("money")*26}
       Q${86+v("money")*30} ${2-v("money")*10} ${58+v("money")*12} 36 Q44 44 30 34 Z"
       fill="currentColor" opacity="${op("money")*.6}"/></g>`;
   // Лапы — «Семья»: опора
@@ -771,7 +824,7 @@ function renderTotem(){
       <path d="M14 -46 Q${22+v("career")*16} ${-62-v("career")*30} ${8+v("career")*10} ${-72-v("career")*34}"
       stroke="currentColor" stroke-width="${2+v("career")*4}" fill="none" stroke-linecap="round" opacity="${op("career")}"/></g>`;
   // Уши — «Друзья»
-  s+=`<g class="bp" data-code="friends"><path d="M-24 -40 L${-28-v("friends")*10} ${-64-v("friends")*30} L-6 -52 Z"
+  s+=`<g class="bp sway-ears" data-code="friends"><path d="M-24 -40 L${-28-v("friends")*10} ${-64-v("friends")*30} L-6 -52 Z"
       fill="currentColor" opacity="${op("friends")}"/>
       <path d="M24 -40 L${28+v("friends")*10} ${-64-v("friends")*30} L6 -52 Z"
       fill="currentColor" opacity="${op("friends")}"/></g>`;
@@ -779,7 +832,7 @@ function renderTotem(){
   s+=`<ellipse cx="0" cy="-30" rx="26" ry="23" fill="currentColor" opacity="${.55+dim*.45}"/>`;
   // Глаза — «Отдых»: чем меньше отдыха, тем уже
   const eye=m==="red"?1.6:2+v("rest")*3.4;
-  s+=`<g class="bp" data-code="rest"><ellipse cx="-10" cy="-34" rx="3.6" ry="${eye}" fill="#0d1014"/>
+  s+=`<g class="bp eyes" data-code="rest"><ellipse cx="-10" cy="-34" rx="3.6" ry="${eye}" fill="#0d1014"/>
       <ellipse cx="10" cy="-34" rx="3.6" ry="${eye}" fill="#0d1014"/>`;
   if(m!=="red"&&v("rest")>.4) s+=`<circle cx="-8.8" cy="-35.4" r="1.3" fill="#fff" opacity=".9"/>
       <circle cx="11.2" cy="-35.4" r="1.3" fill="#fff" opacity=".9"/>`;
@@ -864,6 +917,19 @@ function renderTotem(){
        : слабые.length
          ? `Зверь собран из твоих двенадцати сфер. Пока не проросли: ${слабые.join(", ")}. Поднимешь сферу — вырастет её часть.`
          : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`;
+
+  if(daysWithMe()>0){
+    document.getElementById("totem-state").innerHTML+=
+      `<div class="dim" style="margin-top:8px">С тобой уже ${daysWithMe()} ${plural(daysWithMe(),"день","дня","дней")}</div>`;
+  }
+}
+
+// Тронуть зверя — мгновенный отклик, ничего не начисляет и не требует
+function pokeTotem(){
+  const svg=document.getElementById("totem");
+  svg.classList.remove("poked"); void svg.offsetWidth; svg.classList.add("poked");
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred("light");
+  setTimeout(()=>svg.classList.remove("poked"),500);
 }
 
 // ── Задачка дня ──────────────────────────────────────────────────────
@@ -978,7 +1044,6 @@ function renderToday(){
       ${BASICS.map(b=>`<div class="spark"><span class="d"></span><span>${b}</span></div>`).join("")}
       <div class="dim" style="margin-top:12px">Задачи и баллы вернутся сами, когда станет полегче.</div></div>`
       +(d>=10?"":`<div class="dim" style="margin-top:12px">${HELP}</div>`);
-    document.getElementById("today-stats").innerHTML="";
     document.getElementById("puzzle-title").style.display="none";
     document.getElementById("puzzle").innerHTML="";
     return;
@@ -1022,12 +1087,6 @@ function renderToday(){
     creditDay(todayKey(),rec.t);
     renderToday();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred("light");});
-
-  const t=DATA.today;
-  document.getElementById("today-stats").innerHTML=`
-    <div class="stat"><b>${dayPoints(t.touched)}</b><span>баллов сегодня</span></div>
-    <div class="stat"><b>${t.touched.length}/12</b><span>сфер горело</span></div>
-    <div class="stat"><b>${PET.doneTasks.length}/${list.length}</b><span>задач сделано</span></div>`;
 
   document.getElementById("puzzle-title").style.display="";
   renderPuzzle();
