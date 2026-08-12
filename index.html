@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=28"></script>
+<script src="photos/list.js?v=29"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -310,7 +310,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="28 · 12.08.2026 21:21";
+const APP_VERSION="29 · 12.08.2026 21:35";
 
 let toastTimer=null;
 function toast(text){
@@ -635,6 +635,7 @@ function cloudLoad(done){
         if(got.pet){
           const cp=JSON.parse(got.pet);
           // Зверь родился однажды — берём самую раннюю дату из двух.
+          if(!PET.name&&cp.name) PET.name=cp.name;   // имя даётся один раз, откуда угодно
           PET.bornAt=Math.min(PET.bornAt||Date.now(),cp.bornAt||Date.now());
           PET.days={...(cp.days||{}),...(PET.days||{})};
           PET.bonus=Math.max(PET.bonus||0,cp.bonus||0);
@@ -1066,13 +1067,14 @@ function renderTotem(){
   if(!сколько){
     document.getElementById("totem-state").innerHTML=PHOTO_MODE
       ? `<div class="lead">Знакомство</div>
-         <div class="fname">Твой зверь уже здесь</div>
-         <div class="why">Он растёт сам — раз в 6 часов, весь месяц. Двенадцать сфер жизни
-           ниже его тело не меняют, они отдельно: от них зависит, какой фокус недели
+         <div class="fname">Твоя рысь уже здесь</div>
+         <div class="why">Она растёт сама — раз в 6 часов, весь месяц. Двенадцать сфер жизни
+           её не меняют, они отдельно: от них зависит, какой фокус недели
            показывать и что предлагать на вкладке «Сегодня».</div>
          <div class="dim" style="margin-top:10px">Оцени каждую сферу от 1 до 10, чтобы
            система знала, куда сейчас важнее смотреть.</div>
-         <button class="btn" onclick="startRating()">Оценить сферы</button>`
+         <button class="btn" onclick="startRating()">Оценить сферы</button>
+         ${nameBlock()}`
       : `<div class="lead">Знакомство</div>
          <div class="fname">Здесь будет твой зверь</div>
          <div class="why">Он складывается из двенадцати сторон твоей жизни: корпус — здоровье,
@@ -1087,15 +1089,23 @@ function renderTotem(){
   }
   const low=Math.min(...rated()),w=weakest(),str=strongest();
   const слабые=SPHERES.filter(x=>(DATA.wheel[x.code]||0)<=3).map(x=>BODY[x.code]);
-  const state=m==="red"?"Свернулся рядом с тобой"
-            :m==="yellow"?"Притих, но с ним всё хорошо"
-            :"Бодр и спокоен";
+  // На фото — рысь, женский род. В векторном запасном режиме это по-прежнему
+  // «зверь», мужской. Тексты разошлись бы, если бы не эта развилка.
+  const state=PHOTO_MODE
+    ? (m==="red"?"Свернулась рядом с тобой"
+      :m==="yellow"?"Притихла, но всё хорошо"
+      :"Бодра и спокойна")
+    : (m==="red"?"Свернулся рядом с тобой"
+      :m==="yellow"?"Притих, но с ним всё хорошо"
+      :"Бодр и спокоен");
 
   document.getElementById("totem-state").innerHTML=
     `<div style="display:flex;justify-content:space-between;align-items:center">
       <div><div class="lead">Зрелость ${maturity().toFixed(1)} из 10</div>
-        <div class="fname" style="margin:5px 0 0">${state}</div></div>
+        <div class="fname" style="margin:5px 0 0">${PET.name||state}</div>
+        ${PET.name?`<div class="dim" style="margin-top:3px">${state}</div>`:""}</div>
       <div class="pts">${balance()} ${plural(balance(),"балл","балла","баллов")}</div></div>
+     ${nameBlock()}
      ${сколько<SPHERES.length
        ? `<div class="dim" style="margin-top:12px">Оценено ${сколько} из ${SPHERES.length}.${PHOTO_MODE?"":
             " Неоценённые части ещё не проросли — зверь проявится целиком, когда пройдёшь все."}</div>
@@ -1126,6 +1136,30 @@ function renderTotem(){
         : `Растёт сам: шаг ${done} из ${GROWTH_STEPS} · следующий примерно через ${Math.ceil(hoursLeft)} ч`}</div>`;
   }
   updatePhoto();
+}
+
+// Имя. Пока его нет, зверь — «приложение»; с именем он становится твоим.
+// Спрашиваем прямо в карточке, без модального окна: окна из приложения
+// убраны намеренно, и ради имени возвращать их незачем.
+function nameBlock(){
+  if(PET.name) return "";
+  return `<div style="margin-top:14px;padding-top:13px;border-top:1px solid var(--brd)">
+      <div class="dim">У неё ещё нет имени</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="pet-name" maxlength="20" placeholder="Как назовёшь?"
+          style="flex:1;min-width:0;background:var(--card);color:var(--ink);border:1px solid var(--brd);
+                 border-radius:12px;padding:11px 13px;font:500 15px var(--fu);outline:none">
+        <button class="btn" style="width:auto;padding:0 18px;margin:0" onclick="savePetName()">Назвать</button>
+      </div></div>`;
+}
+function savePetName(){
+  const el=document.getElementById("pet-name");
+  const v=((el&&el.value)||"").trim().slice(0,20);
+  if(!v){toast("Впиши имя");return;}
+  PET.name=v; savePet();
+  renderTotem();
+  toast(v+" — теперь у неё есть имя");
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
 }
 
 // Тронуть зверя — мгновенный отклик, ничего не начисляет и не требует
