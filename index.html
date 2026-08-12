@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=13"></script>
+<script src="photos/list.js?v=14"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -185,8 +185,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   </div>
   <div class="g" id="totem-state" style="margin-top:12px"></div>
   <button class="btn" onclick="go('today')">Что сегодня</button>
-  <h2 id="puzzle-title">Задачка дня</h2>
-  <div class="g" id="puzzle"></div>
 </section>
 
 <section id="v-world" class="hidden">
@@ -199,7 +197,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="g quote" id="quote"></div>
   <div id="today-body"></div>
   <div class="stats" id="today-stats"></div>
-  <button class="btn" onclick="go('checkin')">Записать день</button>
+  <h2 id="puzzle-title">Задачка дня</h2>
+  <div class="g" id="puzzle"></div>
 </section>
 
 <section id="v-checkin" class="hidden">
@@ -263,7 +262,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="13 · 12.08.2026 05:11";
+const APP_VERSION="14 · 12.08.2026 06:43";
 
 let toastTimer=null;
 function toast(text){
@@ -832,7 +831,6 @@ function renderTotem(){
          эта часть жизни тебя сейчас держит. Займёт минуту, и зверь проявится на глазах.</div>
        <button class="btn" onclick="startRating()">Собрать зверя</button>
        ${hasData()?"":`<button class="btn ghost" onclick="showDemo(true)">Посмотреть на примере</button>`}`;
-    renderPuzzle();
     return;
   }
   const low=Math.min(...rated()),w=weakest(),str=strongest();
@@ -866,8 +864,6 @@ function renderTotem(){
        : слабые.length
          ? `Зверь собран из твоих двенадцати сфер. Пока не проросли: ${слабые.join(", ")}. Поднимешь сферу — вырастет её часть.`
          : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`;
-
-  renderPuzzle();
 }
 
 // ── Задачка дня ──────────────────────────────────────────────────────
@@ -983,6 +979,8 @@ function renderToday(){
       <div class="dim" style="margin-top:12px">Задачи и баллы вернутся сами, когда станет полегче.</div></div>`
       +(d>=10?"":`<div class="dim" style="margin-top:12px">${HELP}</div>`);
     document.getElementById("today-stats").innerHTML="";
+    document.getElementById("puzzle-title").style.display="none";
+    document.getElementById("puzzle").innerHTML="";
     return;
   }
 
@@ -1030,6 +1028,9 @@ function renderToday(){
     <div class="stat"><b>${dayPoints(t.touched)}</b><span>баллов сегодня</span></div>
     <div class="stat"><b>${t.touched.length}/12</b><span>сфер горело</span></div>
     <div class="stat"><b>${PET.doneTasks.length}/${list.length}</b><span>задач сделано</span></div>`;
+
+  document.getElementById("puzzle-title").style.display="";
+  renderPuzzle();
 }
 
 // ── Чек-ин по шагам ──────────────────────────────────────────────────
