@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=21"></script>
+<script src="photos/list.js?v=22"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -231,10 +231,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <button class="btn" onclick="go('today')">Что сегодня</button>
 </section>
 
-<section id="v-world" class="hidden">
-  <div class="head"><h1>Мир зверя</h1><div class="sub">Всё, что растёт вокруг него — отдельно от чек-инов</div></div>
-  <div class="g" id="world-shop"></div>
-</section>
 
 <section id="v-today" class="hidden">
   <div class="head"><h1>Сегодня</h1><div class="sub" id="today-date"></div></div>
@@ -299,13 +295,12 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div id="n-checkin" onclick="go('checkin')"><i>✎</i>Чек-ин</div>
   <div id="n-wheel" onclick="go('wheel')"><i>◎</i>Колесо</div>
   <div id="n-trend" onclick="go('trend')"><i>◈</i>Динамика</div>
-  <div id="n-world" onclick="go('world')"><i>❁</i>Мир</div>
 </nav>
 
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="21 · 12.08.2026 08:18";
+const APP_VERSION="22 · 12.08.2026 08:42";
 
 let toastTimer=null;
 function toast(text){
@@ -688,83 +683,6 @@ const BASICS=["Встать с кровати","Выпить воды и пое�
 // купить — он и есть колесо), а на поляну вокруг. Купленное остаётся навсегда,
 // ухода не требует. Цены и темп трат (≈510 баллов в неделю при горении 37 из 84)
 // уже проверены советом, специально не меняю.
-const ITEMS=[
-  {id:"flower",  t:"Полевой цветок",     p:50,   kind:"flower"},
-  {id:"mushroom",t:"Гриб-фонарик",       p:90,   kind:"mushroom"},
-  {id:"pebbles", t:"Камешки на тропе",   p:150,  kind:"pebbles"},
-  {id:"lantern", t:"Фонарик у поляны",   p:350,  kind:"lantern"},
-  {id:"swing",   t:"Качели из лозы",     p:450,  kind:"swing"},
-  {id:"campfire",t:"Костёр",             p:650,  kind:"campfire"},
-  {id:"stream",  t:"Ручей на поляне",    p:800,  kind:"stream"},
-  {id:"meadow",  t:"Поле цветов",        p:1200, kind:"meadow"},
-  {id:"rainbow", t:"Радуга после дождя", p:1600, kind:"rainbow"},
-  {id:"starstone",t:"Звёздный камень",   p:2000, kind:"starstone"},
-];
-function buyItem(id){
-  const it=ITEMS.find(x=>x.id===id);
-  if(!it) return;
-  PET.owned=PET.owned||[];
-  if(PET.owned.includes(id)) return;
-  if(balance()<it.p){toast("Не хватает баллов");return;}
-  PET.owned.push(id);
-  PET.spent=(PET.spent||0)+it.p;
-  savePet();
-  toast(it.t+" теперь в мире зверя");
-  renderTotem();
-  renderWorldShop();
-}
-function renderWorldShop(){
-  const box=document.getElementById("world-shop");
-  if(!box) return;
-  const bal=balance(),owned=PET.owned||[];
-  box.innerHTML=`<div class="spheres">`+ITEMS.map(it=>{
-    const isOwned=owned.includes(it.id),can=!isOwned&&bal>=it.p;
-    return `<div class="item ${isOwned||can?"":"locked"}" ${isOwned?"":`onclick="buyItem('${it.id}')"`}>
-      <div class="t">${isOwned?"✓ ":""}${it.t}</div>
-      <div class="p">${isOwned?"уже в мире":it.p+" "+plural(it.p,"балл","балла","баллов")}</div>
-    </div>`;
-  }).join("")+`</div>
-  <div class="dim" style="margin-top:10px">Остаётся в мире зверя навсегда — ухода не требует. Самого зверя купить нельзя, он и есть твоё колесо.</div>`;
-}
-// Что нарисовать на поляне для купленного предмета. x,y — точка на земле.
-const WORLD_DRAW={
-  flower:(x,y)=>`<circle cx="${x}" cy="${y}" r="1.8" fill="#f2c14e"/>
-    <circle cx="${x-2.6}" cy="${y-1.6}" r="1.6" fill="#e78fb3"/><circle cx="${x+2.6}" cy="${y-1.6}" r="1.6" fill="#e78fb3"/>
-    <circle cx="${x}" cy="${y-3.4}" r="1.6" fill="#e78fb3"/><circle cx="${x}" cy="${y+1.2}" r="1.6" fill="#e78fb3"/>`,
-  pebbles:(x,y)=>`<ellipse cx="${x-4}" cy="${y}" rx="2.2" ry="1.3" fill="currentColor" opacity=".5"/>
-    <ellipse cx="${x+2}" cy="${y+1.2}" rx="2.6" ry="1.5" fill="currentColor" opacity=".42"/>
-    <ellipse cx="${x+6}" cy="${y-.6}" rx="1.7" ry="1.1" fill="currentColor" opacity=".48"/>`,
-  lantern:(x,y)=>`<line x1="${x}" y1="${y}" x2="${x}" y2="${y-13}" stroke="currentColor" stroke-width="1.3" opacity=".5"/>
-    <circle cx="${x}" cy="${y-15}" r="6" fill="#ffd27a" opacity=".22"/><circle cx="${x}" cy="${y-15}" r="3" fill="#ffd27a"/>`,
-  stream:(x,y)=>`<path d="M${x-24} ${y+3} Q${x-8} ${y-4} ${x+8} ${y+2} Q${x+20} ${y+7} ${x+30} ${y+1}"
-    stroke="#6fb3d9" stroke-width="4.5" fill="none" stroke-linecap="round" opacity=".55"/>`,
-  meadow:(x,y)=>[[-14,-2],[-6,2],[2,-3],[9,1],[15,-1]].map(([dx,dy])=>
-    `<circle cx="${x+dx}" cy="${y+dy}" r="1.3" fill="#f2c14e"/>
-     <circle cx="${x+dx-1.8}" cy="${y+dy-1.1}" r="1.1" fill="#e78fb3"/><circle cx="${x+dx+1.8}" cy="${y+dy-1.1}" r="1.1" fill="#e78fb3"/>
-     <circle cx="${x+dx}" cy="${y+dy-2.3}" r="1.1" fill="#e78fb3"/>`).join(""),
-  starstone:(x,y)=>`<circle cx="${x}" cy="${y-4}" r="9" fill="#b79af0" opacity=".22"/>
-    <polygon points="${x},${y-11} ${x+6},${y-3} ${x+3},${y+5} ${x-3},${y+5} ${x-6},${y-3}" fill="#b79af0"/>`,
-  mushroom:(x,y)=>`<line x1="${x}" y1="${y}" x2="${x}" y2="${y-6}" stroke="#c9a876" stroke-width="1.6" opacity=".6"/>
-    <ellipse cx="${x}" cy="${y-8}" rx="4" ry="2.6" fill="#e0637a"/><circle cx="${x}" cy="${y-8}" r="5.5" fill="#ffd27a" opacity=".18"/>`,
-  swing:(x,y)=>`<line x1="${x-8}" y1="${y-20}" x2="${x-5}" y2="${y-2}" stroke="#8a6a4a" stroke-width="1.1" opacity=".55"/>
-    <line x1="${x+8}" y1="${y-20}" x2="${x+5}" y2="${y-2}" stroke="#8a6a4a" stroke-width="1.1" opacity=".55"/>
-    <rect x="${x-6}" y="${y-4}" width="12" height="3" rx="1.4" fill="#8a6a4a" opacity=".7"/>`,
-  campfire:(x,y)=>`<path d="M${x-6} ${y} L${x+6} ${y-2} M${x-5} ${y-1} L${x+5} ${y-3}" stroke="#6b4a34" stroke-width="2" opacity=".6"/>
-    <ellipse cx="${x}" cy="${y-6}" rx="3.2" ry="5" fill="#ff8a4a"/><ellipse cx="${x}" cy="${y-6}" rx="7" ry="9" fill="#ff8a4a" opacity=".2"/>`,
-  rainbow:(x,y)=>[0,-3,-6].map((dy,i)=>
-    `<path d="M${x-22} ${y+2+dy} A22 22 0 0 1 ${x+22} ${y+2+dy}" stroke="${["#e08a8a","#e0c86a","#7ab8a8"][i]}"
-      stroke-width="2.2" fill="none" opacity=".5"/>`).join(""),
-};
-const WORLD_X=[-63,-49,-35,-21,-7,7,21,35,49,63];
-function worldSVG(cx,cy){
-  const y=cy+62;
-  return (PET.owned||[]).map((id,i)=>{
-    const it=ITEMS.find(x=>x.id===id);
-    if(!it) return "";
-    return `<g class="world-item">${WORLD_DRAW[it.kind](cx+WORLD_X[i%WORLD_X.length],y)}</g>`;
-  }).join("");
-}
-
 // Уровней и очков опыта больше нет: зверь — это и есть твоё колесо.
 // Зрелость — среднее по двенадцати сферам, слабейшая показывает, куда расти.
 const scores=()=>SPHERES.map(s=>DATA.wheel[s.code]||0);
@@ -875,8 +793,6 @@ function renderTotem(){
   // Земля под лапами — сфера «Дом»
   s+=`<g class="bp" data-code="env"><ellipse cx="${cx}" cy="${cy+66}" rx="${52+v("env")*46}" ry="${9+v("env")*7}"
       fill="currentColor" opacity="${op("env")*.28}"/></g>`;
-  // Купленный мир вокруг зверя — остаётся навсегда, не зависит от роста сфер
-  s+=worldSVG(cx,cy);
   // Звёзды-вехи: сколько календарных дней вы вместе — растут молча, назад не откатываются
   s+=milestonesSVG(cx,cy);
   // Свечение — «Духовность»
@@ -1483,7 +1399,7 @@ function renderTrend(){
 // с тотема, закрывается назад. Логика магазина не смешивается с тем, что уже
 // внутри пятиэкранного go().
 function go(v){
-  ["totem","today","checkin","wheel","trend","world"].forEach(x=>{
+  ["totem","today","checkin","wheel","trend"].forEach(x=>{
     document.getElementById("v-"+x).classList.toggle("hidden",x!==v);
     document.getElementById("n-"+x).classList.toggle("act2",x===v);});
   window.scrollTo(0,0);
@@ -1492,7 +1408,6 @@ function go(v){
   if(v==="checkin")openCheckin();
   if(v==="wheel")renderWheel();
   if(v==="trend")renderTrend();
-  if(v==="world")renderWorldShop();
 }
 
 if(CONFIRM) confirmFromBot(CONFIRM);   // что дошло до бота — помечаем и чистим
