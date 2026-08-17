@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=35"></script>
+<script src="photos/list.js?v=36"></script>
+<script src="deck.js?v=36"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -218,6 +219,15 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <button class="btn" style="margin-top:16px" onclick="closeStory()">Хорошо</button>
   </div>
 </div>
+<div id="walk-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(6,8,14,.72);
+     align-items:center;justify-content:center;padding:18px">
+  <div class="g" style="max-width:360px;padding:22px">
+    <div class="dim" id="walk-rare" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px"></div>
+    <div class="fname" id="walk-title" style="margin-top:6px"></div>
+    <div class="why" id="walk-text" style="margin-top:10px"></div>
+    <div id="walk-answers" style="margin-top:14px"></div>
+  </div>
+</div>
 <div class="wrap">
 
 <section id="v-totem">
@@ -238,13 +248,22 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     </div>
   </div>
   <div class="g" id="totem-state" style="margin-top:12px"></div>
+  <div class="g" id="walk-box" style="margin-top:12px"></div>
   <button class="btn" onclick="go('today')">Что сегодня</button>
+</section>
+
+<section id="v-finds" class="hidden">
+  <div class="head"><h1>Находки</h1><div class="sub" id="finds-sub"></div></div>
+  <div class="g" id="nature"></div>
+  <div id="finds-grid" style="margin-top:14px"></div>
 </section>
 
 
 <section id="v-today" class="hidden">
   <div class="head"><h1>Сегодня</h1><div class="sub" id="today-date"></div></div>
   <div class="g quote" id="quote"></div>
+  <h2 id="card-title">Карта дня</h2>
+  <div class="g" id="card"></div>
   <div id="today-body"></div>
   <h2 id="puzzle-title">Задачка дня</h2>
   <div class="g" id="puzzle"></div>
@@ -303,6 +322,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div id="n-totem" onclick="go('totem')"><i>❖</i>Тотем</div>
   <div id="n-today" onclick="go('today')"><i>☀</i>Сегодня</div>
   <div id="n-checkin" onclick="go('checkin')"><i>✎</i>Чек-ин</div>
+  <div id="n-finds" onclick="go('finds')"><i>✦</i>Находки</div>
   <div id="n-wheel" onclick="go('wheel')"><i>◎</i>Колесо</div>
   <div id="n-trend" onclick="go('trend')"><i>◈</i>Динамика</div>
 </nav>
@@ -310,7 +330,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="35 · 13.08.2026 00:24";
+const APP_VERSION="36 · 17.08.2026 09:26";
 
 let toastTimer=null;
 function toast(text){
@@ -487,7 +507,31 @@ const STORIES=[
   {sphere:"comm",name:"Флоренс Найтингейл",
    text:"В разгар Крымской войны организовала уход за ранеными там, где до неё почти никто не пытался. Позже, уже тяжело больная сама, из постели продолжала менять принципы медицины на десятилетия вперёд."},
   {sphere:"rest",name:"Чарльз Дарвин",
-   text:"Десятилетиями боролся с загадочной хронической болезнью и мог работать лишь короткими промежутками. Построил вокруг этого весь день — и написал «Происхождение видов», редко работая больше часа подряд."}
+   text:"Десятилетиями боролся с загадочной хронической болезнью и мог работать лишь короткими промежутками. Построил вокруг этого весь день — и написал «Происхождение видов», редко работая больше часа подряд."},
+  {sphere:"love",name:"Уинстон и Клементина Черчилль",
+   text:"Он называл свою депрессию «чёрным псом» и в худшие месяцы почти не говорил. Она писала ему письма через комнату — пятьдесят семь лет брака держались на этом больше, чем на победах."},
+  {sphere:"env",name:"Иммануил Кант",
+   text:"Прожил всю жизнь в одном городе и ходил одним и тем же маршрутом, по которому соседи сверяли часы. Из этого крошечного обжитого мира вышла философия, перевернувшая Европу."},
+  {sphere:"health",name:"Вильма Рудольф",
+   text:"В детстве перенесла полиомиелит, носила скобу на ноге, врачи говорили, что бегать она не будет. В Риме в 1960-м выиграла три золотые медали."},
+  {sphere:"look",name:"Микеланджело",
+   text:"В юности ему сломали нос в драке, и до конца жизни он считал себя уродливым. Руками этого человека сделаны самые красивые тела в истории искусства."},
+  {sphere:"family",name:"Астрид Линдгрен",
+   text:"Родила сына одна, в девятнадцать, и три года он рос в чужой семье в другой стране — она копила на поездки к нему. Забрала, вырастила, и уже потом придумала девочку, которая живёт одна и ничего не боится."},
+  {sphere:"friends",name:"Джон Толкин и Клайв Льюис",
+   text:"Толкин бросал «Властелина колец» несколько раз и считал, что это никому не нужно. Льюис читал каждую главу вслух с ним по вечерам и не дал бросить — иначе книги бы просто не было."},
+  {sphere:"career",name:"Вера Вонг",
+   text:"Не попала в олимпийскую сборную по фигурному катанию, потом двадцать лет проработала в журнале и не получила должность, которую ждала. Своё первое платье нарисовала в сорок и переписала свадебную моду."},
+  {sphere:"money",name:"Джоан Роулинг",
+   text:"Жила на пособие с младенцем на руках, писала в кафе, потому что дома было холодно. Двенадцать издательств отказали, тринадцатое согласилось из-за дочери редактора."},
+  {sphere:"self",name:"Майкл Фарадей",
+   text:"Сын кузнеца, школы почти не видел, работал переплётчиком и читал книги, которые сшивал. Без единого диплома стал человеком, на чьих опытах держится всё наше электричество."},
+  {sphere:"spirit",name:"Мать Тереза",
+   text:"Её письма, опубликованные после смерти, показали десятилетия внутренней пустоты и молчания в ответ. Она продолжала работать каждый день, так и не дождавшись ответа."},
+  {sphere:"rest",name:"Анри Пуанкаре",
+   text:"Неделями бился над задачей и не сдвинулся ни на шаг. Решение пришло, когда он уехал отдыхать и ставил ногу на подножку омнибуса, думая совсем о другом."},
+  {sphere:"comm",name:"Ирена Сендлер",
+   text:"Вывела из варшавского гетто около двух с половиной тысяч детей, записывая их имена на папиросной бумаге и пряча в банке под яблоней. Пережила пытки гестапо и дожила до девяноста восьми."}
 ];
 function showStory(s){
   if(!s||!s.name||!s.text) return;      // пустое окно показывать нечего
@@ -731,9 +775,19 @@ const savedWheel=(()=>{try{return JSON.parse(localStorage.getItem("wheel")||"nul
 if(savedWheel) DATA.wheel={...DATA.wheel,...savedWheel};
 
 const LS=JSON.parse(localStorage.getItem("pet")||"{}");
+// Все поля перечислены явно: то, чего здесь нет, после перезахода пропадёт.
+// Добавляешь механику — добавляй её поле сюда же, иначе оно живёт до закрытия.
 let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          days:LS.days||{}, spent:LS.spent||0, owned:LS.owned||[], bornAt:LS.bornAt||Date.now(),
-         doneTasks:(LS.tasksOn===todayKey()?LS.doneTasks:[])||[], tasksOn:todayKey()};
+         doneTasks:(LS.tasksOn===todayKey()?LS.doneTasks:[])||[], tasksOn:todayKey(),
+         name:LS.name||"",
+         // запечатанная колода
+         deckSeed:LS.deckSeed||0, cardSeen:LS.cardSeen||"", cardEnergy:LS.cardEnergy||0,
+         // прогулка
+         walkStart:LS.walkStart||0, walkRoll:LS.walkRoll??null, walkPick:LS.walkPick??null,
+         walkSpent:LS.walkSpent||0, walks:LS.walks||0,
+         // находки и характер
+         finds:LS.finds||[], traits:LS.traits||{}};
 const savePet=()=>{localStorage.setItem("pet",JSON.stringify(PET));cloudSave();};
 if(!LS.bornAt) savePet();   // фиксируем момент рождения зверя раз и навсегда
 
@@ -769,6 +823,185 @@ function creditDay(key,touched){
   savePet();
 }
 const balance=()=>earned()-(PET.spent||0);
+
+// ══ Карта дня, прогулка, находки, характер ═══════════════════════════
+// Содержимое лежит в запечатанном deck.js. Порядок карт перемешивается
+// личным ключом deckSeed, который рождается один раз и случайно, — поэтому
+// даже тот, кто писал колоду, не знает, что выпадет завтра. В этом и смысл.
+const DECK=window.DECK||[], FINDS=window.FINDS||[];
+
+if(!PET.deckSeed){PET.deckSeed=Math.floor(Math.random()*1e9)+1;savePet();}
+
+// Генератор случайных чисел с зерном: одинаковое зерно — одинаковая
+// последовательность. Без этого карта дня менялась бы при каждом перезаходе.
+function rngFrom(seed){let s=(seed>>>0)||1;
+  return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};}
+
+// Перестановка всей колоды под личный ключ: год без повторов, свой порядок.
+function deckOrder(){
+  const r=rngFrom(PET.deckSeed),a=DECK.map((_,i)=>i);
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+const dayIndex=()=>Math.max(0,Math.floor((Date.now()-(PET.bornAt||Date.now()))/86400000));
+function cardToday(){
+  if(!DECK.length)return null;
+  const order=deckOrder();
+  return DECK[order[dayIndex()%order.length]];
+}
+const CARD_LABEL={"в":"Вопрос дня","а":"Опора","д":"Маленькое дело","м":"Мысль","п":"Написать"};
+
+function renderCard(){
+  const box=document.getElementById("card"),head=document.getElementById("card-title");
+  const c=cardToday();
+  if(!c){box.classList.add("hidden");head.classList.add("hidden");return;}
+  box.classList.remove("hidden");head.classList.remove("hidden");
+  const взял=PET.cardSeen===todayKey();
+  box.innerHTML=
+    `<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">${CARD_LABEL[c.t]||"Карта"}</div>`+
+    `<div class="why" style="margin-top:8px;font-size:16px;line-height:1.5">${c.x}</div>`+
+    (взял?`<div class="dim" style="margin-top:10px">Завтра будет другая. Всего в колоде ${DECK.length}.</div>`
+         :`<button class="btn" style="margin-top:12px" onclick="takeCard()">Принял</button>`);
+}
+function takeCard(){
+  if(PET.cardSeen===todayKey())return;
+  PET.cardSeen=todayKey();
+  PET.cardEnergy=(PET.cardEnergy||0)+5;   // карта — тоже топливо для прогулки
+  savePet();renderCard();renderWalk();toast("+5 к прогулке");
+}
+
+// ── Прогулка ─────────────────────────────────────────────────────────
+// Энергия копится сама от зажжённых сфер (те же баллы) и от карт. Порог
+// растёт вместе со зверем: маленькой рыси хватает малого, взрослой нужно
+// больше. Отсчёта на экране намеренно нет — она возвращается сама, когда
+// ты в следующий раз откроешь приложение. Успевать к сроку не надо.
+const WALK_MIN_MS=2*3600*1000;
+const stageNow=()=>{
+  const per=GROWTH_STEPS/PHOTO_FRAMES;
+  return Math.min(PHOTO_FRAMES,Math.max(1,Math.ceil(growthStepsPassed()/per)||1));
+};
+const walkCost=()=>40+stageNow()*6;
+const energyNow=()=>Math.max(0,earned()+(PET.cardEnergy||0)-(PET.walkSpent||0));
+const isWalking=()=>!!PET.walkStart;
+const walkDone=()=>isWalking()&&Date.now()-PET.walkStart>=WALK_MIN_MS;
+
+const TRAITS={смелость:"смелая",нежность:"ласковая",любопытство:"любопытная",спокойствие:"спокойная"};
+const RESPONSES=[
+  [{t:"Обнять её",k:"нежность"},{t:"Расспросить, как всё было",k:"любопытство"}],
+  [{t:"Сказать, что гордишься",k:"нежность"},{t:"Спросить, не было ли страшно",k:"спокойствие"}],
+  [{t:"Позвать дальше в следующий раз",k:"смелость"},{t:"Сказать, что можно и отдохнуть",k:"спокойствие"}],
+  [{t:"Рассмотреть всё вместе",k:"любопытство"},{t:"Просто посидеть рядом",k:"спокойствие"}],
+  [{t:"Похвалить за смелость",k:"смелость"},{t:"Погладить и ничего не говорить",k:"нежность"}]
+];
+
+function startWalk(){
+  if(isWalking()||energyNow()<walkCost())return;
+  PET.walkSpent=(PET.walkSpent||0)+walkCost();
+  PET.walkStart=Date.now();
+  PET.walkRoll=Math.random();          // что она принесёт — решается на выходе
+  PET.walkPick=Math.floor(Math.random()*1e9);
+  savePet();renderWalk();toast("Ушла бродить");
+}
+
+// Что нашлось. Находка выпадает НЕ всегда — иногда рысь просто гуляла.
+// Именно непредсказуемость держит интерес; гарантированная награда её убивает.
+function walkLoot(){
+  const r=PET.walkRoll??Math.random();
+  if(r>0.55)return null;
+  const p=PET.walkPick??0, rare=(p%100)/100;
+  const редкость=rare<0.05?2:rare<0.30?1:0;
+  const пул=FINDS.map((f,i)=>({f,i})).filter(o=>o.f.r===редкость);
+  if(!пул.length)return null;
+  return пул[p%пул.length];
+}
+
+function renderWalk(){
+  const box=document.getElementById("walk-box");
+  if(!box)return;
+  const цена=walkCost(),есть=energyNow();
+  if(walkDone()){
+    box.innerHTML=`<div class="fname">Рысь вернулась</div>`+
+      `<div class="dim" style="margin-top:6px">Она хочет что-то показать.</div>`+
+      `<button class="btn" style="margin-top:12px" onclick="openWalk()">Встретить</button>`;
+    return;
+  }
+  if(isWalking()){
+    box.innerHTML=`<div class="fname">Рысь бродит</div>`+
+      `<div class="dim" style="margin-top:6px">Вернётся сама — загляни попозже. Ждать у экрана не надо.</div>`;
+    return;
+  }
+  const доля=Math.min(1,есть/цена);
+  box.innerHTML=
+    `<div class="fname">До прогулки ${Math.min(есть,цена)} из ${цена}</div>`+
+    `<div style="margin-top:10px;height:10px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden">`+
+      `<div style="height:100%;width:${(доля*100).toFixed(1)}%;border-radius:6px;background:linear-gradient(90deg,#f0b429,#f6d365);transition:width .6s ease"></div>`+
+    `</div>`+
+    (доля>=1
+      ? `<button class="btn" style="margin-top:12px" onclick="startWalk()">Отпустить бродить</button>`
+      : `<div class="dim" style="margin-top:8px">Зажигай сферы — энергия копится сама. Спящая сфера даёт втрое больше.</div>`);
+}
+
+function openWalk(){
+  if(!walkDone())return;
+  const лут=walkLoot();
+  const пара=RESPONSES[(PET.walkPick||0)%RESPONSES.length];
+  const m=document.getElementById("walk-modal");
+  document.getElementById("walk-title").textContent=лут?лут.f.n:"Она просто гуляла";
+  document.getElementById("walk-text").textContent=
+    лут?лут.f.x:"Ничего не принесла. Ходила, смотрела, вернулась — тоже дело.";
+  document.getElementById("walk-rare").textContent=
+    лут?["находка","редкая находка","легендарная находка"][лут.f.r]:"прогулка";
+  document.getElementById("walk-answers").innerHTML=пара.map((o,i)=>
+    `<button class="btn${i?" ghost":""}" style="margin-top:8px" onclick="answerWalk('${o.k}')">${o.t}</button>`).join("");
+  m.style.display="flex";
+}
+
+function answerWalk(trait){
+  const лут=walkLoot();
+  PET.traits=PET.traits||{};
+  PET.traits[trait]=(PET.traits[trait]||0)+1;
+  if(лут){PET.finds=PET.finds||[];if(!PET.finds.includes(лут.i))PET.finds.push(лут.i);}
+  PET.walks=(PET.walks||0)+1;
+  PET.walkStart=0;PET.walkRoll=null;PET.walkPick=null;
+  savePet();
+  document.getElementById("walk-modal").style.display="none";
+  renderWalk();
+  toast(лут?"Находка в коллекции":"Она рада, что ты рядом");
+}
+
+// ── Характер и витрина ───────────────────────────────────────────────
+function natureWords(){
+  const t=PET.traits||{};
+  const есть=Object.entries(t).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  return есть.slice(0,2).map(([k])=>TRAITS[k]).filter(Boolean);
+}
+function renderFinds(){
+  const слов=natureWords();
+  document.getElementById("nature").innerHTML=
+    `<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Какая она растёт</div>`+
+    `<div class="fname" style="margin-top:6px">`+
+      (слов.length?`${PET.name||"Рысь"} — ${слов.join(" и ")}`:`${PET.name||"Рысь"} ещё никакая`)+`</div>`+
+    `<div class="dim" style="margin-top:6px">`+
+      (слов.length?`Складывается из твоих ответов после прогулок. Прогулок было ${PET.walks||0}.`
+                  :"Отпусти её побродить и ответь, когда вернётся, — характер начнёт складываться.")+
+    `</div>`;
+
+  const мои=new Set(PET.finds||[]);
+  document.getElementById("finds-sub").textContent=`Собрано ${мои.size} из ${FINDS.length}`;
+  const цвет=["rgba(255,255,255,.10)","rgba(120,190,255,.18)","rgba(246,211,101,.22)"];
+  document.getElementById("finds-grid").innerHTML=
+    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">`+
+    FINDS.map((f,i)=>{
+      const открыта=мои.has(i);
+      return `<div style="border-radius:12px;padding:10px;min-height:74px;background:${открыта?цвет[f.r]:"rgba(255,255,255,.04)"};
+        border:1px solid ${открыта?"rgba(255,255,255,.14)":"rgba(255,255,255,.06)"}">`+
+        (открыта
+          ? `<div style="font-size:13px;line-height:1.25">${f.n}</div>`+
+            `<div class="dim" style="font-size:11px;margin-top:4px">${["","редкая","легендарная"][f.r]}</div>`
+          : `<div class="dim" style="font-size:20px;text-align:center;line-height:54px">?</div>`)+
+      `</div>`;
+    }).join("")+`</div>`;
+}
 
 // Режим — не светофор, а состояние зверя. Считается по последним дням.
 function mode(){
@@ -1641,13 +1874,14 @@ function renderTrend(){
 // с тотема, закрывается назад. Логика магазина не смешивается с тем, что уже
 // внутри пятиэкранного go().
 function go(v){
-  ["totem","today","checkin","wheel","trend"].forEach(x=>{
+  ["totem","today","checkin","finds","wheel","trend"].forEach(x=>{
     document.getElementById("v-"+x).classList.toggle("hidden",x!==v);
     document.getElementById("n-"+x).classList.toggle("act2",x===v);});
   window.scrollTo(0,0);
-  if(v==="totem")renderTotem();
-  if(v==="today")renderToday();
+  if(v==="totem"){renderTotem();renderWalk();}
+  if(v==="today"){renderToday();renderCard();}
   if(v==="checkin")openCheckin();
+  if(v==="finds")renderFinds();
   if(v==="wheel")renderWheel();
   if(v==="trend")renderTrend();
 }
