@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=36"></script>
-<script src="deck.js?v=36"></script>
+<script src="photos/list.js?v=37"></script>
+<script src="deck.js?v=37"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -228,6 +228,17 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <div id="walk-answers" style="margin-top:14px"></div>
   </div>
 </div>
+<div id="capsule-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(6,8,14,.78);
+     align-items:center;justify-content:center;padding:18px">
+  <div class="g" style="max-width:360px;padding:22px">
+    <div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Капсула времени</div>
+    <div class="fname" id="cap-when" style="margin-top:6px"></div>
+    <div class="dim" id="cap-ago" style="margin-top:6px"></div>
+    <div class="why" id="cap-text" style="margin-top:12px;white-space:pre-wrap"></div>
+    <button class="btn" id="cap-open" style="margin-top:14px" onclick="openCapsule()">Прочитать</button>
+    <button class="btn ghost" style="margin-top:8px" onclick="laterCapsule()">Пусть полежит ещё</button>
+  </div>
+</div>
 <div class="wrap">
 
 <section id="v-totem">
@@ -245,6 +256,18 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
         <div id="totem-night" style="position:absolute;inset:0;background:rgba(8,10,18,.4);opacity:0;
           transition:opacity 2s ease;pointer-events:none"></div>
       </div>
+      <div id="totem-away" class="hidden" style="position:absolute;inset:0;overflow:hidden;border-radius:inherit">
+        <!-- Градиент лежит ПОД снимком: оба absolute, и без z-index заглушка
+             перекрывала фотографию — на экране был градиент вместо пейзажа. -->
+        <div id="away-fallback" style="position:absolute;inset:0;z-index:0"></div>
+        <img id="away-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;
+          z-index:1;transition:opacity 1.2s ease">
+        <div style="position:absolute;left:0;right:0;bottom:0;padding:16px;z-index:2;
+          background:linear-gradient(transparent,rgba(6,8,14,.72))">
+          <div id="away-where" style="font:600 15px var(--fu);color:#fff"></div>
+          <div style="font-size:12.5px;color:rgba(255,255,255,.72);margin-top:2px">Её здесь нет</div>
+        </div>
+      </div>
     </div>
   </div>
   <div class="g" id="totem-state" style="margin-top:12px"></div>
@@ -255,7 +278,14 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <section id="v-finds" class="hidden">
   <div class="head"><h1>Находки</h1><div class="sub" id="finds-sub"></div></div>
   <div class="g" id="nature"></div>
-  <div id="finds-grid" style="margin-top:14px"></div>
+  <h2>Земли</h2>
+  <div class="sub" style="margin-bottom:10px">Куда она может уходить. Новые открываются за камни</div>
+  <div id="lands"></div>
+  <h2>Что принесла</h2>
+  <div id="finds-grid"></div>
+  <h2>Летопись</h2>
+  <div class="sub" style="margin-bottom:10px">Пишется сама. Вести ничего не надо</div>
+  <div class="g" id="chronicle"></div>
 </section>
 
 
@@ -293,7 +323,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="spheres" id="sp-edit"></div>
   <div class="g" id="spark-hint" style="margin-top:12px"></div>
 
-  <h2>Строка про день</h2>
+  <h2 id="note-title">Строка про день</h2>
+  <div class="sub" id="note-sub" style="margin-bottom:8px"></div>
   <textarea id="note" rows="2" placeholder="Необязательно"></textarea>
 
   <div class="g" id="summary" style="margin-top:14px"></div>
@@ -330,7 +361,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="36 · 17.08.2026 09:26";
+const APP_VERSION="37 · 17.08.2026 10:18";
 
 let toastTimer=null;
 function toast(text){
@@ -450,43 +481,61 @@ const BODY={
 };
 const byCode=c=>SPHERES.find(s=>s.code===c);
 
+// Цитата дня. У каждой — автор и строка о том, кто это и почему он имеет
+// право так говорить. Безымянная фраза читается как случайное предложение
+// и проскальзывает мимо; за цитатой должен стоять человек.
+// t — сама фраза, a — автор, w — кто это был.
 const QUOTES={
- health:[{t:"Заботься о своём теле. Это единственное место, где тебе приходится жить.",a:"Джим Рон"},
-         {t:"Тело не просит многого. Оно просит регулярно."}],
- look:[{t:"Как ты обходишься с собой, так учишь обходиться с собой других."},
-       {t:"Приведёшь себя в порядок — день пойдёт иначе."},
-       {t:"Побриться и переодеться — самое дешёвое, что меняет день."}],
- love:[{t:"Любовь — не то, что чувствуешь. Это то, что делаешь, когда чувствовать лень."},
-       {t:"Близость держится на мелочах, сказанных вовремя, а не на больших словах однажды."},
-       {t:"Убранный на вечер телефон замечают сильнее подарка."}],
- family:[{t:"Семья — это те, кто останется, когда закончатся поводы."},
-         {t:"Позвонить родителям — пять минут и одна галочка."},
-         {t:"Домашние дела важнее домашних разговоров о делах."}],
- friends:[{t:"Напиши тому, о ком сегодня подумал. Дружба — не чувства, а сообщения."},
-          {t:"Позвать первым — не унижение, а работа, которую кто-то должен делать."}],
- career:[{t:"Двадцать пять минут над главным делают больше, чем весь день над мелким."},
-         {t:"Работа не кончается. Кончается день — и это нормальная граница."}],
- money:[{t:"Деньги любят, когда их считают, а не когда о них тревожатся."},
-        {t:"Записанная трата перестаёт быть случайной."},
-        {t:"Спокойствие покупается не суммой, а тем, что ты знаешь свои цифры."}],
- self:[{t:"Мы есть то, что делаем постоянно. Совершенство — не действие, а привычка.",a:"Уилл Дюрант"},
-       {t:"Час в день — пятнадцать полных суток в год."}],
- spirit:[{t:"У кого есть «зачем» жить, тот выдержит почти любое «как».",a:"Фридрих Ницше"},
-         {t:"У тебя есть власть над своим умом, а не над внешними событиями.",a:"Марк Аврелий"},
-         {t:"Мы страдаем чаще в воображении, чем в реальности.",a:"Сенека"}],
- rest:[{t:"Отдых — не награда за работу. Это её условие."},
-       {t:"Час, потраченный ни на что, тоже считается прожитым."}],
- env:[{t:"Внешний порядок — самый дешёвый способ починить внутренний."},
-      {t:"Разбери один угол. Вся квартира — это отговорка, чтобы не начинать."},
-      {t:"Вещь, которой ты не пользуешься, всё равно берёт с тебя понемногу каждый день."}],
- comm:[{t:"Помочь одному человеку сегодня — надёжнее, чем собираться помогать многим."},
-       {t:"Сказанное вслух «спасибо» стоит дешевле всего и работает дольше всего."}]
+ health:[{t:"Заботься о своём теле. Это единственное место, где тебе приходится жить.",
+          a:"Джим Рон",w:"Американец, который в 25 лет был банкротом, а потом полжизни объяснял другим, как из этого выбираются."},
+         {t:"Мы страдаем чаще в воображении, чем в действительности.",
+          a:"Сенека",w:"Римский философ, писавший это в письмах другу — за несколько лет до того, как император приказал ему умереть."}],
+ look:[{t:"В человеке всё должно быть прекрасно: и лицо, и одежда, и душа, и мысли.",
+        a:"Антон Чехов",w:"Врач и писатель. Сам ездил на Сахалин переписывать каторжан, когда мог спокойно жить в Москве."},
+       {t:"Ты властен над своим умом, а не над внешними событиями.",
+        a:"Марк Аврелий",w:"Император Рима, писавший заметки для себя одного в военных походах. Он не собирался их публиковать."}],
+ love:[{t:"Любить — значит смотреть не друг на друга, а вместе в одном направлении.",
+        a:"Антуан де Сент-Экзюпери",w:"Лётчик, который разбился в пустыне и выжил, а потом написал «Маленького принца»."},
+       {t:"Ты навсегда в ответе за тех, кого приручил.",
+        a:"Антуан де Сент-Экзюпери",w:"Из «Маленького принца». Книга написана в эмиграции, вдали от дома, во время войны."}],
+ family:[{t:"Все счастливые семьи похожи друг на друга, каждая несчастливая несчастлива по-своему.",
+          a:"Лев Толстой",w:"Первая строка «Анны Карениной». Своя семейная жизнь у него была тяжёлой, и он это знал."},
+         {t:"Всякий думает изменить мир, но никто не думает изменить себя.",
+          a:"Лев Толстой",w:"Он переписывал «Войну и мир» семь раз и всю жизнь считал, что делает недостаточно."}],
+ friends:[{t:"Друг — это одна душа, живущая в двух телах.",
+           a:"Аристотель",w:"Учил Александра Македонского. Дружбе посвятил две книги из десяти в своей «Этике» — больше, чем любой другой теме."},
+          {t:"Кому мало того, что у него есть, тому мало всего.",
+           a:"Эпикур",w:"Грек, который жил в саду с друзьями и считал дружбу главным условием счастливой жизни."}],
+ career:[{t:"Никогда не сдавайтесь. Никогда, никогда, никогда.",
+          a:"Уинстон Черчилль",w:"Сказано школьникам в 1941 году. За плечами был провал Дарданелл, потеря поста и уход на фронт рядовым офицером."},
+         {t:"Мы есть то, что мы делаем постоянно.",
+          a:"Уилл Дюрант, пересказывая Аристотеля",w:"Историк, писавший одну многотомную книгу больше сорока лет. Закончил её под девяносто."}],
+ money:[{t:"Богат не тот, у кого много, а тот, кому хватает.",
+         a:"Сенека",w:"Один из богатейших людей Рима — и при этом стоик, писавший о довольстве малым. Противоречие он признавал сам."},
+        {t:"Время — это то, из чего сделана жизнь.",
+         a:"Бенджамин Франклин",w:"Печатник, ставший учёным и дипломатом. Вёл дневник, где каждый день отмечал тринадцать привычек."}],
+ self:[{t:"Знающий других мудр. Знающий себя просветлён.",
+        a:"Лао-цзы",w:"Автор «Дао дэ цзин». О нём почти ничего не известно достоверно — осталась только книга в пять тысяч иероглифов."},
+       {t:"Кто перестаёт учиться — стареет, неважно, в двадцать лет или в восемьдесят.",
+        a:"Генри Форд",w:"Дважды обанкротился, прежде чем построил конвейер. Первую машину собрал в сарае за домом."}],
+ spirit:[{t:"Не события расстраивают людей, а мнения об этих событиях.",
+          a:"Эпиктет",w:"Родился рабом, хромал после увечья, полученного в рабстве. Стал учителем, у которого учились императоры."},
+         {t:"Тайна бытия человеческого не в том, чтобы только жить, а в том, для чего жить.",
+          a:"Фёдор Достоевский",w:"Стоял на эшафоте в ожидании расстрела; приговор заменили каторгой в последнюю минуту."}],
+ rest:[{t:"Люди ищут уединения в деревне, у моря, в горах. Но можно уйти в себя.",
+        a:"Марк Аврелий",w:"Записано в палатке во время войны с германцами. Уединения у него не было двадцать лет."},
+       {t:"Отдохнувшее поле даёт обильный урожай.",
+        a:"Овидий",w:"Римский поэт, сосланный на край империи и писавший оттуда до самой смерти."}],
+ env:[{t:"Не держите в доме ничего, что не считаете полезным или красивым.",
+       a:"Уильям Моррис",w:"Художник и мастер, сказал это в лекции 1880 года. Сам делал мебель, ткани и книги руками."},
+      {t:"Две вещи наполняют душу удивлением: звёздное небо надо мной и нравственный закон во мне.",
+       a:"Иммануил Кант",w:"Прожил всю жизнь в одном городе и ходил одним маршрутом. Из этого крошечного мира он смотрел на звёзды."}],
+ comm:[{t:"Если не можешь накормить сотню, накорми одного.",
+        a:"Мать Тереза",w:"Её письма, опубликованные после смерти, показали десятилетия внутренней пустоты. Она продолжала работать каждый день."},
+       {t:"Нет ничего благородного в том, чтобы быть выше другого. Благородство — быть выше себя прежнего.",
+        a:"Эрнест Хемингуэй",w:"Работал санитаром на войне в восемнадцать лет, был ранен осколками мины и вынес другого человека."}]
 };
 
-// Редкая находка после закрытого дня — не рубрика, не мотиватор дня.
-// Привязана к самой слабой сфере недели, когда получается совпасть;
-// если истории под эту сферу нет — берётся любая. Шанс и момент срабатывания
-// нарочно нигде не объявлены пользователю — см. save().
 const STORIES=[
   {sphere:"health",name:"Стивен Хокинг",
    text:"В 21 год ему сказали, что жить осталось два года — боковой амиотрофический склероз. Прожил больше полувека и написал главные свои работы уже после того, как перестал говорить и ходить сам."},
@@ -785,9 +834,12 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          deckSeed:LS.deckSeed||0, cardSeen:LS.cardSeen||"", cardEnergy:LS.cardEnergy||0,
          // прогулка
          walkStart:LS.walkStart||0, walkRoll:LS.walkRoll??null, walkPick:LS.walkPick??null,
-         walkSpent:LS.walkSpent||0, walks:LS.walks||0,
+         walkSpent:LS.walkSpent||0, walks:LS.walks||0, walkLand:LS.walkLand||0,
          // находки и характер
-         finds:LS.finds||[], traits:LS.traits||{}};
+         finds:LS.finds||[], traits:LS.traits||{},
+         // земли, камни, капсулы, летопись, задачки
+         stones:LS.stones||0, lands:LS.lands||[0], capsules:LS.capsules||[],
+         chronicle:LS.chronicle||[], puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0};
 const savePet=()=>{localStorage.setItem("pet",JSON.stringify(PET));cloudSave();};
 if(!LS.bornAt) savePet();   // фиксируем момент рождения зверя раз и навсегда
 
@@ -844,6 +896,23 @@ function deckOrder(){
   return a;
 }
 const dayIndex=()=>Math.max(0,Math.floor((Date.now()-(PET.bornAt||Date.now()))/86400000));
+
+// Свой перемешанный порядок для любого набора карт: у вопросов дня он должен
+// отличаться от порядка колоды, иначе вопрос и карта дня будут ходить парой.
+function ownOrder(list,соль){
+  const r=rngFrom((PET.deckSeed||1)+соль),a=list.map((_,i)=>i);
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+// Вопрос дня для «строки про день». Пустое поле с подписью «Необязательно»
+// не подсказывает ничего: непонятно, что писать и кому. Конкретный вопрос —
+// подсказывает. Меняется каждый день и берётся из той же запечатанной колоды.
+function noteQuestion(){
+  const вопросы=DECK.filter(c=>c.t==="в");
+  if(!вопросы.length)return null;
+  const o=ownOrder(вопросы,7777);
+  return вопросы[o[dayIndex()%o.length]];
+}
 function cardToday(){
   if(!DECK.length)return null;
   const order=deckOrder();
@@ -851,23 +920,107 @@ function cardToday(){
 }
 const CARD_LABEL={"в":"Вопрос дня","а":"Опора","д":"Маленькое дело","м":"Мысль","п":"Написать"};
 
+// Карта, которая просит написать, получает поле. Написанное запечатывается
+// и возвращается через месяцы — см. капсулы ниже. Сроки разные, выбирает
+// не человек: в этом вся штука, к дате нельзя подготовиться.
+const CAPSULE_TERMS=[30,90,365];
+
 function renderCard(){
   const box=document.getElementById("card"),head=document.getElementById("card-title");
   const c=cardToday();
   if(!c){box.classList.add("hidden");head.classList.add("hidden");return;}
   box.classList.remove("hidden");head.classList.remove("hidden");
   const взял=PET.cardSeen===todayKey();
-  box.innerHTML=
-    `<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">${CARD_LABEL[c.t]||"Карта"}</div>`+
-    `<div class="why" style="margin-top:8px;font-size:16px;line-height:1.5">${c.x}</div>`+
-    (взял?`<div class="dim" style="margin-top:10px">Завтра будет другая. Всего в колоде ${DECK.length}.</div>`
-         :`<button class="btn" style="margin-top:12px" onclick="takeCard()">Принял</button>`);
+  const шапка=`<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">${CARD_LABEL[c.t]||"Карта"}</div>`+
+    `<div class="why" style="margin-top:8px;font-size:16px;line-height:1.5">${c.x}</div>`;
+
+  if(взял){box.innerHTML=шапка;return;}
+
+  if(c.t==="п"){
+    const срок=CAPSULE_TERMS[dayIndex()%CAPSULE_TERMS.length];
+    box.innerHTML=шапка+
+      `<textarea id="card-write" rows="3" style="margin-top:12px" placeholder="Пиши как есть, это никто не прочитает"></textarea>`+
+      `<div class="dim" style="margin-top:8px">Написанное запечатается и вернётся к тебе через ${срок} ${plural(срок,"день","дня","дней")}. Прочитать раньше нельзя.</div>`+
+      `<button class="btn" style="margin-top:10px" onclick="sealCapsule(${срок})">Запечатать</button>`;
+    return;
+  }
+  box.innerHTML=шапка+`<button class="btn" style="margin-top:12px" onclick="takeCard()">Принял</button>`;
 }
+
 function takeCard(){
   if(PET.cardSeen===todayKey())return;
   PET.cardSeen=todayKey();
   PET.cardEnergy=(PET.cardEnergy||0)+5;   // карта — тоже топливо для прогулки
   savePet();renderCard();renderWalk();toast("+5 к прогулке");
+}
+
+function sealCapsule(срок){
+  const поле=document.getElementById("card-write");
+  const текст=(поле&&поле.value||"").trim();
+  if(!текст){toast("Пустое запечатывать нечего");return;}
+  PET.capsules=PET.capsules||[];
+  PET.capsules.push({t:текст,at:Date.now(),open:Date.now()+срок*86400000,d:todayKey()});
+  летопись(`Ты запечатал письмо себе. Откроется через ${срок} ${plural(срок,"день","дня","дней")}.`);
+  takeCard();
+  toast("Запечатано");
+}
+
+// Капсулы, которым пришёл срок. Открываются не сами — приложение только
+// говорит, что письмо дозрело, а решает человек. Письмо из плохого дня
+// не должно разворачиваться внезапно.
+const dueCapsules=()=>(PET.capsules||[]).filter(k=>!k.read&&Date.now()>=k.open);
+
+function showCapsule(){
+  const k=dueCapsules()[0];
+  if(!k)return;
+  const дней=Math.round((Date.now()-k.at)/86400000);
+  const д=new Date(k.at);
+  document.getElementById("cap-when").textContent=
+    `Письмо от ${д.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`;
+  document.getElementById("cap-ago").textContent=
+    `Ты писал это ${дней} ${plural(дней,"день","дня","дней")} назад.`;
+  document.getElementById("cap-text").textContent=k.t;
+  document.getElementById("cap-text").style.display="none";
+  document.getElementById("cap-open").style.display="";
+  document.getElementById("capsule-modal").style.display="flex";
+}
+function openCapsule(){
+  document.getElementById("cap-text").style.display="";
+  document.getElementById("cap-open").style.display="none";
+  const k=dueCapsules()[0];
+  if(k){k.read=1;savePet();летопись("Ты открыл письмо, написанное "+k.d+".");}
+}
+function laterCapsule(){document.getElementById("capsule-modal").style.display="none";}
+
+// ── Летопись ─────────────────────────────────────────────────────────
+// Книга, которая пишется сама. Ничего не надо вести руками: заметное
+// событие ложится строкой с датой. Через год это документ прожитого года —
+// не графики, а история. Повторы за один день не пишутся.
+function летопись(текст){
+  PET.chronicle=PET.chronicle||[];
+  const d=todayKey();
+  if(PET.chronicle.some(z=>z.d===d&&z.t===текст))return;
+  PET.chronicle.push({d,t:текст});
+  if(PET.chronicle.length>500)PET.chronicle=PET.chronicle.slice(-500);
+  savePet();
+}
+function renderChronicle(){
+  const box=document.getElementById("chronicle");
+  if(!box)return;
+  const все=(PET.chronicle||[]).slice().reverse();
+  if(!все.length){
+    box.innerHTML=`<div class="dim">Здесь появится история вашей жизни вдвоём: имена, первые прогулки, редкие находки, открытые земли. Писать ничего не надо — она ведётся сама.</div>`;
+    return;
+  }
+  const месяц=["января","февраля","марта","апреля","мая","июня","июля",
+               "августа","сентября","октября","ноября","декабря"];
+  box.innerHTML=все.slice(0,40).map(z=>{
+    const [г,м,д]=z.d.split("-");
+    return `<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)">`+
+      `<div class="dim" style="font-size:11px">${+д} ${месяц[+м-1]}</div>`+
+      `<div style="margin-top:3px;line-height:1.4">${z.t}</div></div>`;
+  }).join("")+
+  (все.length>40?`<div class="dim" style="margin-top:10px">И ещё ${все.length-40} записей раньше.</div>`:"");
 }
 
 // ── Прогулка ─────────────────────────────────────────────────────────
@@ -894,13 +1047,89 @@ const RESPONSES=[
   [{t:"Похвалить за смелость",k:"смелость"},{t:"Погладить и ничего не говорить",k:"нежность"}]
 ];
 
+// ── Земли ────────────────────────────────────────────────────────────
+// Раньше все находки лежали в одном мешке: рысь ходила «куда-то», и через
+// месяц собирать было нечего. Теперь у каждой земли свой набор и своя
+// легендарная, которой больше нигде нет. Камни — вторая валюта: энергия
+// тратится сама на выход, камни копятся и открывают новые места.
+// f — номер снимка в webapp/land. Порядок земель повествовательный (от
+// ближнего леса к перевалу), номера файлов идут своим чередом — поэтому
+// связь задана явно, а не индексом массива.
+const LANDS=[
+  {n:"Ближний лес",  f:1, c:0,   o:"Мох, шишки, следы у самой опушки."},
+  {n:"Река",         f:2, c:60,  o:"Галька, обкатанное стекло, чужие потери на дне."},
+  {n:"Старая просека",f:3,c:140, o:"Здесь когда-то жили люди. Осталось немногое."},
+  {n:"Болото",       f:4, c:240, o:"Туман до полудня. Она возвращается мокрая."},
+  {n:"Каменистая гряда",f:5,c:360,o:"Ветер и кварц. Наверху видно далеко."},
+  {n:"Ночной лес",   f:7, c:500, o:"Она уходит туда только затемно."},
+  {n:"Поле на рассвете",f:9,c:660,o:"Пусто и светло. Находок мало, но они странные."},
+  {n:"Первый снег",  f:8, c:840, o:"След виден целиком, от начала до конца."},
+  {n:"Перевал",      f:6, c:1040,o:"Дальше она пока не ходила."}
+];
+const landPhoto=i=>`land/${(LANDS[i]||LANDS[0]).f}.webp`;
+// Земля находки вычисляется из её места внутри своей редкости — так каждой
+// земле достаётся и обычное, и редкое, и своя легендарная. Файл колоды
+// при этом трогать не нужно: он запечатан.
+function landOf(i){
+  const f=FINDS[i]; if(!f)return 0;
+  const свои=FINDS.map((x,j)=>({x,j})).filter(o=>o.x.r===f.r).map(o=>o.j);
+  return свои.indexOf(i)%LANDS.length;
+}
+const landOpen=i=>(PET.lands||[0]).includes(i);
+const stonesFor=r=>[3,12,40][r]||3;
+
+function openLand(i){
+  if(landOpen(i)||(PET.stones||0)<LANDS[i].c)return;
+  PET.stones-=LANDS[i].c;
+  PET.lands=[...(PET.lands||[0]),i];
+  летопись(`Открыта новая земля: ${LANDS[i].n.toLowerCase()}.`);
+  savePet();renderFinds();toast("Земля открыта");
+}
+
+function renderLands(){
+  const box=document.getElementById("lands");
+  if(!box)return;
+  box.innerHTML=LANDS.map((l,i)=>{
+    const открыта=landOpen(i), хватает=(PET.stones||0)>=l.c;
+    const мои=new Set(PET.finds||[]);
+    const всего=FINDS.filter((_,j)=>landOf(j)===i).length;
+    const собрано=[...мои].filter(j=>landOf(j)===i).length;
+    // Закрытая земля показана размытой: видно, что там что-то есть, но не что
+    // именно. Пустая серая плашка не тянет её открывать, а такая — тянет.
+    return `<div class="g" style="margin-bottom:8px;padding:0;overflow:hidden">`+
+      `<div style="position:relative;height:132px">`+
+        `<img src="${landPhoto(i)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;
+           object-fit:cover;${открыта?"":"filter:blur(13px) saturate(.5) brightness(.55);transform:scale(1.12)"}">`+
+        `<div style="position:absolute;inset:0;background:linear-gradient(transparent 30%,rgba(6,8,14,.82))"></div>`+
+        `<div style="position:absolute;left:14px;right:14px;bottom:11px;display:flex;
+           justify-content:space-between;align-items:flex-end;gap:10px">`+
+          `<div>`+
+            `<div style="font:600 16px var(--fu);color:#fff">${открыта?l.n:"Неизвестное место"}</div>`+
+            `<div style="font-size:12.5px;color:rgba(255,255,255,.74);margin-top:2px">`+
+              `${открыта?l.o:"Она туда ещё не ходила."}</div>`+
+          `</div>`+
+          `<div style="font:600 13px var(--fu);color:#fff;white-space:nowrap">`+
+            `${открыта?`${собрано} из ${всего}`:`${l.c} 💎`}</div>`+
+        `</div>`+
+      `</div>`+
+      (открыта?"":`<div style="padding:12px 14px"><button class="btn${хватает?"":" ghost"}"
+         onclick="openLand(${i})"${хватает?"":" disabled"}>${хватает?"Открыть":`Нужно ещё ${l.c-(PET.stones||0)} камней`}</button></div>`)+
+    `</div>`;
+  }).join("");
+}
+
 function startWalk(){
   if(isWalking()||energyNow()<walkCost())return;
   PET.walkSpent=(PET.walkSpent||0)+walkCost();
   PET.walkStart=Date.now();
   PET.walkRoll=Math.random();          // что она принесёт — решается на выходе
   PET.walkPick=Math.floor(Math.random()*1e9);
-  savePet();renderWalk();toast("Ушла бродить");
+  // Куда пошла — из открытых земель. Чем дальше земля, тем реже она туда ходит.
+  const открытые=(PET.lands||[0]).slice().sort((a,b)=>a-b);
+  PET.walkLand=открытые[Math.floor(Math.random()*открытые.length)];
+  savePet();renderWalk();renderTotem();
+  if(!PET.walks)летопись("Она впервые ушла бродить одна.");
+  toast("Ушла бродить");
 }
 
 // Что нашлось. Находка выпадает НЕ всегда — иногда рысь просто гуляла.
@@ -910,7 +1139,11 @@ function walkLoot(){
   if(r>0.55)return null;
   const p=PET.walkPick??0, rare=(p%100)/100;
   const редкость=rare<0.05?2:rare<0.30?1:0;
-  const пул=FINDS.map((f,i)=>({f,i})).filter(o=>o.f.r===редкость);
+  const земля=PET.walkLand??0;
+  // Сначала ищем в той земле, куда она ходила. Если там такой редкости нет —
+  // берём общий пул, чтобы прогулка не осталась пустой из-за арифметики.
+  let пул=FINDS.map((f,i)=>({f,i})).filter(o=>o.f.r===редкость&&landOf(o.i)===земля);
+  if(!пул.length)пул=FINDS.map((f,i)=>({f,i})).filter(o=>o.f.r===редкость&&landOpen(landOf(o.i)));
   if(!пул.length)return null;
   return пул[p%пул.length];
 }
@@ -918,6 +1151,7 @@ function walkLoot(){
 function renderWalk(){
   const box=document.getElementById("walk-box");
   if(!box)return;
+  updateAway();
   const цена=walkCost(),есть=energyNow();
   if(walkDone()){
     box.innerHTML=`<div class="fname">Рысь вернулась</div>`+
@@ -960,13 +1194,22 @@ function answerWalk(trait){
   const лут=walkLoot();
   PET.traits=PET.traits||{};
   PET.traits[trait]=(PET.traits[trait]||0)+1;
-  if(лут){PET.finds=PET.finds||[];if(!PET.finds.includes(лут.i))PET.finds.push(лут.i);}
+  let камни=2;                                   // за саму прогулку, всегда
+  if(лут){
+    PET.finds=PET.finds||[];
+    const новая=!PET.finds.includes(лут.i);
+    if(новая)PET.finds.push(лут.i);
+    камни+=stonesFor(лут.f.r);
+    if(новая&&лут.f.r>0)
+      летопись(`${лут.f.r===2?"Легендарная находка":"Редкая находка"}: ${лут.f.n.toLowerCase()} — ${LANDS[PET.walkLand??0].n.toLowerCase()}.`);
+  }
+  PET.stones=(PET.stones||0)+камни;
   PET.walks=(PET.walks||0)+1;
   PET.walkStart=0;PET.walkRoll=null;PET.walkPick=null;
   savePet();
   document.getElementById("walk-modal").style.display="none";
-  renderWalk();
-  toast(лут?"Находка в коллекции":"Она рада, что ты рядом");
+  renderWalk();renderTotem();
+  toast(`+${камни} 💎`);
 }
 
 // ── Характер и витрина ───────────────────────────────────────────────
@@ -980,11 +1223,16 @@ function renderFinds(){
   document.getElementById("nature").innerHTML=
     `<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Какая она растёт</div>`+
     `<div class="fname" style="margin-top:6px">`+
-      (слов.length?`${PET.name||"Рысь"} — ${слов.join(" и ")}`:`${PET.name||"Рысь"} ещё никакая`)+`</div>`+
+      (слов.length?`${PET.name||"Рысь"} — ${слов.join(" и ")}`
+                  :`${PET.name||"Рысь"} ещё только начинает`)+`</div>`+
     `<div class="dim" style="margin-top:6px">`+
-      (слов.length?`Складывается из твоих ответов после прогулок. Прогулок было ${PET.walks||0}.`
+      (слов.length?`Характер складывается из твоих ответов после прогулок. Их было ${PET.walks||0}.`
                   :"Отпусти её побродить и ответь, когда вернётся, — характер начнёт складываться.")+
-    `</div>`;
+    `</div>`+
+    `<div style="margin-top:12px;font:600 15px var(--fu)">${PET.stones||0} 💎 камней</div>`+
+    `<div class="dim" style="margin-top:3px">Копятся с прогулок: чем реже находка, тем больше. Тратятся на новые земли.</div>`;
+
+  renderLands();renderChronicle();
 
   const мои=new Set(PET.finds||[]);
   document.getElementById("finds-sub").textContent=`Собрано ${мои.size} из ${FINDS.length}`;
@@ -1129,7 +1377,44 @@ function currentPhotoKey(){
   // Ближе к «ничего от тебя не хочет, просто побудьте рядом», чем стоячая поза.
   return m==="red"?"10-rest":m==="yellow"?"10-curious":"10-happy";
 }
+// Пока рысь бродит — её на экране быть не должно. Иначе механика разваливается:
+// написано «ушла», а зверь лежит на месте. Показываем пейзаж той земли, куда
+// она ушла: land/1.jpg … land/9.jpg. Файлов ещё нет — рисуем градиент по
+// времени суток, без зверя. Появятся снимки — код подхватит их сам.
+function updateAway(){
+  const away=document.getElementById("totem-away");
+  if(!away)return;
+  const бродит=isWalking()&&!walkDone();
+  away.classList.toggle("hidden",!бродит);
+  const svg=document.getElementById("totem"), фото=document.getElementById("totem-photos");
+  if(svg) svg.style.display=бродит?"none":"";
+  if(фото) фото.classList.toggle("hidden",бродит?true:!PHOTO_MODE);
+  if(!бродит)return;
+
+  const i=(PET.walkLand??0);
+  document.getElementById("away-where").textContent=LANDS[i]?LANDS[i].n:"Где-то далеко";
+  // Пока снимков земель нет — рисуем пейзаж градиентом по времени суток.
+  // Небо сверху, земля снизу, зверя нет. Это не заглушка «серый квадрат»,
+  // а нормальный вид, который сам сменится на фото, когда оно появится.
+  const НЕБО={morning:["#f6c99a","#7ea8b8","#2f4a49"],
+              day:["#9fc7e0","#6f9ab0","#2c4436"],
+              evening:["#e0956b","#6a5a7a","#232f38"],
+              night:["#101a2a","#16202c","#0b1014"]};
+  const c=НЕБО[timeKey()]||НЕБО.day;
+  document.getElementById("away-fallback").style.background=
+    `linear-gradient(180deg,${c[0]} 0%,${c[1]} 46%,${c[2]} 100%)`;
+  const img=document.getElementById("away-photo");
+  const src=landPhoto(i);
+  if(img.dataset.src!==src){
+    img.dataset.src=src; img.style.opacity=0;
+    img.onload=()=>{img.style.opacity=1;};
+    img.onerror=()=>{img.style.opacity=0;};
+    img.src=src;
+  }
+}
+
 function updatePhoto(){
+  updateAway();
   if(!PHOTO_MODE) return;
   photoBaseKey=currentPhotoKey();
   showPhoto(photoBaseKey);
@@ -1402,6 +1687,7 @@ function savePetName(){
   const v=((el&&el.value)||"").trim().slice(0,20);
   if(!v){toast("Впиши имя");return;}
   PET.name=v; savePet();
+  летопись(`Ты дал ей имя — ${v}.`);
   renderTotem();
   toast(v+" — теперь у неё есть имя");
   if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
@@ -1422,26 +1708,47 @@ function pokeTotem(){
 // ── Задачка дня ──────────────────────────────────────────────────────
 // Задачка каждый раз новая: шесть видов, числа случайные.
 // Баллы дают один раз в день, но решать можно сколько хочется.
-const KINDS=["ряд","удвоение","фибоначчи","лишнее","сумма","зеркало"];
+// Задачка дня. Три штуки — и на сегодня всё: бесконечная лента задачек
+// превращается в жвачку, а завершённость видно. Сложность подрастает вместе
+// со зверем: на десятой стадии ряды с двумя правилами и умножение в столбик.
+const PUZZLES_PER_DAY=3;
+const KINDS=["ряд","удвоение","фибоначчи","лишнее","сумма","зеркало",
+             "умножение","двойное","доли","разность","процент"];
 function makePuzzle(){
   const R=n=>Math.floor(Math.random()*n);
+  const ур=stageNow();                       // 1..10 — растёт вместе с рысью
+  const К=1+Math.floor(ур/3);                // множитель сложности: 1..4
   const mix=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=R(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;};
   const uniq=(ans,alt)=>{const s=new Set([ans]);alt.forEach(v=>{if(v!==ans&&v>0)s.add(v);});
     const out=[...s].slice(0,4);
     while(out.length<4){const v=ans+1+R(9);if(!out.includes(v))out.push(v);}
     return mix(out);};
-  switch(KINDS[R(KINDS.length)]){
-    case "ряд":{const a=2+R(9),d=2+R(8),ans=a+4*d;
+  // На первых стадиях простые виды, дальше подключаются тяжёлые
+  const доступно=ур<3?KINDS.slice(0,6):ур<6?KINDS.slice(0,9):KINDS;
+  switch(доступно[R(доступно.length)]){
+    case "ряд":{const a=2+R(9*К),d=2+R(8*К),ans=a+4*d;
       return {q:`Продолжи ряд: ${a}, ${a+d}, ${a+2*d}, ${a+3*d}, ?`,ans,opts:uniq(ans,[ans+d,ans-d,ans+1])};}
-    case "удвоение":{const b=2+R(5),ans=b*16;
+    case "удвоение":{const b=2+R(5*К),ans=b*16;
       return {q:`Продолжи ряд: ${b}, ${b*2}, ${b*4}, ${b*8}, ?`,ans,opts:uniq(ans,[ans+b,ans-b,ans*2])};}
-    case "фибоначчи":{const a=1+R(5),b=a+1+R(4),s=[a,b,a+b,a+2*b,2*a+3*b],ans=3*a+5*b;
+    case "фибоначчи":{const a=1+R(5),b=a+1+R(4*К),s=[a,b,a+b,a+2*b,2*a+3*b],ans=3*a+5*b;
       return {q:`Продолжи ряд: ${s.join(", ")}, ?`,ans,opts:uniq(ans,[ans+1,ans-2,ans+b])};}
-    case "лишнее":{const base=2+R(6),arr=[base*2,base*4,base*6,base*8],odd=base*5+1;
+    case "лишнее":{const base=2+R(6*К),arr=[base*2,base*4,base*6,base*8],odd=base*5+1;
       arr[R(4)]=odd;
       return {q:`Что здесь лишнее: ${arr.join(", ")}?`,ans:odd,opts:mix(arr)};}
-    case "сумма":{const a=11+R(60),b=11+R(60),ans=a+b;
+    case "сумма":{const a=11+R(60*К),b=11+R(60*К),ans=a+b;
       return {q:`Сколько будет ${a} + ${b}?`,ans,opts:uniq(ans,[ans+9,ans-10,ans+1])};}
+    case "умножение":{const a=3+R(9+3*К),b=3+R(9+2*К),ans=a*b;
+      return {q:`Сколько будет ${a} × ${b}?`,ans,opts:uniq(ans,[ans+a,ans-b,ans+10])};}
+    case "двойное":{const a=1+R(6),d=2+R(5),m=2,s=[a,a*m+d,(a*m+d)*m+d,((a*m+d)*m+d)*m+d];
+      const ans=s[3]*m+d;
+      return {q:`Ряд по правилу «умножь на ${m}, прибавь ${d}»: ${s.join(", ")}, ?`,ans,
+              opts:uniq(ans,[ans+d,ans-m,ans+m*d])};}
+    case "доли":{const ч=2+R(3),всего=ч*(4+R(8*К)),ans=всего/ч;
+      return {q:`${всего} разделить на ${ч} — сколько?`,ans,opts:uniq(ans,[ans+ч,ans-1,ans*2])};}
+    case "разность":{const a=40+R(90*К),b=11+R(38),ans=a-b;
+      return {q:`Сколько будет ${a} − ${b}?`,ans,opts:uniq(ans,[ans+9,ans-11,ans+1])};}
+    case "процент":{const б=[10,20,25,50][R(4)],ц=б*(2+R(9*К)),ans=Math.round(ц*б/100);
+      return {q:`Сколько будет ${б}% от ${ц}?`,ans,opts:uniq(ans,[ans+б,Math.round(ans/2),ans+1])};}
     default:{const n=100+R(800),ans=+String(n).split("").reverse().join("");
       return {q:`Прочитай число задом наперёд: ${n}`,ans,opts:uniq(ans,[ans+11,ans-9,n])};}
   }
@@ -1454,7 +1761,15 @@ function renderPuzzle(){
     box.style.display="none"; if(title) title.style.display="none"; return;
   }
   box.style.display=""; if(title) title.style.display="";
-  const paid=PET.puzzleOn===todayKey();
+  const решено=PET.puzzleOn===todayKey()?(PET.puzzleDone||0):0;
+
+  if(решено>=PUZZLES_PER_DAY){             // на сегодня всё — блок закрыт
+    if(title) title.textContent="Задачки дня";
+    box.innerHTML=`<div class="fname">На сегодня всё</div>`+
+      `<div class="dim" style="margin-top:6px">Три из трёх. Завтра будут новые и чуть сложнее.</div>`;
+    return;
+  }
+  if(title) title.textContent=`Задачка дня · ${решено+1} из ${PUZZLES_PER_DAY}`;
   PZ=PZ||makePuzzle();
   box.innerHTML=`<div class="lead">Внимание и логика</div>
     <div style="font:600 18px var(--fd);margin-top:8px">${PZ.q}</div>
@@ -1464,8 +1779,15 @@ function renderPuzzle(){
   box.querySelectorAll(".opt").forEach(el=>el.onclick=()=>{
     const ok=+el.dataset.v===PZ.ans;
     el.classList.add(ok?"ok":"no");
-    if(ok&&!paid){PET.puzzleOn=todayKey();PET.bonus+=20;savePet();}
-    if(ok)setTimeout(nextPuzzle,700);
+    if(ok){
+      PET.puzzleOn=todayKey();
+      PET.puzzleDone=решено+1;
+      PET.bonus+=20;                       // энергия на прогулку
+      PET.stones=(PET.stones||0)+4;        // и камни на земли
+      if(PET.puzzleDone>=PUZZLES_PER_DAY)летопись("Все три задачки дня решены.");
+      savePet();
+      setTimeout(()=>{PZ=null;renderPuzzle();renderWalk();},700);
+    }
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred(ok?"success":"error");});
 }
 
@@ -1512,7 +1834,11 @@ function renderToday(){
     box.style.display="";
     const all=Object.values(QUOTES).flat();
     const q=all[(new Date().getDate()*7+new Date().getMonth())%all.length];
-    box.innerHTML=`<div class="q">${q.t}</div>${q.a?`<div class="a">— ${q.a}</div>`:""}`;
+    // Кто это сказал и почему имеет право — иначе фраза читается как
+    // случайное предложение и проскальзывает мимо, не задев ничего.
+    box.innerHTML=`<div class="q">${q.t}</div>`+
+      (q.a?`<div class="a">— ${q.a}</div>`:"")+
+      (q.w?`<div class="tag">${q.w}</div>`:"");
   }
 
   const body=document.getElementById("today-body");
@@ -1639,6 +1965,14 @@ function openCheckin(){
   pills(document.getElementById("p-train"),["нет","зал","кардио","игра","другое"],edit.train,"train");
   spheresGrid(document.getElementById("sp-edit"),edit.touched,true,true);
   sparkHint();
+  // Вопрос дня вместо пустого поля: так понятно, что писать.
+  const в=noteQuestion(), зг=document.getElementById("note-title"),
+        под=document.getElementById("note-sub"), поле=document.getElementById("note");
+  if(в&&зг){
+    зг.textContent="Строка про день";
+    под.textContent=в.x;
+    поле.placeholder="Одной строкой, как есть. Можно пропустить";
+  }
   [["pulse","f-pulse"],["weight","f-weight"],["steps","f-steps"],["dist","f-dist"]].forEach(([k,id])=>{
     const el=document.getElementById(id);
     el.value=edit[k]??"";
@@ -1884,7 +2218,35 @@ function go(v){
   if(v==="finds")renderFinds();
   if(v==="wheel")renderWheel();
   if(v==="trend")renderTrend();
+  VIEW=v;
 }
+
+// ── Свайпы между вкладками ───────────────────────────────────────────
+// Вертикальный свайп в мини-аппе занят самим Телеграмом (тянешь вниз —
+// приложение закрывается), поэтому берём только горизонтальный. Колесо и
+// графики ловят движение пальцем сами — там свайп отключаем, иначе вместо
+// вращения колеса будет перелистываться вкладка.
+const ORDER=["totem","today","checkin","finds","wheel","trend"];
+let VIEW="totem";
+(function swipes(){
+  let x0=null,y0=null,блок=false;
+  const область=document.querySelector(".wrap")||document.body;
+  область.addEventListener("touchstart",e=>{
+    if(e.touches.length!==1){x0=null;return;}
+    блок=!!e.target.closest("#wheel,#charts,#totem-wrap,textarea,input");
+    x0=e.touches[0].clientX; y0=e.touches[0].clientY;
+  },{passive:true});
+  область.addEventListener("touchend",e=>{
+    if(x0===null||блок)return;
+    const t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0;
+    x0=null;
+    if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.6)return;  // не горизонтальный
+    const i=ORDER.indexOf(VIEW), к=dx<0?i+1:i-1;
+    if(к<0||к>=ORDER.length)return;
+    go(ORDER[к]);
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+  },{passive:true});
+})();
 
 if(CONFIRM) confirmFromBot(CONFIRM);   // что дошло до бота — помечаем и чистим
 prune();
@@ -1892,6 +2254,19 @@ mergeLog();
 DATA.today=todayState();     // новый день начинается с чистого листа
 go("totem");
 setInterval(applyTheme,60000);
+
+// Вехи пишутся в летопись сами, при заходе. Считаем от рождения зверя.
+(function вехи(){
+  const д=daysWithMe();
+  [7,14,30,50,100,200,365].forEach(m=>{
+    if(д>=m) летопись(`${m} ${plural(m,"день","дня","дней")} вместе.`);
+  });
+})();
+
+// Капсула, которой пришёл срок, — самое сильное, что тут может случиться.
+// Показываем не сразу при загрузке, а через секунду: пусть экран сначала
+// нарисуется, иначе письмо выскакивает на пустое место.
+if(dueCapsules().length) setTimeout(showCapsule,1200);
 
 // Подтягиваем облако уже после первой отрисовки: экран показывается сразу
 // на местных данных, а когда придёт ответ Телеграма — обновляем.
