@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=40"></script>
-<script src="data.js?v=40"></script>
-<script src="deck.js?v=40"></script>
+<script src="photos/list.js?v=41"></script>
+<script src="data.js?v=41"></script>
+<script src="deck.js?v=41"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -41,6 +41,8 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
   -webkit-backdrop-filter:blur(24px) saturate(1.25);
   border:1px solid var(--brd);border-radius:20px;padding:17px}
 .quote{margin-bottom:12px}
+/* Карточки подряд без отступа читались как один слипшийся блок */
+#ready,#quest,#card,#den-box,#season-box,#walk-box{margin-bottom:12px}
 .quote .q{font:400 18.5px/1.45 var(--fd)}
 .quote .a{font-size:12.5px;color:var(--ink2);margin-top:9px}
 .quote .tag{font-size:11px;color:var(--ink2);opacity:.8;margin-top:11px}
@@ -395,7 +397,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="40 · 17.08.2026 11:51";
+const APP_VERSION="41 · 17.08.2026 16:04";
 
 let toastTimer=null;
 function toast(text){
@@ -410,6 +412,35 @@ const tg=window.Telegram&&window.Telegram.WebApp;
 // ничего не доказывает. Настоящий телеграм отдаёт initData — по нему и отличаем.
 // Без этой проверки кнопка «Сохранить» в браузере молча не делала ничего.
 const inTelegram=!!(tg&&tg.initData&&tg.initData.length>0);
+
+// ── Своя память у каждого аккаунта ───────────────────────────────────
+// localStorage общий для всего телеграма на телефоне: он привязан к адресу
+// сайта, а не к аккаунту. Поэтому второй аккаунт на том же телефоне видел
+// чужие данные с первого же открытия — облако-то у каждого своё, но
+// приложение читает сначала локальную память. Теперь у каждого свои ключи.
+const TG_ID=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.id)||0;
+const NS=TG_ID?"u"+TG_ID+":":"";
+const lsGet=k=>localStorage.getItem(NS+k);
+const lsSet=(k,v)=>localStorage.setItem(NS+k,v);
+const lsDel=k=>localStorage.removeItem(NS+k);
+
+// Разовый переезд старых данных, лежавших без имени аккаунта. Забрать их
+// может только первый аккаунт, который откроет приложение после обновления;
+// остальные начинают с чистого листа. Своё они всё равно подтянут из облака.
+(function claimLegacy(){
+  if(!TG_ID)return;
+  const хозяин=localStorage.getItem("legacy_owner");
+  if(хозяин&&хозяин!==String(TG_ID))return;      // старое уже забрал другой
+  if(!хозяин){
+    let было=false;
+    ["log","pet","wheel","goals","theme","demo"].forEach(k=>{
+      const v=localStorage.getItem(k);
+      if(v!==null&&localStorage.getItem(NS+k)===null){localStorage.setItem(NS+k,v);было=true;}
+    });
+    localStorage.setItem("legacy_owner",String(TG_ID));
+    if(было)["log","pet","wheel","goals","demo"].forEach(k=>localStorage.removeItem(k));
+  }
+})();
 if(tg&&inTelegram){tg.ready();tg.expand();}
 
 const THEMES={
@@ -432,7 +463,7 @@ const THEMES={
 const PH=window.PHOTOS||{};
 const hasPhotos=Object.values(PH).some(a=>a&&a.length);
 const usesPhoto=k=>!!THEMES[k]&&(k==="photo"||THEMES[k].photo);
-let theme=localStorage.getItem("theme")||"bw";
+let theme=lsGet("theme")||"bw";
 if(!THEMES[theme]) theme="bw";
 
 function timeKey(){const h=new Date().getHours();
@@ -462,7 +493,7 @@ function applyTheme(){
     .filter(k=>k!=="photo"||hasPhotos)
     .map(k=>`<div class="th ${k===theme?"on":""}" data-t="${k}">${THEMES[k].n}</div>`).join("");
   document.querySelectorAll(".th[data-t]").forEach(el=>el.onclick=()=>{
-    theme=el.dataset.t;localStorage.setItem("theme",theme);applyTheme();renderTotem();});
+    theme=el.dataset.t;lsSet("theme",theme);applyTheme();renderTotem();});
 }
 
 const byCode=c=>SPHERES.find(s=>s.code===c);
@@ -497,7 +528,7 @@ function demo(){
 }
 // Демо показываем только по кнопке. Иначе новый человек увидит чужой вес,
 // чужой пульс и чужую слабую сферу — и не поймёт, каким цифрам верить.
-let DEMO_ON=localStorage.getItem("demo")==="1";
+let DEMO_ON=lsGet("demo")==="1";
 let DAYS=DEMO_ON?demo():[];
 // Ноль означает «сферу ещё не оценивали». Зверь проявляется по мере
 // того, как человек выставляет оценки, а не выдаётся готовым.
@@ -509,7 +540,7 @@ let DATA={today:{sleep:null,mood:null,energy:null,touched:[],note:"",
 
 let IS_DEMO=DEMO_ON, CONFIRM=null;
 function showDemo(on){
-  if(on) localStorage.setItem("demo","1"); else localStorage.removeItem("demo");
+  if(on) lsSet("demo","1"); else lsDel("demo");
   location.reload();
 }
 // Есть ли вообще что показывать
@@ -554,9 +585,9 @@ const todayKey=()=>keyOf(new Date());
 // ── Память приложения ────────────────────────────────────────────────
 // Чек-ины хранятся прямо в телефоне и уезжают боту, когда он на связи.
 const LOG_DAYS=30, LOG_LIMIT=3600;
-function loadLog(){try{return JSON.parse(localStorage.getItem("log")||"{}");}catch(e){return {};}}
+function loadLog(){try{return JSON.parse(lsGet("log")||"{}");}catch(e){return {};}}
 let LOG=loadLog();
-const saveLog=()=>{localStorage.setItem("log",JSON.stringify(LOG));cloudSave();};
+const saveLog=()=>{lsSet("log",JSON.stringify(LOG));cloudSave();};
 
 // ── Облако Телеграма ─────────────────────────────────────────────────
 // localStorage живёт в одном браузере на одном устройстве: открыл на
@@ -600,17 +631,17 @@ function cloudLoad(done){
         // Дни объединяем по дате. При совпадении оставляем местную запись:
         // её только что редактировали руками, она свежее облачной копии.
         LOG={...cloudLog,...LOG};
-        localStorage.setItem("log",JSON.stringify(LOG));
+        lsSet("log",JSON.stringify(LOG));
 
         if(got.wheel){
           const cw=JSON.parse(got.wheel);
           // Пустые оценки не должны затирать заполненные — на новом
           // устройстве колесо пустое, и без этой проверки оно бы стёрло облачное.
           SPHERES.forEach(s=>{ if(!(DATA.wheel[s.code]>0)&&cw[s.code]>0) DATA.wheel[s.code]=cw[s.code]; });
-          localStorage.setItem("wheel",JSON.stringify(DATA.wheel));
+          lsSet("wheel",JSON.stringify(DATA.wheel));
         }
         if(got.goals){DATA.goals={...JSON.parse(got.goals),...DATA.goals};
-          localStorage.setItem("goals",JSON.stringify(DATA.goals));}
+          lsSet("goals",JSON.stringify(DATA.goals));}
         if(got.pet){
           const cp=JSON.parse(got.pet);
           // Зверь родился однажды — берём самую раннюю дату из двух.
@@ -619,7 +650,7 @@ function cloudLoad(done){
           PET.days={...(cp.days||{}),...(PET.days||{})};
           PET.bonus=Math.max(PET.bonus||0,cp.bonus||0);
           PET.spent=Math.max(PET.spent||0,cp.spent||0);
-          localStorage.setItem("pet",JSON.stringify(PET));
+          lsSet("pet",JSON.stringify(PET));
         }
         mergeLog();
         DATA.today=todayState();
@@ -702,13 +733,13 @@ function todayState(){
 }
 
 // Цели живут в памяти приложения — их задаёт человек, а не код
-const savedGoals=(()=>{try{return JSON.parse(localStorage.getItem("goals")||"null");}catch(e){return null;}})();
+const savedGoals=(()=>{try{return JSON.parse(lsGet("goals")||"null");}catch(e){return null;}})();
 if(savedGoals) DATA.goals={...DATA.goals,...savedGoals};
 // Оценки, выставленные руками, сильнее автоматических — так записано в ПРАВИЛАх
-const savedWheel=(()=>{try{return JSON.parse(localStorage.getItem("wheel")||"null");}catch(e){return null;}})();
+const savedWheel=(()=>{try{return JSON.parse(lsGet("wheel")||"null");}catch(e){return null;}})();
 if(savedWheel) DATA.wheel={...DATA.wheel,...savedWheel};
 
-const LS=JSON.parse(localStorage.getItem("pet")||"{}");
+const LS=JSON.parse(lsGet("pet")||"{}");
 // Все поля перечислены явно: то, чего здесь нет, после перезахода пропадёт.
 // Добавляешь механику — добавляй её поле сюда же, иначе оно живёт до закрытия.
 let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
@@ -726,7 +757,7 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          stones:LS.stones||0, lands:LS.lands||[0], capsules:LS.capsules||[],
          chronicle:LS.chronicle||[], slow:LS.slow||[], questOn:LS.questOn||"",
          den:LS.den||[], heard:LS.heard||0, tries:LS.tries||{}, exportedAt:LS.exportedAt||0, once:LS.once||0, seasonSeen:LS.seasonSeen||"", puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0};
-const savePet=()=>{localStorage.setItem("pet",JSON.stringify(PET));cloudSave();};
+const savePet=()=>{lsSet("pet",JSON.stringify(PET));cloudSave();};
 if(!LS.bornAt) savePet();   // фиксируем момент рождения зверя раз и навсегда
 
 // Переезд со старой версии: баллы раньше считались по окну, теперь копятся.
@@ -1083,16 +1114,11 @@ function renderReady(){
 // То, что Александр заметил у Finch: вчера опрос, сегодня «распиши день».
 // Никакой магии — пул типов и ротация. Задание добровольное: пропустил —
 // оно просто ушло, никаких «ты не выполнил». Награда — камни.
-const QUESTS=[
-  {k:"мир",  t:"Побудь с ней минуту",       d:"Открой «Тотем» и просто нажми на рысь. Ничего считать не надо."},
-  {k:"память",t:"Загляни в летопись",        d:"Посмотри, что у вас уже было. Это ваша история, её никто больше не читал."},
-  {k:"тело", t:"Один замер",                d:"Впиши хотя бы одну цифру про тело — вес, пульс или шаги."},
-  {k:"слово",t:"Скажи что-то живому человеку",d:"Одно сообщение или звонок тому, о ком сегодня вспомнил."},
-  {k:"тишина",t:"Пять минут без экрана",     d:"Отложи телефон и посиди. Пять минут, засекать не обязательно."},
-  {k:"место",t:"Посмотри на земли",          d:"Загляни, куда она может уходить и что там ещё закрыто."},
-  {k:"взгляд",t:"Найди глазами что-то хорошее",d:"Одну вещь вокруг, которая тебе нравится. Просто заметь её."},
-  {k:"воздух",t:"Выйди на улицу",            d:"Хоть на десять минут. Погода не имеет значения."}
-];
+// Задания лежат в запечатанном deck.js: шестьдесят штук, и они про жизнь,
+// а не про приложение. Прежние восемь («побудь с ней минуту», «загляни
+// в летопись») были заданиями про сам продукт — Александр назвал их тупыми,
+// и был прав: это механика удержания, притворяющаяся заботой.
+const QUESTS=window.QUESTS||[];
 function questToday(){
   const o=ownOrder(QUESTS,4242);
   return QUESTS[o[dayIndex()%o.length]];
@@ -1733,8 +1759,7 @@ function renderTotem(){
   const names={dawn:"Рассвет",day:"День",sunset:"Закат",night:"Ночь"};
   document.getElementById("totem-date").textContent=
     names[timeKey()]+" · "+new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"})
-    +(IS_DEMO?" · демо-данные":"")
-    +` · версия ${APP_VERSION}`;
+    +(IS_DEMO?" · демо-данные":"");   // версия живёт в кабинете, не здесь
 
   const cx=160,cy=168,step=2*Math.PI/12;
   const gl=getComputedStyle(document.documentElement).getPropertyValue("--brd");
@@ -2398,7 +2423,7 @@ function renderWheel(){
   sc.querySelectorAll(".sn").forEach(el=>el.onclick=()=>{
     const знакомство=rated().length<SPHERES.length;      // ещё не все сферы оценены
     DATA.wheel[d.code]=+el.dataset.n;
-    localStorage.setItem("wheel",JSON.stringify(DATA.wheel));
+    lsSet("wheel",JSON.stringify(DATA.wheel));
     cloudSave();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
 
@@ -2440,7 +2465,7 @@ function spark2(vals,color,goal,h=56){
 }
 function setGoal(key,el){
   const v=parseFloat(String(el.value).replace(",","."));
-  if(!isNaN(v)&&v>0){DATA.goals[key]=v;localStorage.setItem("goals",JSON.stringify(DATA.goals));}
+  if(!isNaN(v)&&v>0){DATA.goals[key]=v;lsSet("goals",JSON.stringify(DATA.goals));}
   renderTrend();
 }
 function renderTrend(){
