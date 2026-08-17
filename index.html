@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=46"></script>
-<script src="data.js?v=46"></script>
-<script src="deck.js?v=46"></script>
+<script src="photos/list.js?v=47"></script>
+<script src="data.js?v=47"></script>
+<script src="deck.js?v=47"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -310,7 +310,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <h2>Сохранить себе</h2>
   <div class="g">
     <div class="dim">Капсулы, летопись, находки и цифры живут в облаке Телеграма. Облако можно потерять — письмо, запечатанное на год, потерять нельзя. Забирай копию себе когда захочешь.</div>
-    <button class="btn" style="margin-top:12px" onclick="exportAll()">Выгрузить всё файлом</button>
+    <button class="btn" style="margin-top:12px" onclick="exportAll()">Выгрузить всё</button>
     <div class="dim" id="export-note" style="margin-top:8px"></div>
   </div>
   <button class="btn ghost" style="margin-top:12px" onclick="go('totem')">Назад</button>
@@ -404,7 +404,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="46 · 17.08.2026 17:50";
+const APP_VERSION="47 · 18.08.2026 02:03";
 
 let toastTimer=null;
 function toast(text){
@@ -1069,21 +1069,56 @@ function exportText(){
   });
   return L.join("\n");
 }
+// Скачать файл из мини-аппа в Телеграме нельзя: ссылка с download там
+// молча не срабатывает — ни файла, ни ошибки. Прежний код ловил исключение,
+// которого не бывает, поэтому запасной путь не включался никогда и кнопка
+// выглядела мёртвой. Теперь наоборот: текст всегда показывается на экране,
+// откуда его можно выделить и скопировать руками, а буфер и скачивание —
+// попытки сверху, которые могут и не сработать.
 function exportAll(){
   const текст=exportText(), нота=document.getElementById("export-note");
   const имя=`баланс-${todayKey()}.txt`;
-  try{
-    const b=new Blob([текст],{type:"text/plain;charset=utf-8"});
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(b); a.download=имя;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-    нота.textContent=`Файл ${имя} — ${(текст.length/1024).toFixed(1)} КБ. Если телеграм не дал скачать, нажми ещё раз: скопирую в буфер.`;
-    PET.exportedAt=Date.now(); savePet();
-  }catch(e){
-    if(navigator.clipboard) navigator.clipboard.writeText(текст);
-    нота.textContent="Скачивание тут запрещено — скопировал всё в буфер, вставляй куда угодно.";
+  PET.exportedAt=Date.now(); savePet();
+
+  // 1. Всегда кладём текст на экран — это работает везде и всегда
+  нота.innerHTML=
+    `<div>Твоя копия — ${(текст.length/1024).toFixed(1)} КБ. Выдели и скопируй, `+
+    `или отправь себе в «Избранное».</div>`+
+    `<textarea id="export-box" rows="7" readonly style="margin-top:8px;font-size:12px"></textarea>`+
+    `<button class="btn" style="margin-top:8px" onclick="copyExport()">Скопировать</button>`;
+  const бокс=document.getElementById("export-box");
+  бокс.value=текст; бокс.scrollTop=0;      // показываем с начала, а не с конца
+
+  // 2. Вне телеграма ещё и скачиваем файлом — там это работает
+  if(!inTelegram){
+    try{
+      const b=new Blob([текст],{type:"text/plain;charset=utf-8"});
+      const a=document.createElement("a");
+      a.href=URL.createObjectURL(b); a.download=имя;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    }catch(e){}
   }
+  copyExport(true);                    // и сразу пробуем в буфер, молча
+}
+
+function copyExport(тихо){
+  const box=document.getElementById("export-box");
+  if(!box)return;
+  let вышло=false;
+  try{
+    box.removeAttribute("readonly");
+    box.setSelectionRange(0,box.value.length);   // без focus, иначе поле уезжает вниз
+    вышло=document.execCommand&&document.execCommand("copy");
+    box.setAttribute("readonly","");
+  }catch(e){}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(box.value).then(()=>{
+      if(!тихо)toast("Скопировано");
+    }).catch(()=>{ if(!тихо&&!вышло)toast("Скопируй вручную — текст выделен"); });
+    return;
+  }
+  if(!тихо)toast(вышло?"Скопировано":"Скопируй вручную — текст выделен");
 }
 
 // ── Готовность дня ───────────────────────────────────────────────────
