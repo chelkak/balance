@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=43"></script>
-<script src="data.js?v=43"></script>
-<script src="deck.js?v=43"></script>
+<script src="photos/list.js?v=44"></script>
+<script src="data.js?v=44"></script>
+<script src="deck.js?v=44"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -397,7 +397,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="43 · 17.08.2026 16:23";
+const APP_VERSION="44 · 17.08.2026 16:35";
 
 let toastTimer=null;
 function toast(text){
@@ -1362,14 +1362,14 @@ function renderLands(){
     return `<div class="g" style="margin-bottom:8px;padding:0;overflow:hidden">`+
       `<div style="position:relative;height:132px">`+
         `<img src="${landPhoto(i)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;
-           object-fit:cover;${открыта?"":"filter:blur(13px) saturate(.5) brightness(.55);transform:scale(1.12)"}">`+
+           object-fit:cover;${открыта?"":"filter:blur(5px) saturate(.85) brightness(.8);transform:scale(1.06)"}">`+
         `<div style="position:absolute;inset:0;background:linear-gradient(transparent 30%,rgba(6,8,14,.82))"></div>`+
         `<div style="position:absolute;left:14px;right:14px;bottom:11px;display:flex;
            justify-content:space-between;align-items:flex-end;gap:10px">`+
           `<div>`+
-            `<div style="font:600 16px var(--fu);color:#fff">${открыта?l.n:"Неизвестное место"}</div>`+
+            `<div style="font:600 16px var(--fu);color:#fff">${l.n}</div>`+
             `<div style="font-size:12.5px;color:rgba(255,255,255,.74);margin-top:2px">`+
-              `${открыта?l.o:"Она туда ещё не ходила."}</div>`+
+              `${открыта?l.o:"Она туда ещё не ходила"}</div>`+
           `</div>`+
           `<div style="font:600 13px var(--fu);color:#fff;white-space:nowrap">`+
             `${открыта?`${собрано} из ${всего}`:`${l.c} 💎`}</div>`+
