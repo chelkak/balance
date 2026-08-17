@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=42"></script>
-<script src="data.js?v=42"></script>
-<script src="deck.js?v=42"></script>
+<script src="photos/list.js?v=43"></script>
+<script src="data.js?v=43"></script>
+<script src="deck.js?v=43"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -397,7 +397,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="42 · 17.08.2026 16:16";
+const APP_VERSION="43 · 17.08.2026 16:23";
 
 let toastTimer=null;
 function toast(text){
@@ -1086,28 +1086,40 @@ function readiness(){
   return {состояние,сдвиг,слабое,норма:{сон:сонН,энергия:энН,пульс:пулН},части};
 }
 const READY_WORDS={
-  "рабочий":{t:"Рабочий день",d:"Тело сегодня выше твоей обычной нормы. Хороший день, чтобы взяться за то, что откладывал."},
-  "ровный": {t:"Ровный день",d:"Всё примерно как обычно. Обычные дни — то, из чего состоит год."},
-  "бережный":{t:"Бережный день",d:"Ты сегодня ниже своей нормы. Это не провал и не повод себя подгонять — просто планируй поменьше."}
+  "рабочий":{t:"Рабочий день",d:"тело выше обычного — можно взяться за отложенное"},
+  "ровный": {t:"Ровный день",d:"всё как обычно"},
+  "бережный":{t:"Бережный день",d:"ниже своей нормы — планируй поменьше"}
 };
+// Показываем одной строкой. Раньше это был блок в четыре строки с процентами
+// вроде «сон −28% к твоей норме» — язык аналитика, а не человека, и он
+// перегружал экран. Разбор прячется за нажатие: кому надо — развернёт.
+let READY_OPEN=false;
+function toggleReady(){READY_OPEN=!READY_OPEN;renderReady();}
 function renderReady(){
   const box=document.getElementById("ready");
   if(!box)return;
   const r=readiness();
   if(!r){
-    box.innerHTML=`<div class="lead">Готовность дня</div>`+
-      `<div class="dim" style="margin-top:6px">Появится, когда наберётся неделя записей: считать «норму» надо по твоим цифрам, а не по чужим таблицам. Записано дней: ${DAYS.length}.</div>`;
+    // Пока нормы нет — молчим совсем, а не занимаем место обещанием
+    box.style.display="none";
     return;
   }
+  box.style.display="";
   const w=READY_WORDS[r.состояние];
   const цвет=r.состояние==="рабочий"?"#7fc0a4":r.состояние==="бережный"?"#e0a06b":"var(--ink2)";
+  box.style.cursor="pointer";
+  box.onclick=toggleReady;
   box.innerHTML=
-    `<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Готовность дня</div>`+
-    `<div style="font:600 20px var(--fd);margin-top:6px;color:${цвет}">${w.t}</div>`+
-    `<div class="dim" style="margin-top:6px">${w.d}</div>`+
-    `<div class="dim" style="margin-top:10px;font-size:12px">`+
-      r.части.map(c=>`${c.к}: ${c.v>=0?"+":"−"}${Math.abs(Math.round(c.v*100))}% к твоей норме`).join(" · ")+
-    `</div>`;
+    `<div style="display:flex;align-items:baseline;gap:8px">`+
+      `<div style="font:600 16px var(--fu);color:${цвет}">${w.t}</div>`+
+      `<div class="dim" style="font-size:13px;flex:1">${w.d}</div>`+
+    `</div>`+
+    (READY_OPEN
+      ? `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd);font-size:12px">`+
+        `Сравниваю с твоей средней за месяц:<br>`+
+        r.части.map(c=>`${c.к} ${c.v>=0?"выше":"ниже"} нормы на ${Math.abs(Math.round(c.v*100))}%`).join("<br>")+
+        `</div>`
+      : "");
 }
 
 // ── Задание дня ──────────────────────────────────────────────────────
