@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=45"></script>
-<script src="data.js?v=45"></script>
-<script src="deck.js?v=45"></script>
+<script src="photos/list.js?v=46"></script>
+<script src="data.js?v=46"></script>
+<script src="deck.js?v=46"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -301,6 +301,12 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <h2>Оформление</h2>
   <div class="themes" id="themes"></div>
   <div class="g" id="me-info"></div>
+  <h2>Начать заново</h2>
+  <div class="g">
+    <div class="dim">Стереть всё и начать с чистого листа: новый зверь, пустая летопись, ноль находок. Отменить будет нельзя — сначала выгрузи копию себе.</div>
+    <button class="btn ghost" style="margin-top:12px" onclick="resetAll()">Стереть и начать заново</button>
+    <div class="dim" id="reset-note" style="margin-top:8px"></div>
+  </div>
   <h2>Сохранить себе</h2>
   <div class="g">
     <div class="dim">Капсулы, летопись, находки и цифры живут в облаке Телеграма. Облако можно потерять — письмо, запечатанное на год, потерять нельзя. Забирай копию себе когда захочешь.</div>
@@ -398,7 +404,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="45 · 17.08.2026 17:14";
+const APP_VERSION="46 · 17.08.2026 17:50";
 
 let toastTimer=null;
 function toast(text){
@@ -430,6 +436,11 @@ const lsDel=k=>localStorage.removeItem(NS+k);
 // остальные начинают с чистого листа. Своё они всё равно подтянут из облака.
 (function claimLegacy(){
   if(!TG_ID)return;
+  // Забрать старые данные может только владелец. Отличаем его по тому, что
+  // его кнопка бота даёт ссылку с данными после решётки, а гостю уходит
+  // чистый адрес. Без этой проверки гость, открывший приложение на чужом
+  // телефоне, унаследовал бы чужого зверя вместе с его возрастом.
+  if(location.hash.length<=2)return;
   const хозяин=localStorage.getItem("legacy_owner");
   if(хозяин&&хозяин!==String(TG_ID))return;      // старое уже забрал другой
   if(!хозяин){
@@ -997,6 +1008,25 @@ function marksText(){
 // в облаке Телеграма — аккаунт, переустановка, сбой, и обещания нет.
 // Поэтому копию можно забрать себе в любой момент, обычным текстом,
 // который читается без всякого приложения.
+// Полный сброс. Нужен, когда данные перепутались — например, приложение
+// открыли на чужом телефоне и достался чужой зверь. Стираем только СВОЮ
+// память: ключи с приставкой своего аккаунта, чужие не трогаем.
+let RESET_ARMED=false;
+function resetAll(){
+  const нота=document.getElementById("reset-note");
+  if(!RESET_ARMED){
+    RESET_ARMED=true;
+    нота.innerHTML="<b>Нажми ещё раз, чтобы подтвердить.</b> Всё сотрётся навсегда.";
+    setTimeout(()=>{RESET_ARMED=false;нота.textContent="";},8000);
+    return;
+  }
+  ["log","pet","wheel","goals","theme","demo"].forEach(k=>lsDel(k));
+  if(CLOUD){["log_n","wheel","goals","pet"].forEach(k=>CLOUD.removeItem(k,()=>{}));
+    for(let i=0;i<40;i++)CLOUD.removeItem("log_"+i,()=>{});}
+  нота.textContent="Готово. Перезапускаю…";
+  setTimeout(()=>location.reload(),900);
+}
+
 function exportText(){
   const м=["января","февраля","марта","апреля","мая","июня","июля",
            "августа","сентября","октября","ноября","декабря"];
@@ -1943,7 +1973,7 @@ function renderTotem(){
   // лавку. Число, которое только растёт и ничего не делает, — пустой шум.
   // Само начисление осталось: оно уезжает боту в отчёте (поле pt).
   document.getElementById("totem-state").innerHTML=
-    `<div><div class="lead">Зрелость ${maturity().toFixed(1)} из 10</div>
+    `<div><div class="lead">${сколько?`Сферы в среднем — ${maturity().toFixed(1)} из 10`:"Сферы ещё не оценены"}</div>
         <div class="fname" style="margin:5px 0 0">${PET.name||state}</div>
         ${PET.name?`<div class="dim" style="margin-top:3px">${state}</div>`:""}</div>
      ${nameBlock()}
@@ -1973,8 +2003,10 @@ function renderTotem(){
     const done=growthStepsPassed(), hoursLeft=GROWTH_STEP_H-((Date.now()-(PET.bornAt||Date.now()))/3600000%GROWTH_STEP_H);
     document.getElementById("totem-state").innerHTML+=
       `<div class="dim" style="margin-top:8px">${done>=GROWTH_STEPS
-        ? "Вырос полностью — тридцать дней позади"
-        : `Растёт сам: шаг ${done} из ${GROWTH_STEPS} · следующий примерно через ${Math.ceil(hoursLeft)} ч`}</div>`;
+        ? "Выросла полностью — тридцать дней позади"
+        : done===0
+          ? "Первый день вместе. Растёт сама, ничего делать не надо"
+          : `Стадия ${stageNow()} из ${PHOTO_FRAMES} · следующий подрост примерно через ${Math.ceil(hoursLeft)} ч`}</div>`;
   }
   updatePhoto();
 }
