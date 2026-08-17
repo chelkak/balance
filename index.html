@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=41"></script>
-<script src="data.js?v=41"></script>
-<script src="deck.js?v=41"></script>
+<script src="photos/list.js?v=42"></script>
+<script src="data.js?v=42"></script>
+<script src="deck.js?v=42"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -327,13 +327,13 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <section id="v-today" class="hidden">
   <div class="head"><h1>Сегодня</h1><div class="sub" id="today-date"></div></div>
   <div class="g" id="ready"></div>
-  <div class="g quote" id="quote"></div>
-  <h2 id="quest-title">Задание дня</h2>
-  <div class="g" id="quest"></div>
-  <h2 id="card-title">Карта дня</h2>
-  <div class="g" id="card"></div>
   <div id="today-body"></div>
-  <h2 id="puzzle-title">Задачка дня</h2>
+  <h2 id="quest-title">Одно дело</h2>
+  <div class="g" id="quest"></div>
+  <h2 id="card-title">Мысль дня</h2>
+  <div class="g" id="card"></div>
+  <div class="g quote" id="quote"></div>
+  <h2 id="puzzle-title">Разминка</h2>
   <div class="g" id="puzzle"></div>
 </section>
 
@@ -397,7 +397,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="41 · 17.08.2026 16:04";
+const APP_VERSION="42 · 17.08.2026 16:16";
 
 let toastTimer=null;
 function toast(text){
@@ -2049,12 +2049,12 @@ function renderPuzzle(){
   const решено=PET.puzzleOn===todayKey()?(PET.puzzleDone||0):0;
 
   if(решено>=PUZZLES_PER_DAY){             // на сегодня всё — блок закрыт
-    if(title) title.textContent="Задачки дня";
+    if(title) title.textContent="Разминка";
     box.innerHTML=`<div class="fname">На сегодня всё</div>`+
       `<div class="dim" style="margin-top:6px">Три из трёх. Завтра будут новые и чуть сложнее.</div>`;
     return;
   }
-  if(title) title.textContent=`Задачка дня · ${решено+1} из ${PUZZLES_PER_DAY}`;
+  if(title) title.textContent=`Разминка · ${решено+1} из ${PUZZLES_PER_DAY}`;
   PZ=PZ||makePuzzle();
   box.innerHTML=`<div class="lead">Внимание и логика</div>
     <div style="font:600 18px var(--fd);margin-top:8px">${PZ.q}</div>
@@ -2159,7 +2159,7 @@ function renderToday(){
         <div class="why">Система сама найдёт сторону, которой достаётся меньше всего,
           и будет тянуть внимание туда. Пока просто выбери, чем заняться.</div></div>`;
   body.innerHTML=шапка+`
-    <h2>Задачи на сегодня</h2>
+    <h2>Что зажечь сегодня</h2>
     <div class="g" id="tasks"></div>`;
   const tb=document.getElementById("tasks");
   // Ни баллов, ни пометки «уже горит» справа: это просто список дел на день.
