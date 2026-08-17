@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=39"></script>
-<script src="data.js?v=39"></script>
-<script src="deck.js?v=39"></script>
+<script src="photos/list.js?v=40"></script>
+<script src="data.js?v=40"></script>
+<script src="deck.js?v=40"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -269,6 +269,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
           <img id="photo-a" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s ease">
           <img id="photo-b" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s ease">
         </div></div>
+        <div id="totem-marks" style="position:absolute;inset:0;pointer-events:none"></div>
         <div id="totem-night" style="position:absolute;inset:0;background:rgba(8,10,18,.4);opacity:0;
           transition:opacity 2s ease;pointer-events:none"></div>
       </div>
@@ -298,6 +299,12 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <h2>Оформление</h2>
   <div class="themes" id="themes"></div>
   <div class="g" id="me-info"></div>
+  <h2>Сохранить себе</h2>
+  <div class="g">
+    <div class="dim">Капсулы, летопись, находки и цифры живут в облаке Телеграма. Облако можно потерять — письмо, запечатанное на год, потерять нельзя. Забирай копию себе когда захочешь.</div>
+    <button class="btn" style="margin-top:12px" onclick="exportAll()">Выгрузить всё файлом</button>
+    <div class="dim" id="export-note" style="margin-top:8px"></div>
+  </div>
   <button class="btn ghost" style="margin-top:12px" onclick="go('totem')">Назад</button>
 </section>
 
@@ -317,6 +324,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
 <section id="v-today" class="hidden">
   <div class="head"><h1>Сегодня</h1><div class="sub" id="today-date"></div></div>
+  <div class="g" id="ready"></div>
   <div class="g quote" id="quote"></div>
   <h2 id="quest-title">Задание дня</h2>
   <div class="g" id="quest"></div>
@@ -387,7 +395,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="39 · 17.08.2026 11:02";
+const APP_VERSION="40 · 17.08.2026 11:51";
 
 let toastTimer=null;
 function toast(text){
@@ -717,7 +725,7 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          // земли, камни, капсулы, летопись, задачки
          stones:LS.stones||0, lands:LS.lands||[0], capsules:LS.capsules||[],
          chronicle:LS.chronicle||[], slow:LS.slow||[], questOn:LS.questOn||"",
-         den:LS.den||[], heard:LS.heard||0, once:LS.once||0, seasonSeen:LS.seasonSeen||"", puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0};
+         den:LS.den||[], heard:LS.heard||0, tries:LS.tries||{}, exportedAt:LS.exportedAt||0, once:LS.once||0, seasonSeen:LS.seasonSeen||"", puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0};
 const savePet=()=>{localStorage.setItem("pet",JSON.stringify(PET));cloudSave();};
 if(!LS.bornAt) savePet();   // фиксируем момент рождения зверя раз и навсегда
 
@@ -746,6 +754,25 @@ const weakest=()=>{
   const из=быстрые.length?быстрые:база;      // все долгие — тогда как раньше
   return из.reduce((m,s)=>(DATA.wheel[s.code]||0)<(DATA.wheel[m.code]||0)?s:m,из[0]);
 };
+// ── Счётчик попыток ──────────────────────────────────────────────────
+// Весь мир меряет результат: есть работа или нет. Девять месяцев поиска
+// при этом выглядят как пустота — хотя это сотни отправленных откликов,
+// переписанных резюме и собеседований, после которых не перезвонили.
+// Каждое из них требовало усилия ровно тогда, когда его взять неоткуда.
+// Счётчик считает сделанное. Только вверх, без обнуления, никогда не падает.
+const TRY_MARKS=[10,25,50,100,200,350,500,1000];
+const triesOf=c=>(PET.tries||{})[c]||0;
+function addTry(code){
+  PET.tries={...(PET.tries||{})};
+  PET.tries[code]=triesOf(code)+1;
+  const n=PET.tries[code], s=byCode(code);
+  if(TRY_MARKS.includes(n))
+    летопись(`${n} ${plural(n,"попытка","попытки","попыток")} — ${s.name.toLowerCase()}. Ни одна не пропала.`);
+  savePet();renderWheel();
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+  toast(`${n} ${plural(n,"попытка","попытки","попыток")}`);
+}
+
 function toggleSlow(code){
   PET.slow=(PET.slow||[]).includes(code)
     ? PET.slow.filter(c=>c!==code)
@@ -884,6 +911,173 @@ function openCapsule(){
   if(k){k.read=1;savePet();летопись("Ты открыл письмо, написанное "+k.d+".");}
 }
 function laterCapsule(){document.getElementById("capsule-modal").style.display="none";}
+
+// ── Метки: зверь, которого больше ни у кого нет ──────────────────────
+// Рысь у всех одинаковая — это то место, где терялась уникальность.
+// Новые фотографии на каждый случай не нужны: поверх снимка ложатся
+// тонкие прозрачные слои, и шесть слоёв дают сотни сочетаний.
+// Каждый слой обязан значить что-то прожитое, иначе это просто украшение.
+// Файлов ещё нет — код молча ничего не рисует и ждёт художника.
+const MARKS_DIR="pet/marks/";
+function marksNow(){
+  const m=[];
+  const вед=strongest(), сл=weakest();
+  if((DATA.wheel[вед.code]||0)>=7) m.push({f:"lead-"+вед.code, w:`метка сильной стороны — ${вед.name.toLowerCase()}`});
+  const мес=Math.floor(daysWithMe()/30);
+  if(мес>=3) m.push({f:"grey-"+Math.min(3,Math.floor(мес/3)), w:`седина: ${мес} ${plural(мес,"месяц","месяца","месяцев")} вместе`});
+  if(hardDays()>=7) m.push({f:"scar", w:"след тяжёлого периода"});
+  const хар=natureWords()[0];
+  if(хар) m.push({f:"nature-"+хар, w:`характер: ${хар}`});
+  const ред=(PET.finds||[]).filter(i=>FINDS[i]&&FINDS[i].r===2).length;
+  if(ред>=1) m.push({f:"legend", w:`легендарных находок: ${ред}`});
+  if((PET.lands||[0]).length>=5) m.push({f:"far", w:"ходит далеко"});
+  return m;
+}
+// Пока художник не прислал слои, шесть картинок дают шесть ошибок 404
+// на каждое открытие. Поэтому сначала один пробный запрос: нет папки —
+// слои не рисуем вообще. Появятся файлы — включится само, без правки кода.
+let MARKS_READY=false;
+(function probeMarks(){
+  const im=new Image();
+  im.onload=()=>{MARKS_READY=true;renderMarks();};
+  im.onerror=()=>{MARKS_READY=false;};
+  im.src=MARKS_DIR+"probe.png";
+})();
+function renderMarks(){
+  const box=document.getElementById("totem-marks");
+  if(!box)return;
+  if(!MARKS_READY){box.innerHTML="";return;}
+  box.innerHTML=marksNow().map(x=>
+    `<img src="${MARKS_DIR}${x.f}.png" alt="" onerror="this.remove()"
+      style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+      opacity:.9"> `).join("");
+}
+// Словами — чтобы механика работала уже сейчас, до появления картинок,
+// и чтобы было видно, из чего именно сложился твой зверь.
+function marksText(){
+  const m=marksNow();
+  return m.length?m.map(x=>x.w).join(" · "):null;
+}
+
+// ── Выгрузка ─────────────────────────────────────────────────────────
+// Мы пообещали человеку, что письмо вернётся через год. Данные лежат
+// в облаке Телеграма — аккаунт, переустановка, сбой, и обещания нет.
+// Поэтому копию можно забрать себе в любой момент, обычным текстом,
+// который читается без всякого приложения.
+function exportText(){
+  const м=["января","февраля","марта","апреля","мая","июня","июля",
+           "августа","сентября","октября","ноября","декабря"];
+  const дата=k=>{const[г,мм,д]=k.split("-");return `${+д} ${м[+мм-1]} ${г}`;};
+  const L=[];
+  L.push("БАЛАНС — копия всего, что накопилось");
+  L.push("Выгружено "+new Date().toLocaleString("ru-RU"));
+  L.push("Зверь: "+(PET.name||"без имени")+", дней вместе: "+daysWithMe());
+  L.push("");
+  L.push("═══ ПИСЬМА СЕБЕ ═══");
+  const кап=(PET.capsules||[]);
+  if(!кап.length)L.push("(пока ни одного)");
+  кап.forEach(k=>{
+    L.push("");
+    L.push("Написано: "+дата(k.d));
+    L.push("Открыть: "+new Date(k.open).toLocaleDateString("ru-RU")+(k.read?" (прочитано)":""));
+    L.push(k.t);
+  });
+  L.push("");
+  L.push("═══ ЛЕТОПИСЬ ═══");
+  (PET.chronicle||[]).forEach(z=>L.push(дата(z.d)+" — "+z.t));
+  L.push("");
+  L.push("═══ ПОПЫТКИ ═══");
+  SPHERES.forEach(s=>{const n=triesOf(s.code);if(n)L.push(s.name+": "+n);});
+  L.push("");
+  L.push("═══ НАХОДКИ ═══");
+  (PET.finds||[]).forEach(i=>{const f=FINDS[i];
+    if(f)L.push(f.n+" — "+LANDS[landOf(i)].n+(f.r?" ("+["","редкая","легендарная"][f.r]+")":""));});
+  L.push("");
+  L.push("═══ ДНИ ═══");
+  L.push("дата; сон; настроение; энергия; пульс; вес; шаги; км; сфер горело; строка про день");
+  // У дня поле называется date и хранит момент времени, а не строку «2026-08-17».
+  // Без keyOf в выгрузке была пустая первая колонка — файл без дат бесполезен.
+  DAYS.forEach(d=>{
+    const к=keyOf(new Date(d.date));
+    // Строка про день живёт в LOG, а не в DAYS — иначе колонка была бы пустой
+    const заметка=((LOG[к]||{}).n||"").replace(/[;\r\n]+/g," ");
+    L.push([к,d.sleep,d.mood,d.energy,d.pulse,d.weight,d.steps,d.dist,
+            (d.touched||[]).length,заметка].map(v=>v==null?"":v).join("; "));
+  });
+  return L.join("\n");
+}
+function exportAll(){
+  const текст=exportText(), нота=document.getElementById("export-note");
+  const имя=`баланс-${todayKey()}.txt`;
+  try{
+    const b=new Blob([текст],{type:"text/plain;charset=utf-8"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(b); a.download=имя;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    нота.textContent=`Файл ${имя} — ${(текст.length/1024).toFixed(1)} КБ. Если телеграм не дал скачать, нажми ещё раз: скопирую в буфер.`;
+    PET.exportedAt=Date.now(); savePet();
+  }catch(e){
+    if(navigator.clipboard) navigator.clipboard.writeText(текст);
+    нота.textContent="Скачивание тут запрещено — скопировал всё в буфер, вставляй куда угодно.";
+  }
+}
+
+// ── Готовность дня ───────────────────────────────────────────────────
+// Одно число из твоих же цифр — сон, пульс покоя, энергия — относительно
+// ТВОЕЙ нормы, а не чужих таблиц. Смысл не в том, чтобы его повышать:
+// это подсказка, какой сегодня день — рабочий или бережный. Поэтому
+// показываем словами, а «рекорда готовности» здесь нет и не будет.
+const READY_MIN_DAYS=7;
+function personalNorm(field,дней=28){
+  const все=DAYS.slice(-дней).map(d=>d[field]).filter(v=>v!=null&&v>0);
+  return все.length>=3?avg(все):null;
+}
+function readiness(){
+  const свежие=DAYS.slice(-14).filter(d=>d.sleep!=null||d.energy!=null);
+  if(DAYS.length<READY_MIN_DAYS||!свежие.length)return null;
+
+  const последний=[...DAYS].reverse().find(d=>d.sleep!=null||d.energy!=null);
+  if(!последний)return null;
+
+  const части=[];
+  const сонН=personalNorm("sleep"), энН=personalNorm("energy"), пулН=personalNorm("pulse");
+  if(последний.sleep!=null&&сонН) части.push({к:"сон",v:(последний.sleep-сонН)/Math.max(1,сонН)});
+  if(последний.energy!=null&&энН) части.push({к:"энергия",v:(последний.energy-энН)/Math.max(1,энН)});
+  // Пульс покоя выше нормы — организм ещё не восстановился, поэтому знак обратный
+  const пульс=[...DAYS].reverse().find(d=>d.pulse!=null&&d.pulse>0);
+  if(пульс&&пулН) части.push({к:"пульс",v:-(пульс.pulse-пулН)/Math.max(1,пулН)});
+  if(!части.length)return null;
+
+  const сдвиг=avg(части.map(c=>c.v));
+  const слабое=части.slice().sort((a,b)=>a.v-b.v)[0];
+  const состояние=сдвиг>0.06?"рабочий":сдвиг<-0.08?"бережный":"ровный";
+  return {состояние,сдвиг,слабое,норма:{сон:сонН,энергия:энН,пульс:пулН},части};
+}
+const READY_WORDS={
+  "рабочий":{t:"Рабочий день",d:"Тело сегодня выше твоей обычной нормы. Хороший день, чтобы взяться за то, что откладывал."},
+  "ровный": {t:"Ровный день",d:"Всё примерно как обычно. Обычные дни — то, из чего состоит год."},
+  "бережный":{t:"Бережный день",d:"Ты сегодня ниже своей нормы. Это не провал и не повод себя подгонять — просто планируй поменьше."}
+};
+function renderReady(){
+  const box=document.getElementById("ready");
+  if(!box)return;
+  const r=readiness();
+  if(!r){
+    box.innerHTML=`<div class="lead">Готовность дня</div>`+
+      `<div class="dim" style="margin-top:6px">Появится, когда наберётся неделя записей: считать «норму» надо по твоим цифрам, а не по чужим таблицам. Записано дней: ${DAYS.length}.</div>`;
+    return;
+  }
+  const w=READY_WORDS[r.состояние];
+  const цвет=r.состояние==="рабочий"?"#7fc0a4":r.состояние==="бережный"?"#e0a06b":"var(--ink2)";
+  box.innerHTML=
+    `<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Готовность дня</div>`+
+    `<div style="font:600 20px var(--fd);margin-top:6px;color:${цвет}">${w.t}</div>`+
+    `<div class="dim" style="margin-top:6px">${w.d}</div>`+
+    `<div class="dim" style="margin-top:10px;font-size:12px">`+
+      r.части.map(c=>`${c.к}: ${c.v>=0?"+":"−"}${Math.abs(Math.round(c.v*100))}% к твоей норме`).join(" · ")+
+    `</div>`;
+}
 
 // ── Задание дня ──────────────────────────────────────────────────────
 // То, что Александр заметил у Finch: вчера опрос, сегодня «распиши день».
@@ -1293,6 +1487,8 @@ function renderFinds(){
       (слов.length?`Характер складывается из твоих ответов после прогулок. Их было ${PET.walks||0}.`
                   :"Отпусти её побродить и ответь, когда вернётся, — характер начнёт складываться.")+
     `</div>`+
+    (marksText()?`<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
+      `<b>Из чего сложился твой зверь</b><br>${marksText()}</div>`:"")+
     `<div style="margin-top:12px;font:600 15px var(--fu)">${PET.stones||0} 💎 камней</div>`+
     `<div class="dim" style="margin-top:3px">Копятся с прогулок: чем реже находка, тем больше. Тратятся на новые земли.</div>`;
 
@@ -2183,6 +2379,17 @@ function renderWheel(){
            : "Включи, если тут всё зависит не от тебя одного: работу можно искать год, и низкая оценка будет не про лень. Приложение перестанет выбирать эту сферу как самую слабую."}</div>
        <button class="btn ghost" style="margin-top:10px" onclick="toggleSlow('${d.code}')">
          ${isSlow(d.code)?"Сделать обычной":"Отметить как долгую"}</button>
+     </div>
+     <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--brd)">
+       <div style="display:flex;justify-content:space-between;align-items:baseline">
+         <div class="lead">Попытки</div>
+         <div style="font:600 26px var(--fd);color:${d.color}">${triesOf(d.code)}</div>
+       </div>
+       <div class="dim" style="margin-top:6px">
+         ${triesOf(d.code)
+           ? "Столько раз ты здесь что-то сделал. Это число не обнуляется никогда и не зависит от того, получилось или нет."
+           : "Отклик, звонок, переписанное резюме, разговор — всё, что ты здесь сделал. Результат может не приходить месяцами, попытки остаются твоими."}</div>
+       <button class="btn" style="margin-top:10px" onclick="addTry('${d.code}')">Ещё одна попытка</button>
      </div>`;
   // Оценки ставятся здесь: без этого телу зверя нечем меняться
   const sc=document.getElementById("wheel-scale");
@@ -2297,8 +2504,8 @@ function go(v){
     const n=document.getElementById("n-"+x);
     if(n) n.classList.toggle("act2",x===v);});
   window.scrollTo(0,0);
-  if(v==="totem"){renderTotem();renderWalk();renderDen();renderSeason();}
-  if(v==="today"){renderToday();renderQuest();renderCard();}
+  if(v==="totem"){renderTotem();renderWalk();renderDen();renderSeason();renderMarks();}
+  if(v==="today"){renderToday();renderReady();renderQuest();renderCard();}
   if(v==="checkin")openCheckin();
   if(v==="finds")renderFinds();
   if(v==="me")renderMe();
