@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=37"></script>
-<script src="deck.js?v=37"></script>
+<script src="photos/list.js?v=38"></script>
+<script src="deck.js?v=38"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -242,8 +242,13 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <div class="wrap">
 
 <section id="v-totem">
-  <div class="head"><h1 id="hello"></h1><div class="sub" id="totem-date"></div></div>
-  <div class="themes" id="themes"></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+    <div class="head"><h1 id="hello"></h1><div class="sub" id="totem-date"></div></div>
+    <div id="cabinet-btn" onclick="go('me')" title="Кабинет"
+      style="flex:0 0 auto;width:38px;height:38px;border-radius:12px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;font-size:17px;
+      background:var(--card);border:1px solid var(--brd)">☰</div>
+  </div>
   <div class="g" style="text-align:center;padding:0;overflow:hidden">
     <div id="totem-wrap" style="position:relative;width:100%;aspect-ratio:1/1;margin:0 auto" onclick="pokeTotem()">
       <svg id="totem" viewBox="0 0 320 320" width="100%" height="100%" style="cursor:pointer;display:block"></svg>
@@ -273,6 +278,14 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="g" id="totem-state" style="margin-top:12px"></div>
   <div class="g" id="walk-box" style="margin-top:12px"></div>
   <button class="btn" onclick="go('today')">Что сегодня</button>
+</section>
+
+<section id="v-me" class="hidden">
+  <div class="head"><h1>Кабинет</h1><div class="sub" id="me-sub"></div></div>
+  <h2>Оформление</h2>
+  <div class="themes" id="themes"></div>
+  <div class="g" id="me-info"></div>
+  <button class="btn ghost" style="margin-top:12px" onclick="go('totem')">Назад</button>
 </section>
 
 <section id="v-finds" class="hidden">
@@ -321,13 +334,11 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <h2>Что сегодня горело</h2>
   <div class="sub" style="margin-bottom:10px">Отметь, где сделал хотя бы минимум — сфера считается зажжённой</div>
   <div class="spheres" id="sp-edit"></div>
-  <div class="g" id="spark-hint" style="margin-top:12px"></div>
 
   <h2 id="note-title">Строка про день</h2>
   <div class="sub" id="note-sub" style="margin-bottom:8px"></div>
   <textarea id="note" rows="2" placeholder="Необязательно"></textarea>
 
-  <div class="g" id="summary" style="margin-top:14px"></div>
   <button class="btn" onclick="save()">Сохранить и закрыть</button>
   <button class="btn ghost" onclick="go('totem')">Отмена</button>
 </section>
@@ -361,7 +372,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="37 · 17.08.2026 10:18";
+const APP_VERSION="38 · 17.08.2026 10:50";
 
 let toastTimer=null;
 function toast(text){
@@ -839,7 +850,7 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          finds:LS.finds||[], traits:LS.traits||{},
          // земли, камни, капсулы, летопись, задачки
          stones:LS.stones||0, lands:LS.lands||[0], capsules:LS.capsules||[],
-         chronicle:LS.chronicle||[], puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0};
+         chronicle:LS.chronicle||[], slow:LS.slow||[], puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0};
 const savePet=()=>{localStorage.setItem("pet",JSON.stringify(PET));cloudSave();};
 if(!LS.bornAt) savePet();   // фиксируем момент рождения зверя раз и навсегда
 
@@ -855,11 +866,26 @@ let edit={...DATA.today,touched:[...DATA.today.touched]};
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 function plural(n,o,f,m){const a=Math.abs(n)%100,b=a%10;
   return a>10&&a<20?m:b>1&&b<5?f:b===1?o:m;}
+// «Долгая» сфера — та, где результат не зависит от тебя месяц к месяцу:
+// работу можно искать год, и низкая оценка тут не про лень. Раньше такая
+// сфера навсегда становилась «самой слабой», и приложение целый год тыкало
+// человека в его больное место. Теперь долгие исключены из выбора слабейшей:
+// в колесе они видны, в оценке участвуют, но виноватым за них никто не будет.
+const isSlow=c=>(PET.slow||[]).includes(c);
 const weakest=()=>{
   const оценённые=SPHERES.filter(s=>(DATA.wheel[s.code]||0)>0);
-  const из=оценённые.length?оценённые:SPHERES;
+  const база=оценённые.length?оценённые:SPHERES;
+  const быстрые=база.filter(s=>!isSlow(s.code));
+  const из=быстрые.length?быстрые:база;      // все долгие — тогда как раньше
   return из.reduce((m,s)=>(DATA.wheel[s.code]||0)<(DATA.wheel[m.code]||0)?s:m,из[0]);
 };
+function toggleSlow(code){
+  PET.slow=(PET.slow||[]).includes(code)
+    ? PET.slow.filter(c=>c!==code)
+    : [...(PET.slow||[]),code];
+  savePet();renderWheel();
+  toast(isSlow(code)?"Считаем шаги, а не результат":"Обычная сфера");
+}
 const strongest=()=>SPHERES.reduce((m,s)=>DATA.wheel[s.code]>DATA.wheel[m.code]?s:m,SPHERES[0]);
 function dormant(c){let n=0;for(let i=DAYS.length-1;i>=0;i--){if(DAYS[i].touched.includes(c))break;n++;}return n;}
 const BASE=10,BONUS=30;
@@ -992,6 +1018,24 @@ function openCapsule(){
 }
 function laterCapsule(){document.getElementById("capsule-modal").style.display="none";}
 
+// ── Кабинет ──────────────────────────────────────────────────────────
+// Отдельный экран под кнопкой в шапке «Тотема». Сюда уезжает всё, что
+// настраивают раз в месяц: оформление, сведения о звере, версия. На главном
+// экране этому не место — там должна быть рысь, а не переключатели.
+function renderMe(){
+  applyTheme();                                   // перерисовать список тем
+  const д=daysWithMe();
+  document.getElementById("me-sub").textContent=
+    PET.name?`${PET.name} · ${д} ${plural(д,"день","дня","дней")} вместе`:"Настройки и сведения";
+  const мои=(PET.finds||[]).length, земель=(PET.lands||[0]).length;
+  document.getElementById("me-info").innerHTML=
+    `<div class="lead">Коротко</div>`+
+    `<div class="dim" style="margin-top:8px">Прогулок: ${PET.walks||0} · находок: ${мои} из ${FINDS.length}</div>`+
+    `<div class="dim">Земель открыто: ${земель} из ${LANDS.length} · камней: ${PET.stones||0}</div>`+
+    `<div class="dim">Запечатано писем: ${(PET.capsules||[]).length}</div>`+
+    `<div class="dim" style="margin-top:10px">Версия ${APP_VERSION}</div>`;
+}
+
 // ── Летопись ─────────────────────────────────────────────────────────
 // Книга, которая пишется сама. Ничего не надо вести руками: заметное
 // событие ложится строкой с датой. Через год это документ прожитого года —
@@ -1120,7 +1164,10 @@ function renderLands(){
 
 function startWalk(){
   if(isWalking()||energyNow()<walkCost())return;
-  PET.walkSpent=(PET.walkSpent||0)+walkCost();
+  // Забираем всё накопленное, а не только цену: у Александра за прошлые дни
+  // скопился банк на семь прогулок, и полоска первые дни была бы всегда полной —
+  // то есть механика показала бы себя худшей стороной в первый же день.
+  PET.walkSpent=(PET.walkSpent||0)+energyNow();
   PET.walkStart=Date.now();
   PET.walkRoll=Math.random();          // что она принесёт — решается на выходе
   PET.walkPick=Math.floor(Math.random()*1e9);
@@ -1782,7 +1829,10 @@ function renderPuzzle(){
     if(ok){
       PET.puzzleOn=todayKey();
       PET.puzzleDone=решено+1;
-      PET.bonus+=20;                       // энергия на прогулку
+      // Было 20 — и три задачки давали больше энергии (60), чем целый день
+      // настоящей жизни (5 сфер × 10 = 50). Приложение платило за примеры
+      // больше, чем за «позвонил отцу». Теперь арифметика — приятная мелочь.
+      PET.bonus+=5;
       PET.stones=(PET.stones||0)+4;        // и камни на земли
       if(PET.puzzleDone>=PUZZLES_PER_DAY)летопись("Все три задачки дня решены.");
       savePet();
@@ -1914,9 +1964,13 @@ function pills(box,values,cur,key,labels,subs){
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
   });
 }
+// Убрано по просьбе Александра: «чем разжечь» дублировало «задачи на сегодня»,
+// а сводка «что запишем» повторяла то, что и так видно на экране выше.
+// Функции оставлены пустыми — их зовут из трёх мест.
 function sparkHint(){
-  const cold=SPHERES.filter(s=>dormant(s.code)>=3&&!edit.touched.includes(s.code));
   const box=document.getElementById("spark-hint");
+  if(!box)return;
+  const cold=SPHERES.filter(s=>dormant(s.code)>=3&&!edit.touched.includes(s.code));
   if(!hasData()){box.innerHTML=`<div class="dim">Первый день. Отметь всё, где сегодня сделал хотя бы минимум — этого достаточно.</div>`;return;}
   if(!cold.length){box.innerHTML=`<div class="dim">Все сферы горели на этой неделе. Держи так.</div>`;return;}
   const s=cold.sort((a,b)=>dormant(b.code)-dormant(a.code))[0];
@@ -1983,6 +2037,7 @@ function openCheckin(){
   renderSummary();
 }
 function renderSummary(){
+  if(!document.getElementById("summary"))return;
   const got=dayPoints(edit.touched);
   const names=edit.touched.map(c=>byCode(c)?.name).filter(Boolean).join(", ")||"—";
   const v=x=>x==null?"—":x;
@@ -2102,7 +2157,16 @@ function renderWheel(){
        <div class="pts">+${ptsFor(d.code)}</div></div>
      <div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
      <div class="dim" style="margin-top:4px">Из этой оценки растёт ${BODY[d.code]} зверя</div>
-     <div class="scale" id="wheel-scale"></div>`;
+     <div class="scale" id="wheel-scale"></div>
+     <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--brd)">
+       <div class="lead">Долгая сфера</div>
+       <div class="dim" style="margin-top:6px">
+         ${isSlow(d.code)
+           ? "Здесь результат приходит не за неделю. Приложение больше не будет называть эту сферу самой слабой и тыкать в неё каждый день — считаем сделанные шаги, а не итог."
+           : "Включи, если тут всё зависит не от тебя одного: работу можно искать год, и низкая оценка будет не про лень. Приложение перестанет выбирать эту сферу как самую слабую."}</div>
+       <button class="btn ghost" style="margin-top:10px" onclick="toggleSlow('${d.code}')">
+         ${isSlow(d.code)?"Сделать обычной":"Отметить как долгую"}</button>
+     </div>`;
   // Оценки ставятся здесь: без этого телу зверя нечем меняться
   const sc=document.getElementById("wheel-scale");
   sc.innerHTML=[1,2,3,4,5,6,7,8,9,10].map(n=>
@@ -2208,14 +2272,19 @@ function renderTrend(){
 // с тотема, закрывается назад. Логика магазина не смешивается с тем, что уже
 // внутри пятиэкранного go().
 function go(v){
-  ["totem","today","checkin","finds","wheel","trend"].forEach(x=>{
-    document.getElementById("v-"+x).classList.toggle("hidden",x!==v);
-    document.getElementById("n-"+x).classList.toggle("act2",x===v);});
+  // Кабинет — экран без своей кнопки внизу: прячем все секции, включая его,
+  // а подсвечиваем в меню ту вкладку, откуда пришли.
+  ["totem","today","checkin","finds","wheel","trend","me"].forEach(x=>{
+    const s=document.getElementById("v-"+x);
+    if(s) s.classList.toggle("hidden",x!==v);
+    const n=document.getElementById("n-"+x);
+    if(n) n.classList.toggle("act2",x===v);});
   window.scrollTo(0,0);
   if(v==="totem"){renderTotem();renderWalk();}
   if(v==="today"){renderToday();renderCard();}
   if(v==="checkin")openCheckin();
   if(v==="finds")renderFinds();
+  if(v==="me")renderMe();
   if(v==="wheel")renderWheel();
   if(v==="trend")renderTrend();
   VIEW=v;
@@ -2241,8 +2310,12 @@ let VIEW="totem";
     const t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0;
     x0=null;
     if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.6)return;  // не горизонтальный
-    const i=ORDER.indexOf(VIEW), к=dx<0?i+1:i-1;
-    if(к<0||к>=ORDER.length)return;
+    // По кругу в обе стороны: с «Тотема» вправо попадаешь на «Динамику»,
+    // с «Динамики» влево — обратно на «Тотем». Иначе на краях свайп молчит,
+    // и кажется, что он работает только в одну сторону.
+    const i=ORDER.indexOf(VIEW);
+    if(i<0)return;                       // кабинет — вне карусели
+    const к=((dx<0?i+1:i-1)+ORDER.length)%ORDER.length;
     go(ORDER[к]);
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
   },{passive:true});
