@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=44"></script>
-<script src="data.js?v=44"></script>
-<script src="deck.js?v=44"></script>
+<script src="photos/list.js"></script>
+<script src="data.js"></script>
+<script src="deck.js"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -313,13 +313,14 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <section id="v-finds" class="hidden">
   <div class="head"><h1>Находки</h1><div class="sub" id="finds-sub"></div></div>
   <div class="g" id="nature"></div>
-  <h2>Земли</h2>
-  <div class="sub" style="margin-bottom:10px">Куда она может уходить. Новые открываются за камни</div>
+  <div class="g" id="finds-intro"></div>
+  <h2 id="h-lands">Земли</h2>
+  <div class="sub" id="h-lands-sub" style="margin-bottom:10px">Куда она может уходить. Новые открываются за камни</div>
   <div id="lands"></div>
-  <h2>Что принесла</h2>
+  <h2 id="h-grid">Что принесла</h2>
   <div id="finds-grid"></div>
-  <h2>Летопись</h2>
-  <div class="sub" style="margin-bottom:10px">Пишется сама. Вести ничего не надо</div>
+  <h2 id="h-chron">Летопись</h2>
+  <div class="sub" id="h-chron-sub" style="margin-bottom:10px">Пишется сама. Вести ничего не надо</div>
   <div class="g" id="chronicle"></div>
 </section>
 
@@ -397,7 +398,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="44 · 17.08.2026 16:35";
+const APP_VERSION="рабочая";
 
 let toastTimer=null;
 function toast(text){
@@ -464,6 +465,7 @@ const PH=window.PHOTOS||{};
 const hasPhotos=Object.values(PH).some(a=>a&&a.length);
 const usesPhoto=k=>!!THEMES[k]&&(k==="photo"||THEMES[k].photo);
 let theme=lsGet("theme")||"bw";
+if(theme==="photo"&&!hasPhotos) theme="bw";   // снимков нет — тема «Фото» не работает
 if(!THEMES[theme]) theme="bw";
 
 function timeKey(){const h=new Date().getHours();
@@ -1221,11 +1223,8 @@ function renderDen(){
   const box=document.getElementById("den-box");
   if(!box)return;
   const вещи=(PET.den||[]).filter(i=>FINDS[i]);
-  if(!вещи.length){
-    box.innerHTML=`<div class="lead">Логово</div>`+
-      `<div class="dim" style="margin-top:6px">Пока пусто. Всё, что она приносит, можно поставить сюда — во вкладке «Находки». Полка на ${DEN_SLOTS} вещей.</div>`;
-    return;
-  }
+  if(!вещи.length){box.style.display="none";return;}   // пустую полку не показываем
+  box.style.display="";
   const цвет=["rgba(255,255,255,.10)","rgba(120,190,255,.18)","rgba(246,211,101,.22)"];
   box.innerHTML=`<div class="lead">Логово</div>`+
     `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">`+
@@ -1271,10 +1270,11 @@ function renderChronicle(){
   const box=document.getElementById("chronicle");
   if(!box)return;
   const все=(PET.chronicle||[]).slice().reverse();
-  if(!все.length){
-    box.innerHTML=`<div class="dim">Здесь появится история вашей жизни вдвоём: имена, первые прогулки, редкие находки, открытые земли. Писать ничего не надо — она ведётся сама.</div>`;
-    return;
-  }
+  const пусто=!все.length;
+  ["h-chron","h-chron-sub"].forEach(id=>{const e=document.getElementById(id);
+    if(e)e.style.display=пусто?"none":"";});
+  box.style.display=пусто?"none":"";
+  if(пусто)return;
   const месяц=["января","февраля","марта","апреля","мая","июня","июля",
                "августа","сентября","октября","ноября","декабря"];
   box.innerHTML=все.slice(0,40).map(z=>{
@@ -1529,6 +1529,20 @@ function renderFinds(){
       `<b>Из чего сложился твой зверь</b><br>${marksText()}</div>`:"")+
     `<div style="margin-top:12px;font:600 15px var(--fu)">${PET.stones||0} 💎 камней</div>`+
     `<div class="dim" style="margin-top:3px">Копятся с прогулок: чем реже находка, тем больше. Тратятся на новые земли.</div>`;
+
+  // Первый день не должен выглядеть складом пустых полок: пока рысь никуда
+  // не ходила, показываем одну строчку о том, что здесь будет, и прячем
+  // земли с витриной. Появится первая прогулка — разделы возникнут сами.
+  const новичок=!(PET.walks||0)&&!(PET.finds||[]).length;
+  ["h-lands","h-lands-sub","h-grid"].forEach(id=>{const e=document.getElementById(id);
+    if(e)e.style.display=новичок?"none":"";});
+  document.getElementById("lands").style.display=новичок?"none":"";
+  document.getElementById("finds-grid").style.display=новичок?"none":"";
+  const intro=document.getElementById("finds-intro");
+  intro.style.display=новичок?"":"none";
+  if(новичок)intro.innerHTML=
+    `<div class="fname">Здесь будет то, что она приносит</div>`+
+    `<div class="dim" style="margin-top:6px">Отпусти её побродить — кнопка на вкладке «Тотем». Вернётся с находкой, историей или просто довольная.</div>`;
 
   renderLands();renderChronicle();
 
