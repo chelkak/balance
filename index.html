@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=49"></script>
-<script src="data.js?v=49"></script>
-<script src="deck.js?v=49"></script>
+<script src="photos/list.js?v=50"></script>
+<script src="data.js?v=50"></script>
+<script src="deck.js?v=50"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -404,7 +404,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="49 · 18.08.2026 07:03";
+const APP_VERSION="50 · 18.08.2026 14:22";
 
 let toastTimer=null;
 function toast(text){
@@ -2213,7 +2213,6 @@ function spheresGrid(box,list,editable,showBonus){
     const c=el.dataset.c,i=edit.touched.indexOf(c);
     i<0?edit.touched.push(c):edit.touched.splice(i,1);
     spheresGrid(box,edit.touched,true,showBonus);
-    sparkHint(); renderSummary();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
 }
 function tasksToday(){
@@ -2321,24 +2320,12 @@ function pills(box,values,cur,key,labels,subs){
     const r=el.dataset.v;edit[key]=isNaN(parseFloat(r))?r:parseFloat(r);
     box.querySelectorAll(".pill").forEach(p=>p.classList.remove("sel"));
     el.classList.add("sel");
-    renderSummary();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
   });
 }
 // Убрано по просьбе Александра: «чем разжечь» дублировало «задачи на сегодня»,
 // а сводка «что запишем» повторяла то, что и так видно на экране выше.
 // Функции оставлены пустыми — их зовут из трёх мест.
-function sparkHint(){
-  const box=document.getElementById("spark-hint");
-  if(!box)return;
-  const cold=SPHERES.filter(s=>dormant(s.code)>=3&&!edit.touched.includes(s.code));
-  if(!hasData()){box.innerHTML=`<div class="dim">Первый день. Отметь всё, где сегодня сделал хотя бы минимум — этого достаточно.</div>`;return;}
-  if(!cold.length){box.innerHTML=`<div class="dim">Все сферы горели на этой неделе. Держи так.</div>`;return;}
-  const s=cold.sort((a,b)=>dormant(b.code)-dormant(a.code))[0];
-  box.innerHTML=`<div class="lead">Чем разжечь «${s.name}»</div>`+
-    s.spark.map(a=>`<div class="spark"><span class="d"></span><span>${a}</span></div>`).join("")+
-    `<div class="dim" style="margin-top:10px">Любое из трёх — сфера засчитана. ${BONUS} баллов: не горела ${dormant(s.code)} ${plural(dormant(s.code),"день","дня","дней")}.</div>`;
-}
 function lastKnown(field){
   for(let i=DAYS.length-1;i>=0;i--){const v=DAYS[i][field];if(v)return v;}
   return null;
@@ -2379,7 +2366,6 @@ function openCheckin(){
     ["выжат","мало","средне","полный бак"],["1–2","3–5","6–8","9–10"]);
   pills(document.getElementById("p-train"),["нет","зал","кардио","игра","другое"],edit.train,"train");
   spheresGrid(document.getElementById("sp-edit"),edit.touched,true,true);
-  sparkHint();
   // Вопрос дня вместо пустого поля: так понятно, что писать.
   const в=noteQuestion(), зг=document.getElementById("note-title"),
         под=document.getElementById("note-sub"), поле=document.getElementById("note");
@@ -2395,19 +2381,6 @@ function openCheckin(){
     el.placeholder=prev?`вчера ${prev}`:"—";   // подсказка, а не готовый ответ
   });
   document.getElementById("note").value=edit.note||"";
-  renderSummary();
-}
-function renderSummary(){
-  if(!document.getElementById("summary"))return;
-  const got=dayPoints(edit.touched);
-  const names=edit.touched.map(c=>byCode(c)?.name).filter(Boolean).join(", ")||"—";
-  const v=x=>x==null?"—":x;
-  document.getElementById("summary").innerHTML=
-    `<div class="lead">Что запишем</div>
-     <div class="dim" style="margin-top:8px">Сон ${v(edit.sleep)} ч · настроение ${v(edit.mood)} · энергия ${v(edit.energy)}</div>
-     <div class="dim">Сферы: ${names}</div>
-     <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
-       <span class="dim">Сфер зажглось</span><span class="pts">${edit.touched.length} из 12</span></div>`;
 }
 function readBody(){
   [["pulse","f-pulse"],["weight","f-weight"],["steps","f-steps"],["dist","f-dist"]].forEach(([k,id])=>{
