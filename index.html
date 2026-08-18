@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=48"></script>
-<script src="data.js?v=48"></script>
-<script src="deck.js?v=48"></script>
+<script src="photos/list.js?v=49"></script>
+<script src="data.js?v=49"></script>
+<script src="deck.js?v=49"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -404,7 +404,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="48 · 18.08.2026 06:39";
+const APP_VERSION="49 · 18.08.2026 07:03";
 
 let toastTimer=null;
 function toast(text){
@@ -773,7 +773,8 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          // земли, камни, капсулы, летопись, задачки
          stones:LS.stones||0, lands:LS.lands||[0], capsules:LS.capsules||[],
          chronicle:LS.chronicle||[], slow:LS.slow||[], questOn:LS.questOn||"",
-         den:LS.den||[], heard:LS.heard||0, tries:LS.tries||{}, exportedAt:LS.exportedAt||0, once:LS.once||0, seasonSeen:LS.seasonSeen||"", puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0};
+         den:LS.den||[], heard:LS.heard||0, tries:LS.tries||{}, exportedAt:LS.exportedAt||0, once:LS.once||0, seasonSeen:LS.seasonSeen||"", puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0,
+         puzzleKinds:(LS.puzzleOn===todayKey()?LS.puzzleKinds:[])||[]};
 const savePet=()=>{lsSet("pet",JSON.stringify(PET));cloudSave();};
 if(!LS.bornAt) savePet();   // фиксируем момент рождения зверя раз и навсегда
 
@@ -2115,7 +2116,8 @@ function pokeTotem(){
 const PUZZLES_PER_DAY=3;
 const KINDS=["ряд","удвоение","фибоначчи","лишнее","сумма","зеркало",
              "умножение","двойное","доли","разность","процент"];
-function makePuzzle(){
+let ПОСЛЕДНИЙ_ВИД=null;
+function makePuzzle(избегать){
   const R=n=>Math.floor(Math.random()*n);
   const ур=stageNow();                       // 1..10 — растёт вместе с рысью
   const К=1+Math.floor(ур/3);                // множитель сложности: 1..4
@@ -2124,15 +2126,19 @@ function makePuzzle(){
     const out=[...s].slice(0,4);
     while(out.length<4){const v=ans+1+R(9);if(!out.includes(v))out.push(v);}
     return mix(out);};
-  // На первых стадиях простые виды, дальше подключаются тяжёлые
-  const доступно=ур<3?KINDS.slice(0,6):ур<6?KINDS.slice(0,9):KINDS;
-  switch(доступно[R(доступно.length)]){
+  // Виды все и сразу: сложность растёт числами, а не запретами. Раньше
+  // новичку доставались шесть простейших, из которых три выглядели одинаково.
+  // Внутри одного дня вид не повторяется — три задачки, три разных.
+  const свободные=KINDS.filter(k=>!(избегать||[]).includes(k));
+  const вид=(свободные.length?свободные:KINDS)[R(свободные.length||KINDS.length)];
+  ПОСЛЕДНИЙ_ВИД=вид;
+  switch(вид){
     case "ряд":{const a=2+R(9*К),d=2+R(8*К),ans=a+4*d;
       return {q:`Продолжи ряд: ${a}, ${a+d}, ${a+2*d}, ${a+3*d}, ?`,ans,opts:uniq(ans,[ans+d,ans-d,ans+1])};}
     case "удвоение":{const b=2+R(5*К),ans=b*16;
-      return {q:`Продолжи ряд: ${b}, ${b*2}, ${b*4}, ${b*8}, ?`,ans,opts:uniq(ans,[ans+b,ans-b,ans*2])};}
+      return {q:`Какое число следующее: ${b}, ${b*2}, ${b*4}, ${b*8}, ?`,ans,opts:uniq(ans,[ans+b,ans-b,ans*2])};}
     case "фибоначчи":{const a=1+R(5),b=a+1+R(4*К),s=[a,b,a+b,a+2*b,2*a+3*b],ans=3*a+5*b;
-      return {q:`Продолжи ряд: ${s.join(", ")}, ?`,ans,opts:uniq(ans,[ans+1,ans-2,ans+b])};}
+      return {q:`Угадай правило и продолжи: ${s.join(", ")}, ?`,ans,opts:uniq(ans,[ans+1,ans-2,ans+b])};}
     case "лишнее":{const base=2+R(6*К),arr=[base*2,base*4,base*6,base*8],odd=base*5+1;
       arr[R(4)]=odd;
       return {q:`Что здесь лишнее: ${arr.join(", ")}?`,ans:odd,opts:mix(arr)};}
@@ -2155,7 +2161,7 @@ function makePuzzle(){
   }
 }
 let PZ=null;
-function nextPuzzle(){PZ=makePuzzle();renderPuzzle();}
+function nextPuzzle(){PZ=makePuzzle(PET.puzzleKinds||[]);renderPuzzle();}
 function renderPuzzle(){
   const box=document.getElementById("puzzle"),title=document.getElementById("puzzle-title");
   if(mode()==="red"){                      // в тяжёлые дни ничего не просим
@@ -2171,7 +2177,7 @@ function renderPuzzle(){
     return;
   }
   if(title) title.textContent=`Разминка · ${решено+1} из ${PUZZLES_PER_DAY}`;
-  PZ=PZ||makePuzzle();
+  PZ=PZ||makePuzzle(PET.puzzleKinds||[]);
   box.innerHTML=`<div class="lead">Внимание и логика</div>
     <div style="font:600 18px var(--fd);margin-top:8px">${PZ.q}</div>
     <div class="opts">${PZ.opts.map(o=>`<div class="opt" data-v="${o}">${o}</div>`).join("")}</div>
@@ -2183,6 +2189,7 @@ function renderPuzzle(){
     if(ok){
       PET.puzzleOn=todayKey();
       PET.puzzleDone=решено+1;
+      PET.puzzleKinds=[...(PET.puzzleKinds||[]),ПОСЛЕДНИЙ_ВИД].filter(Boolean);
       // Было 20 — и три задачки давали больше энергии (60), чем целый день
       // настоящей жизни (5 сфер × 10 = 50). Приложение платило за примеры
       // больше, чем за «позвонил отцу». Теперь арифметика — приятная мелочь.
