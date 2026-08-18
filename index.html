@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=47"></script>
-<script src="data.js?v=47"></script>
-<script src="deck.js?v=47"></script>
+<script src="photos/list.js?v=48"></script>
+<script src="data.js?v=48"></script>
+<script src="deck.js?v=48"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -404,7 +404,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="47 · 18.08.2026 02:03";
+const APP_VERSION="48 · 18.08.2026 06:39";
 
 let toastTimer=null;
 function toast(text){
@@ -686,7 +686,10 @@ function logPacket(){
     if(size(test)>LOG_LIMIT) break;
     days=test;
   }
-  return {packet:JSON.stringify({type:"log",days,wheel:DATA.wheel}),days};
+  // Когда рысь в пути, кладём в посылку время её возвращения: бот сам
+  // не может ничего узнать у приложения, у него нет адреса в интернете.
+  const прогулка=(isWalking()&&!walkDone())?PET.walkStart+WALK_MIN_MS:0;
+  return {packet:JSON.stringify({type:"log",days,wheel:DATA.wheel,walk:прогулка}),days};
 }
 // Раньше день помечался отправленным ДО отправки, а подтверждения не было:
 // не доехало — потерялось навсегда. Теперь подтверждение приходит от самого
@@ -764,6 +767,7 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          // прогулка
          walkStart:LS.walkStart||0, walkRoll:LS.walkRoll??null, walkPick:LS.walkPick??null,
          walkSpent:LS.walkSpent||0, walks:LS.walks||0, walkLand:LS.walkLand||0,
+         walkTold:LS.walkTold||0,
          // находки и характер
          finds:LS.finds||[], traits:LS.traits||{},
          // земли, камни, капсулы, летопись, задачки
@@ -790,7 +794,14 @@ function plural(n,o,f,m){const a=Math.abs(n)%100,b=a%10;
 // сфера навсегда становилась «самой слабой», и приложение целый год тыкало
 // человека в его больное место. Теперь долгие исключены из выбора слабейшей:
 // в колесе они видны, в оценке участвуют, но виноватым за них никто не будет.
-const isSlow=c=>(PET.slow||[]).includes(c);
+// Раньше «долгую» сферу отмечали вручную переключателем. Александр дважды
+// сказал, что это путает, и был прав: любая сфера долгая на своей дистанции,
+// а горизонт и так выбирается сверху — неделя, месяц, год.
+// Теперь приложение решает само и по делу: если человек раз за разом что-то
+// в сфере делает, а оценка не растёт — значит результат от него не зависит,
+// и тыкать в эту сферу каждый день незачем. Пять попыток — достаточный знак.
+const SLOW_TRIES=5;
+const isSlow=c=>(PET.slow||[]).includes(c)||triesOf(c)>=SLOW_TRIES;
 const weakest=()=>{
   const оценённые=SPHERES.filter(s=>(DATA.wheel[s.code]||0)>0);
   const база=оценённые.length?оценённые:SPHERES;
@@ -817,13 +828,7 @@ function addTry(code){
   toast(`${n} ${plural(n,"попытка","попытки","попыток")}`);
 }
 
-function toggleSlow(code){
-  PET.slow=(PET.slow||[]).includes(code)
-    ? PET.slow.filter(c=>c!==code)
-    : [...(PET.slow||[]),code];
-  savePet();renderWheel();
-  toast(isSlow(code)?"Считаем шаги, а не результат":"Обычная сфера");
-}
+
 const strongest=()=>SPHERES.reduce((m,s)=>DATA.wheel[s.code]>DATA.wheel[m.code]?s:m,SPHERES[0]);
 function dormant(c){let n=0;for(let i=DAYS.length-1;i>=0;i--){if(DAYS[i].touched.includes(c))break;n++;}return n;}
 const BASE=10,BONUS=30;
@@ -1453,6 +1458,7 @@ function startWalk(){
   // то есть механика показала бы себя худшей стороной в первый же день.
   PET.walkSpent=(PET.walkSpent||0)+energyNow();
   PET.walkStart=Date.now();
+  PET.walkTold=0;
   PET.walkRoll=Math.random();          // что она принесёт — решается на выходе
   PET.walkPick=Math.floor(Math.random()*1e9);
   // Куда пошла — из открытых земель. Чем дальше земля, тем реже она туда ходит.
@@ -1506,7 +1512,16 @@ function renderWalk(){
   }
   if(isWalking()){
     box.innerHTML=`<div class="fname">Рысь бродит</div>`+
-      `<div class="dim" style="margin-top:6px">Вернётся сама — загляни попозже. Ждать у экрана не надо.</div>`;
+      `<div class="dim" style="margin-top:6px">Вернётся сама — загляни попозже. Ждать у экрана не надо.</div>`+
+      // Приложение не может позвать бота в фоне: единственный канал —
+      // посылка через телеграм, а она закрывает мини-апп. Поэтому это
+      // отдельная кнопка с честным предупреждением, а не тихое действие.
+      (inTelegram&&!PET.walkTold
+        ? `<button class="btn ghost" style="margin-top:12px" onclick="tellBotAboutWalk()">Пусть бот позовёт, когда вернётся</button>`+
+          `<div class="dim" style="margin-top:6px;font-size:12px">Приложение при этом закроется</div>`
+        : inTelegram
+          ? `<div class="dim" style="margin-top:10px">Бот позовёт, когда она вернётся.</div>`
+          : "");
     return;
   }
   const доля=Math.min(1,есть/цена);
@@ -1518,6 +1533,14 @@ function renderWalk(){
     (доля>=1
       ? `<button class="btn" style="margin-top:12px" onclick="startWalk()">Отпустить бродить</button>`
       : `<div class="dim" style="margin-top:8px">Зажигай сферы — энергия копится сама. Спящая сфера даёт втрое больше.</div>`);
+}
+
+// Сказать боту, когда ждать возвращения. Посылка закрывает мини-апп —
+// это ограничение телеграма, обойти нечем.
+function tellBotAboutWalk(){
+  if(!inTelegram||!isWalking())return;
+  PET.walkTold=1; savePet();
+  tg.sendData(JSON.stringify({type:"walk",walk:PET.walkStart+WALK_MIN_MS}));
 }
 
 function openWalk(){
@@ -2490,15 +2513,6 @@ function renderWheel(){
      <div class="dim" style="margin-top:4px">Из этой оценки растёт ${BODY[d.code]} зверя</div>
      <div class="scale" id="wheel-scale"></div>
      <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--brd)">
-       <div class="lead">Долгая сфера</div>
-       <div class="dim" style="margin-top:6px">
-         ${isSlow(d.code)
-           ? "Здесь результат приходит не за неделю. Приложение больше не будет называть эту сферу самой слабой и тыкать в неё каждый день — считаем сделанные шаги, а не итог."
-           : "Включи, если тут всё зависит не от тебя одного: работу можно искать год, и низкая оценка будет не про лень. Приложение перестанет выбирать эту сферу как самую слабую."}</div>
-       <button class="btn ghost" style="margin-top:10px" onclick="toggleSlow('${d.code}')">
-         ${isSlow(d.code)?"Сделать обычной":"Отметить как долгую"}</button>
-     </div>
-     <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--brd)">
        <div style="display:flex;justify-content:space-between;align-items:baseline">
          <div class="lead">Попытки</div>
          <div style="font:600 26px var(--fd);color:${d.color}">${triesOf(d.code)}</div>
@@ -2507,6 +2521,7 @@ function renderWheel(){
          ${triesOf(d.code)
            ? "Столько раз ты здесь что-то сделал. Это число не обнуляется никогда и не зависит от того, получилось или нет."
            : "Отклик, звонок, переписанное резюме, разговор — всё, что ты здесь сделал. Результат может не приходить месяцами, попытки остаются твоими."}</div>
+       ${isSlow(d.code)?`<div class="dim" style="margin-top:8px">Здесь результат приходит не за неделю, и приложение это видит: эту сферу оно больше не называет самой слабой.</div>`:""}
        <button class="btn" style="margin-top:10px" onclick="addTry('${d.code}')">Ещё одна попытка</button>
      </div>`;
   // Оценки ставятся здесь: без этого телу зверя нечем меняться
