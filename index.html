@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=55"></script>
-<script src="data.js?v=55"></script>
-<script src="deck.js?v=55"></script>
+<script src="photos/list.js?v=56"></script>
+<script src="data.js?v=56"></script>
+<script src="deck.js?v=56"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -223,12 +223,32 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <button class="btn" style="margin-top:16px" onclick="closeStory()">Хорошо</button>
   </div>
 </div>
-<div id="walk-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(6,8,14,.72);
-     align-items:center;justify-content:center;padding:18px">
-  <div class="g" style="max-width:360px;padding:22px">
-    <div class="dim" id="walk-rare" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px"></div>
-    <div class="fname" id="walk-title" style="margin-top:6px"></div>
-    <div class="why" id="walk-text" style="margin-top:10px"></div>
+<!-- Открытка с прогулки. Девять снимков земель лежали готовыми, а встреча
+     приносила голый текст. Теперь возвращение выглядит как карточка, которую
+     хочется сфотографировать: снимок той земли, куда она ходила, находка,
+     подпись с именем рыси и датой. Ответы вынесены ПОД карточку — чтобы на
+     снимке экрана остались место, находка и день, а не две кнопки. -->
+<div id="walk-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(6,8,14,.78);
+     align-items:center;justify-content:center;padding:18px;overflow:auto">
+  <div style="width:100%;max-width:360px">
+    <div id="walk-card" style="border-radius:20px;overflow:hidden;background:var(--card);
+         border:1px solid var(--brd)">
+      <div style="position:relative;height:196px;background:#0b1014">
+        <img id="walk-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
+        <div style="position:absolute;inset:0;background:linear-gradient(transparent 30%,rgba(6,8,14,.92))"></div>
+        <div style="position:absolute;left:16px;right:16px;bottom:13px">
+          <div id="walk-rare" style="letter-spacing:.05em;text-transform:uppercase;font-size:10.5px;
+               color:rgba(255,255,255,.68)"></div>
+          <div id="walk-title" style="font:600 19px var(--fu);color:#fff;margin-top:4px"></div>
+        </div>
+      </div>
+      <div style="padding:18px">
+        <div class="why" id="walk-text"></div>
+        <div id="walk-sign" class="dim" style="margin-top:14px;padding-top:12px;
+             border-top:1px solid var(--brd);display:flex;justify-content:space-between;
+             gap:10px;font-size:12px"></div>
+      </div>
+    </div>
     <div id="walk-answers" style="margin-top:14px"></div>
   </div>
 </div>
@@ -464,7 +484,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="55 · 19.08.2026 07:48";
+const APP_VERSION="56 · 19.08.2026 07:51";
 
 let toastTimer=null;
 function toast(text){
@@ -1779,6 +1799,15 @@ function openWalk(){
   document.getElementById("walk-rare").textContent=шапка;
   document.getElementById("walk-title").textContent=имя;
   document.getElementById("walk-text").textContent=текст;
+  // Снимок земли и подпись — то, ради чего открытку и делали. Даже пустая
+  // прогулка перестаёт быть пустой: остаётся место, где она была.
+  const земля=LANDS[PET.walkLand??0]||LANDS[0];
+  const ph=document.getElementById("walk-photo");
+  ph.onerror=()=>{ph.style.opacity=0;};
+  ph.style.opacity=1; ph.src=landPhoto(PET.walkLand??0);
+  document.getElementById("walk-sign").innerHTML=
+    `<span>${PET.name||"Рысь"} · ${земля.n.toLowerCase()}</span>`+
+    `<span>${датаСловами(todayKey())}</span>`;
   document.getElementById("walk-answers").innerHTML=пара.map((o,i)=>
     `<button class="btn${i?" ghost":""}" style="margin-top:8px" onclick="answerWalk('${o.k}')">${o.t}</button>`).join("");
   m.style.display="flex";
