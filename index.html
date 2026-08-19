@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=51"></script>
-<script src="data.js?v=51"></script>
-<script src="deck.js?v=51"></script>
+<script src="photos/list.js?v=52"></script>
+<script src="data.js?v=52"></script>
+<script src="deck.js?v=52"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -405,7 +405,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="51 · 19.08.2026 06:56";
+const APP_VERSION="52 · 19.08.2026 07:14";
 
 let toastTimer=null;
 function toast(text){
@@ -427,7 +427,15 @@ const inTelegram=!!(tg&&tg.initData&&tg.initData.length>0);
 // чужие данные с первого же открытия — облако-то у каждого своё, но
 // приложение читает сначала локальную память. Теперь у каждого свои ключи.
 const TG_ID=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.id)||0;
-const NS=TG_ID?"u"+TG_ID+":":"";
+
+// Телеграм не всегда отдаёт номер пользователя при открытии — зависит от того,
+// откуда открыли мини-апп. Без него приставка становилась пустой, приложение
+// читало ДРУГОЙ ящик памяти, и человек видел «новый аккаунт»; перезаход
+// «чинил», потому что со второго раза номер приходил. Поэтому запоминаем,
+// чей ящик открывали в прошлый раз, и при отсутствии номера берём его же.
+if(TG_ID) localStorage.setItem("last_user",String(TG_ID));
+const NS_ID=TG_ID||+(localStorage.getItem("last_user")||0);
+const NS=NS_ID?"u"+NS_ID+":":"";
 const lsGet=k=>localStorage.getItem(NS+k);
 const lsSet=(k,v)=>localStorage.setItem(NS+k,v);
 const lsDel=k=>localStorage.removeItem(NS+k);
@@ -436,21 +444,21 @@ const lsDel=k=>localStorage.removeItem(NS+k);
 // может только первый аккаунт, который откроет приложение после обновления;
 // остальные начинают с чистого листа. Своё они всё равно подтянут из облака.
 (function claimLegacy(){
-  if(!TG_ID)return;
+  if(!NS_ID)return;
   // Забрать старые данные может только владелец. Отличаем его по тому, что
   // его кнопка бота даёт ссылку с данными после решётки, а гостю уходит
   // чистый адрес. Без этой проверки гость, открывший приложение на чужом
   // телефоне, унаследовал бы чужого зверя вместе с его возрастом.
   if(location.hash.length<=2)return;
   const хозяин=localStorage.getItem("legacy_owner");
-  if(хозяин&&хозяин!==String(TG_ID))return;      // старое уже забрал другой
+  if(хозяин&&хозяин!==String(NS_ID))return;      // старое уже забрал другой
   if(!хозяин){
     let было=false;
     ["log","pet","wheel","goals","theme","demo"].forEach(k=>{
       const v=localStorage.getItem(k);
       if(v!==null&&localStorage.getItem(NS+k)===null){localStorage.setItem(NS+k,v);было=true;}
     });
-    localStorage.setItem("legacy_owner",String(TG_ID));
+    localStorage.setItem("legacy_owner",String(NS_ID));
     if(было)["log","pet","wheel","goals","demo"].forEach(k=>localStorage.removeItem(k));
   }
 })();
@@ -2050,15 +2058,6 @@ function renderTotem(){
             " Неоценённые части ещё не проросли — зверь проявится целиком, когда пройдёшь все."}</div>
           <button class="btn ghost" onclick="startRating()">Дооценить сферы</button>`
        : ""}
-     ${allRated()&&Math.max(...rated())===low
-       ? `<div class="dim" style="margin-top:12px">Все двенадцать сфер пока на ${low} — колесо ровное.
-            Оценки ставятся на вкладке «Колесо»${PHOTO_MODE?"":", от них и растут части зверя"}.</div>`
-       : `<div class="row" style="margin-top:14px"><div class="rlabel">Слабее всего</div>
-       <div class="track"><div class="fill" style="width:${low*10}%;background:var(--accent)"></div></div>
-       <div class="rval">${w.name} ${low}</div></div>
-     <div class="row"><div class="rlabel">Сильнее всего</div>
-       <div class="track"><div class="fill" style="width:${(DATA.wheel[str.code]||0)*10}%;background:var(--accent)"></div></div>
-       <div class="rval">${str.name} ${DATA.wheel[str.code]||0}</div></div>`}
      ${DEMO_ON?`<button class="btn ghost" onclick="showDemo(false)">Это пример. Убрать и начать своё</button>`:""}
      ${m==="red"
        ? `<div class="dim" style="margin-top:12px">Сейчас он ничего от тебя не хочет. Просто побудьте рядом.</div>`
