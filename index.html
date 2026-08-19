@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=53"></script>
-<script src="data.js?v=53"></script>
-<script src="deck.js?v=53"></script>
+<script src="photos/list.js?v=54"></script>
+<script src="data.js?v=54"></script>
+<script src="deck.js?v=54"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -232,6 +232,29 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <div id="walk-answers" style="margin-top:14px"></div>
   </div>
 </div>
+<!-- Находка как сцена: не строчка в списке, а место и день, когда её принесли.
+     Снимок земли сверху, под ним текст находки. Отсюда же она ставится на полку. -->
+<div id="find-modal" style="display:none;position:fixed;inset:0;z-index:65;background:rgba(4,6,10,.86);
+     align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)closeFind()">
+  <div style="width:100%;max-width:360px;border-radius:20px;overflow:hidden;
+       background:var(--card);border:1px solid var(--brd)">
+    <div style="position:relative;height:186px;background:#0b1014">
+      <img id="find-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
+      <div style="position:absolute;inset:0;background:linear-gradient(transparent 32%,rgba(6,8,14,.92))"></div>
+      <div style="position:absolute;left:16px;right:16px;bottom:13px">
+        <div id="find-rare" style="letter-spacing:.05em;text-transform:uppercase;font-size:10.5px;
+             color:rgba(255,255,255,.68)"></div>
+        <div id="find-name" style="font:600 19px var(--fu);color:#fff;margin-top:4px"></div>
+        <div id="find-where" style="font-size:12.5px;color:rgba(255,255,255,.72);margin-top:3px"></div>
+      </div>
+    </div>
+    <div style="padding:18px">
+      <div class="why" id="find-text"></div>
+      <button class="btn" id="find-den" style="margin-top:14px" onclick="denFromScene()"></button>
+      <button class="btn ghost" style="margin-top:8px" onclick="closeFind()">Закрыть</button>
+    </div>
+  </div>
+</div>
 <div id="release-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(6,8,14,.72);
      align-items:center;justify-content:center;padding:18px">
   <div class="g" style="max-width:360px;padding:22px">
@@ -416,7 +439,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="53 · 19.08.2026 07:40";
+const APP_VERSION="54 · 19.08.2026 07:43";
 
 let toastTimer=null;
 function toast(text){
@@ -796,6 +819,8 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          stageSeen:LS.stageSeen||0, stageSeenOn:LS.stageSeenOn||"",
          // находки и характер
          finds:LS.finds||[], traits:LS.traits||{},
+         // где и когда нашлась каждая вещь: {номер:{d:день,l:земля}}
+         findAt:LS.findAt||{},
          // земли, камни, капсулы, летопись, задачки
          stones:LS.stones||0, lands:LS.lands||[0], capsules:LS.capsules||[],
          chronicle:LS.chronicle||[], slow:LS.slow||[], questOn:LS.questOn||"",
@@ -1299,6 +1324,54 @@ function showOnce(){
   document.getElementById("once-modal").style.display="flex";
 }
 
+// ── Находка как сцена ────────────────────────────────────────────────
+// Раньше находка жила ровно одно мгновение: выпала после прогулки — и всё,
+// дальше плитка с названием в витрине, а нажатие на неё молча клало вещь
+// на полку. Текст находки человек видел один раз в жизни и больше никогда.
+// Теперь у каждой есть своя сцена: снимок той земли, где её подобрали,
+// день, когда это случилось, и полный текст. Витрина из склада становится
+// памятью — шестьдесят мест, где вы были.
+const датаСловами=k=>{
+  const d=new Date(k+"T12:00:00");
+  return isNaN(d)?"":d.toLocaleDateString("ru-RU",{day:"numeric",month:"long"});
+};
+// У находок, подобранных до этой версии, места и дня в памяти нет: земля
+// вычисляется по её месту в колоде, а день честно не показывается.
+const findPlace=i=>((PET.findAt||{})[i]||{}).l??landOf(i);
+let findOpen=null;
+function openFind(i){
+  const f=FINDS[i];
+  if(!f||!(PET.finds||[]).includes(i))return;
+  findOpen=i;
+  const где=findPlace(i), когда=((PET.findAt||{})[i]||{}).d;
+  const img=document.getElementById("find-photo");
+  img.onerror=()=>{img.style.opacity=0;};
+  img.style.opacity=1; img.src=landPhoto(где);
+  document.getElementById("find-rare").textContent=
+    ["находка","редкая находка","легендарная находка"][f.r];
+  document.getElementById("find-name").textContent=f.n;
+  document.getElementById("find-where").textContent=
+    (LANDS[где]||LANDS[0]).n+(когда?" · "+датаСловами(когда):"");
+  document.getElementById("find-text").textContent=f.x;
+  denButton();
+  document.getElementById("find-modal").style.display="flex";
+}
+function denButton(){
+  const b=document.getElementById("find-den");
+  if(!b||findOpen===null)return;
+  b.textContent=inDen(findOpen)?"Убрать с полки":"Поставить в логово";
+  b.className=inDen(findOpen)?"btn ghost":"btn";
+}
+function denFromScene(){
+  if(findOpen===null)return;
+  toggleDen(findOpen);
+  denButton();
+}
+function closeFind(){
+  findOpen=null;
+  document.getElementById("find-modal").style.display="none";
+}
+
 // ── Логово ───────────────────────────────────────────────────────────
 // У находок было одно назначение — ключ к следующей земле. Теперь второе:
 // поставить на полку у неё дома и видеть каждый день на главном экране.
@@ -1326,10 +1399,10 @@ function renderDen(){
   box.innerHTML=`<div class="lead">Логово</div>`+
     `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">`+
     вещи.map(i=>{const f=FINDS[i];
-      return `<div style="border-radius:12px;padding:9px;min-height:62px;background:${цвет[f.r]};
-        border:1px solid rgba(255,255,255,.14)">`+
+      return `<div onclick="openFind(${i})" style="cursor:pointer;border-radius:12px;padding:9px;
+        min-height:62px;background:${цвет[f.r]};border:1px solid rgba(255,255,255,.14)">`+
         `<div style="font-size:12.5px;line-height:1.25">${f.n}</div>`+
-        `<div class="dim" style="font-size:10.5px;margin-top:3px">${LANDS[landOf(i)].n}</div></div>`;
+        `<div class="dim" style="font-size:10.5px;margin-top:3px">${LANDS[findPlace(i)].n}</div></div>`;
     }).join("")+`</div>`;
 }
 
@@ -1657,6 +1730,10 @@ function answerWalk(trait){
     PET.finds=PET.finds||[];
     const новая=!PET.finds.includes(лут.i);
     if(новая)PET.finds.push(лут.i);
+    // Место и день записываются один раз — при первой встрече с вещью.
+    // Вторая такая же не переписывает историю первой.
+    PET.findAt=PET.findAt||{};
+    if(новая)PET.findAt[лут.i]={d:todayKey(),l:PET.walkLand??0};
     камни+=stonesFor(лут.f.r);
     if(новая&&лут.f.r>0)
       летопись(`${лут.f.r===2?"Легендарная находка":"Редкая находка"}: ${лут.f.n.toLowerCase()} — ${LANDS[PET.walkLand??0].n.toLowerCase()}.`);
@@ -1718,7 +1795,10 @@ function renderFinds(){
     `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">`+
     FINDS.map((f,i)=>{
       const открыта=мои.has(i);
-      return `<div ${открыта?`onclick="toggleDen(${i})" style="cursor:pointer;`:'style="'}border-radius:12px;padding:10px;min-height:74px;background:${открыта?цвет[f.r]:"rgba(255,255,255,.04)"};
+      // Нажатие открывает сцену, а не кладёт вещь на полку молча: раньше
+      // тычок в плитку давал непонятный побочный эффект, а прочитать
+      // находку было нельзя вообще.
+      return `<div ${открыта?`onclick="openFind(${i})" style="cursor:pointer;`:'style="'}border-radius:12px;padding:10px;min-height:74px;background:${открыта?цвет[f.r]:"rgba(255,255,255,.04)"};
         border:1px solid ${inDen(i)?"var(--accent)":открыта?"rgba(255,255,255,.14)":"rgba(255,255,255,.06)"}">`+
         (открыта
           ? `<div style="font-size:13px;line-height:1.25">${f.n}</div>`+
