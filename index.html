@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=54"></script>
-<script src="data.js?v=54"></script>
-<script src="deck.js?v=54"></script>
+<script src="photos/list.js?v=55"></script>
+<script src="data.js?v=55"></script>
+<script src="deck.js?v=55"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -232,6 +232,31 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <div id="walk-answers" style="margin-top:14px"></div>
   </div>
 </div>
+<!-- Легендарная — не карточка, а событие. Их всего девять на девять земель,
+     выпадает примерно раз в двадцать прогулок, и второй такой в этой земле
+     нет. Поэтому во весь экран, без интерфейса вокруг, и проявляется
+     медленно: сначала место, потом имя, потом текст. Нажатие по экрану
+     показывает всё сразу — ждать никого не заставляем. -->
+<div id="legend-modal" style="display:none;position:fixed;inset:0;z-index:70;background:#05070c;
+     align-items:center;justify-content:center" onclick="legendAll()">
+  <div style="position:absolute;inset:0;overflow:hidden">
+    <img id="legend-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+      opacity:0;transform:scale(1.08);transition:opacity 2.4s ease,transform 9s ease">
+    <div style="position:absolute;inset:0;background:linear-gradient(rgba(4,6,10,.42) 0%,
+      rgba(4,6,10,.84) 52%,rgba(4,6,10,.97) 100%)"></div>
+  </div>
+  <div style="position:relative;z-index:2;max-width:380px;padding:26px;text-align:center">
+    <div id="legend-cap" style="opacity:0;transition:opacity 1.2s ease;letter-spacing:.16em;
+         text-transform:uppercase;font-size:10.5px;color:rgba(255,255,255,.6)">Такое случается редко</div>
+    <div id="legend-name" style="opacity:0;transition:opacity 1.4s ease;font:600 26px var(--fu);
+         color:#fff;margin-top:12px;line-height:1.2"></div>
+    <div id="legend-where" style="opacity:0;transition:opacity 1.4s ease;font-size:12.5px;
+         color:rgba(255,255,255,.66);margin-top:8px"></div>
+    <div id="legend-text" style="opacity:0;transition:opacity 1.4s ease;color:rgba(255,255,255,.86);
+         margin-top:16px;line-height:1.55;font-size:15px"></div>
+    <div id="legend-answers" style="opacity:0;transition:opacity 1.4s ease;margin-top:22px"></div>
+  </div>
+</div>
 <!-- Находка как сцена: не строчка в списке, а место и день, когда её принесли.
      Снимок земли сверху, под ним текст находки. Отсюда же она ставится на полку. -->
 <div id="find-modal" style="display:none;position:fixed;inset:0;z-index:65;background:rgba(4,6,10,.86);
@@ -439,7 +464,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="54 · 19.08.2026 07:43";
+const APP_VERSION="55 · 19.08.2026 07:48";
 
 let toastTimer=null;
 function toast(text){
@@ -1324,6 +1349,11 @@ function showOnce(){
   document.getElementById("once-modal").style.display="flex";
 }
 
+// Сколько их — считаем по колоде, а не пишем числом в тексте: колода
+// запечатана и может поменяться, а соврать в подписи легко.
+const LEGENDS=()=>FINDS.map((f,i)=>i).filter(i=>FINDS[i].r===2);
+const legendCount=()=>(PET.finds||[]).filter(i=>FINDS[i]&&FINDS[i].r===2).length;
+
 // ── Находка как сцена ────────────────────────────────────────────────
 // Раньше находка жила ровно одно мгновение: выпала после прогулки — и всё,
 // дальше плитка с названием в витрине, а нажатие на неё молча клало вещь
@@ -1690,10 +1720,47 @@ function tellBotAboutWalk(){
   tg.sendData(JSON.stringify({type:"walk",walk:walkBackTime()}));
 }
 
+const LEGEND_STEPS=[["legend-photo",120],["legend-cap",700],["legend-name",1500],
+                    ["legend-where",2200],["legend-text",2900],["legend-answers",3600]];
+function legendAll(){
+  LEGEND_STEPS.forEach(([id])=>{
+    const el=document.getElementById(id);
+    if(el){el.style.opacity=1; if(id==="legend-photo")el.style.transform="scale(1)";}
+  });
+}
+// Легендарная выпадает примерно раз в двадцать прогулок и в каждой земле
+// ровно одна. Показывать её тем же окном, что и шишку из ближнего леса, —
+// значит уравнять их. Здесь весь экран отдан ей одной и проявляется всё
+// по частям: место, имя, текст. Нажатие показывает сразу — торопящегося
+// не держим, но по умолчанию это событие, а не карточка.
+function openLegend(лут,пара){
+  const земля=LANDS[PET.walkLand??0]||LANDS[0];
+  const ph=document.getElementById("legend-photo");
+  ph.onerror=()=>{ph.style.opacity=0;};
+  document.getElementById("legend-name").textContent=лут.f.n;
+  document.getElementById("legend-where").textContent=`${земля.n} · второй такой не найдётся`;
+  document.getElementById("legend-text").textContent=лут.f.x;
+  document.getElementById("legend-answers").innerHTML=пара.map((o,i)=>
+    `<button class="btn${i?" ghost":""}" style="margin-top:8px"
+       onclick="event.stopPropagation();answerWalk('${o.k}')">${o.t}</button>`).join("");
+  LEGEND_STEPS.forEach(([id])=>{
+    const el=document.getElementById(id);
+    if(el){el.style.opacity=0; if(id==="legend-photo")el.style.transform="scale(1.08)";}
+  });
+  ph.src=landPhoto(PET.walkLand??0);
+  document.getElementById("legend-modal").style.display="flex";
+  LEGEND_STEPS.forEach(([id,ms])=>setTimeout(()=>{
+    const el=document.getElementById(id);
+    if(el){el.style.opacity=1; if(id==="legend-photo")el.style.transform="scale(1)";}
+  },ms));
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+}
+
 function openWalk(){
   if(!walkDone())return;
   const лут=walkLoot();
   const пара=RESPONSES[(PET.walkPick||0)%RESPONSES.length];
+  if(лут&&лут.f&&лут.f.r===2){ openLegend(лут,пара); return; }
   const m=document.getElementById("walk-modal");
   let шапка,имя,текст;
   if(лут&&лут.story){
@@ -1737,12 +1804,15 @@ function answerWalk(trait){
     камни+=stonesFor(лут.f.r);
     if(новая&&лут.f.r>0)
       летопись(`${лут.f.r===2?"Легендарная находка":"Редкая находка"}: ${лут.f.n.toLowerCase()} — ${LANDS[PET.walkLand??0].n.toLowerCase()}.`);
+    if(новая&&лут.f.r===2&&legendCount()===1)
+      летопись(`Первая легендарная. Всего их ${LEGENDS().length}, и каждая находится один раз.`);
   }
   PET.stones=(PET.stones||0)+камни;
   PET.walks=(PET.walks||0)+1;
   PET.walkStart=0;PET.walkRoll=null;PET.walkPick=null;PET.walkBack=0;PET.walkNight=0;
   savePet();
   document.getElementById("walk-modal").style.display="none";
+  document.getElementById("legend-modal").style.display="none";
   // Подрост показываем сразу после встречи, а не пока её нет дома: смысл
   // ночного цикла в том, чтобы разницу увидели глазами.
   maybeGrowOvernight();
@@ -1769,6 +1839,11 @@ function renderFinds(){
     `</div>`+
     (marksText()?`<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
       `<b>Из чего сложился твой зверь</b><br>${marksText()}</div>`:"")+
+    (legendCount()
+      ? `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
+        `<b>Легендарных: ${legendCount()} из ${LEGENDS().length}</b><br>`+
+        `Каждая находится один раз и больше не повторяется.</div>`
+      : "")+
     `<div style="margin-top:12px;font:600 15px var(--fu)">${PET.stones||0} 💎 камней</div>`+
     `<div class="dim" style="margin-top:3px">Копятся с прогулок: чем реже находка, тем больше. Тратятся на новые земли.</div>`;
 
