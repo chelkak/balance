@@ -286,3 +286,88 @@ function drawVectorTotem(m){
     });
   }
 }
+
+
+// ── Звук места ────────────────────────────────────────────────────────
+// Девять профилей шума, по одному на землю: ни одного звукового файла,
+// всё считается на месте из коричневого шума и фильтров. Живёт здесь,
+// а не в index.html, потому что это самодостаточные данные плюс их
+// проигрыватель — ровно то, чему место рядом со сферами и цитатами.
+const SOUNDS=[
+  {f:600, q:0.7, lfo:0.08, d:220, g:0.16},              // ближний лес — листва
+  {f:1700,q:0.6, lfo:0.55, d:520, g:0.20, hp:320},      // река — вода
+  {f:450, q:0.7, lfo:0.05, d:120, g:0.13},              // старая просека
+  {f:300, q:0.8, lfo:0.03, d:80,  g:0.13},              // болото — глухо
+  {f:900, q:0.9, lfo:0.22, d:520, g:0.18},              // гряда — порывы
+  {f:250, q:0.8, lfo:0.04, d:60,  g:0.11},              // ночной лес
+  {f:700, q:0.7, lfo:0.12, d:250, g:0.14},              // поле на рассвете
+  {f:200, q:0.9, lfo:0.02, d:50,  g:0.10},              // первый снег — тише всего
+  {f:1100,q:1.0, lfo:0.35, d:700, g:0.21}               // перевал — ветер
+];
+const SOUND_MAX_MS=3*60*1000;      // забыл выключить — сам замолчит через три минуты
+let AC=null, SND=null, SNDLand=null, SNDTimer=null;
+
+function noiseBuffer(ac){
+  // Коричневый шум: белый, проинтегрированный. Он мягче белого и звучит
+  // как ветер и вода, а не как ненастроенное радио.
+  const n=ac.sampleRate*4, b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0);
+  let last=0;
+  for(let i=0;i<n;i++){ const w=Math.random()*2-1; last=(last+0.02*w)/1.02; d[i]=last*3.4; }
+  return b;
+}
+
+function soundStop(){
+  clearTimeout(SNDTimer);
+  if(!SND)return;
+  const s=SND; SND=null; SNDLand=null;
+  try{
+    s.gain.gain.setTargetAtTime(0,AC.currentTime,0.2);
+    setTimeout(()=>{try{s.src.stop();}catch(e){}},900);
+  }catch(e){}
+  soundButtons();
+}
+
+function soundPlay(i){
+  const p=SOUNDS[i]||SOUNDS[0];
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==="suspended") AC.resume();
+    const src=AC.createBufferSource();
+    src.buffer=noiseBuffer(AC); src.loop=true;
+    let node=src;
+    if(p.hp){ const hp=AC.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=p.hp;
+              node.connect(hp); node=hp; }
+    const lp=AC.createBiquadFilter(); lp.type="lowpass";
+    lp.frequency.value=p.f; lp.Q.value=p.q;
+    // Ветер не ровный: медленная волна водит частоту среза вверх-вниз.
+    // Без неё получается ровное шипение, и это слышно как брак.
+    const lfo=AC.createOscillator(), amp=AC.createGain();
+    lfo.frequency.value=p.lfo; amp.gain.value=p.d;
+    lfo.connect(amp); amp.connect(lp.frequency); lfo.start();
+    const gain=AC.createGain(); gain.gain.value=0;
+    node.connect(lp); lp.connect(gain); gain.connect(AC.destination);
+    src.start();
+    gain.gain.setTargetAtTime(p.g,AC.currentTime,0.9);   // вплывает, а не бьёт по ушам
+    SND={src,gain,lfo}; SNDLand=i;
+    SNDTimer=setTimeout(soundStop,SOUND_MAX_MS);
+    return true;
+  }catch(e){ return false; }
+}
+
+// Одна кнопка на все экраны: нажал на землю — слышно её, нажал ещё раз —
+// тихо. Другая земля переключает звук, а не запускает второй поверх.
+function soundToggle(i){
+  if(!PET.sound){ toast("Звук выключен в кабинете"); return; }
+  if(SND&&SNDLand===i){ soundStop(); return; }
+  soundStop();
+  if(!soundPlay(i)) toast("Звук здесь не заводится");
+  soundButtons();
+}
+const soundBtn=i=>`<div class="sound-btn" data-land="${i}" onclick="event.stopPropagation();soundToggle(${i})"
+   title="Звук места">${SND&&SNDLand===i?"◼":"▶"}</div>`;
+function soundButtons(){
+  document.querySelectorAll(".sound-btn").forEach(el=>{
+    el.textContent=(SND&&SNDLand===+el.dataset.land)?"◼":"▶";
+  });
+}
+// Свернул приложение — звук замолкает. Иначе он остаётся играть в кармане.

@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=59"></script>
-<script src="data.js?v=59"></script>
-<script src="deck.js?v=59"></script>
+<script src="photos/list.js?v=60"></script>
+<script src="data.js?v=60"></script>
+<script src="deck.js?v=60"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -498,7 +498,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="59 · 20.08.2026 00:40";
+const APP_VERSION="60 · 20.08.2026 00:55";
 
 let toastTimer=null;
 function toast(text){
@@ -875,7 +875,8 @@ function mergeLog(){
   const keys=Object.keys(LOG).sort();
   if(!keys.length) return;
   const make=e=>({date:new Date(e.d+"T12:00:00"),sleep:e.s??7,mood:e.m??5,energy:e.e??5,
-    touched:e.t||[],pulse:e.p??null,weight:e.w??null,steps:e.st??0,dist:e.di??0});
+    touched:e.t||[],pulse:e.p??null,weight:e.w??null,steps:e.st??0,dist:e.di??0,
+    grey:!!e.grey});
   if(!DEMO_ON){
     DAYS=keys.slice(-LOG_DAYS).map(k=>make(LOG[k]));
     IS_DEMO=false;
@@ -942,6 +943,10 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          findAt:LS.findAt||{},
          // звук места: 1 — можно, 0 — выключен насовсем
          sound:LS.sound??1,
+         // когда колесо последний раз пересчитывалось само + что оно сдвинуло
+         wheelAt:LS.wheelAt||"", wheelMoved:LS.wheelMoved||[],
+         // какие истории про людей уже слышал — чтобы не повторялись
+         storiesSeen:LS.storiesSeen||[], pendingStoryIndex:LS.pendingStoryIndex??null,
          // земли, камни, капсулы, летопись, задачки
          stones:LS.stones||0, lands:LS.lands||[0], capsules:LS.capsules||[],
          chronicle:LS.chronicle||[], slow:LS.slow||[], questOn:LS.questOn||"",
@@ -982,6 +987,133 @@ const weakest=()=>{
   const из=быстрые.length?быстрые:база;      // все долгие — тогда как раньше
   return из.reduce((m,s)=>(DATA.wheel[s.code]||0)<(DATA.wheel[m.code]||0)?s:m,из[0]);
 };
+// ── Удача дня ────────────────────────────────────────────────────────
+// Взято из Stardew Valley: удача дня определяется утром и не зависит ни
+// от чего, что ты сделал. Мир честно признаёт, что часть результата не про
+// тебя. Это снимает вину за пустую прогулку и не даёт приписать удачную
+// исключительно себе — прямое лекарство для того, кому девять месяцев
+// меряют только результат.
+//
+// Правило железное: удача ТОЛЬКО добавляет. «Глухой день» — это обычные
+// шансы, «везёт» — надбавка. Иначе получилось бы наказание за случайность.
+// И она не влияет ни на прогулку, ни на камни, ни на возможность что-то
+// сделать: решает только, что рысь принесёт, если уже вернулась.
+const LUCK=[{k:0,t:"день обычный",  x:"Что найдётся, то найдётся."},
+            {k:1,t:"рыси везёт",    x:"Она сегодня внимательнее обычного."},
+            {k:2,t:"рыси очень везёт",x:"Такие дни бывают редко."}];
+// Считается от личного ключа и даты: выкрутить нельзя, но и не случайно
+// заново при каждой перерисовке. У каждого своя погода удачи.
+// Вынесено параметром, чтобы распределение можно было проверить по году,
+// а не только на сегодня.
+function luckFor(ключ){
+  const d=(ключ||"").replace(/-/g,"");
+  let h=((PET.deckSeed||1)^0x9e3779b9)>>>0;
+  for(let i=0;i<d.length;i++){
+    h=(h^d.charCodeAt(i))>>>0;
+    h=Math.imul(h,0x01000193)>>>0;          // перемешиваем как следует: соседние
+  }                                          // даты отличаются одним символом
+  // Каждый шаг приводим к беззнаковому: `^` в JS работает со знаковыми
+  // числами, и без этого h уходил в минус. Остаток тоже получался
+  // отрицательным, r<0.12 срабатывало всегда — «очень везёт» выпадало
+  // в 57% дней вместо 12%. Поймано прогоном года по трём разным ключам.
+  h=(h^(h>>>15))>>>0; h=Math.imul(h,0x2545f491)>>>0; h=(h^(h>>>13))>>>0;
+  const r=(h%1000)/1000;
+  return LUCK[r<0.12?2:r<0.38?1:0];
+}
+const luckToday=()=>luckFor(todayKey());
+
+// ── Серый день ───────────────────────────────────────────────────────
+// Взято у Way of Life: у дня три состояния, а не два. Да, нет и «этот день
+// не про это». Разница между «я не смог» и «сегодня не в счёт» огромная:
+// первое человек носит на себе, второе кладёт на полку.
+//
+// Философия «не наказывать за пропуск» до сих пор держалась на молчании —
+// приложение просто ничего не говорило. Но молчание не то же самое, что
+// прощение: человек достраивает упрёк сам. Это активный жест вместо тишины.
+//
+// Ни счётчика серых дней, ни лимита, ни предложения от приложения:
+// «может, отметишь день серым?» читается как «ты ведь всё равно не сделаешь».
+const isGrey=k=>!!(LOG[k]&&LOG[k].grey);
+function toggleGrey(){
+  const k=dayKey();
+  const было=isGrey(k);
+  LOG[k]={...(LOG[k]||{d:k}),grey:было?0:1};
+  if(!было&&!LOG[k].t) LOG[k].t=[];
+  saveLog(); mergeLog();
+  renderToday(); renderDays();
+  toast(было?"День снова обычный":"Хорошо. Этот день не в счёт");
+}
+
+// Истории про живых людей — самое сильное, что здесь написано, и их 22.
+// Но на сферу приходится одна-две, а берутся они под самую слабую сферу.
+// Пока колесо стояло, человек видел одну и ту же по кругу. Теперь помним
+// услышанное: сначала отдаём неслыханное из своей сферы, потом неслыханное
+// вообще, и только когда кончилось всё — начинаем по второму разу.
+function pickStory(sphere,seed){
+  const слышал=new Set(PET.storiesSeen||[]);
+  const все=STORIES.map((s,i)=>({s,i}));
+  const свои=все.filter(o=>o.s.sphere===sphere);
+  let выбор=свои.filter(o=>!слышал.has(o.i));            // своя сфера, неслыханное
+  if(!выбор.length) выбор=все.filter(o=>!слышал.has(o.i)); // любое неслыханное
+  if(!выбор.length) выбор=свои.length?свои:все;            // всё услышано — по кругу
+  return выбор[(seed>>>0)%выбор.length];
+}
+function rememberStory(i){
+  if(i==null)return;
+  PET.storiesSeen=[...new Set([...(PET.storiesSeen||[]),i])];
+  PET.heard=(PET.heard||0)+1;
+  savePet();
+}
+
+// ── Колесо двигается само ────────────────────────────────────────────
+// 19 августа убрали шкалу («колесо спрашивает оценку один раз, дальше она
+// двигается сама от чек-инов») — и вторую половину правки не написали.
+// Экран обещал движение, а двигать было нечем: оценка стояла намертво.
+// Из-за этого «Фокус недели» показывал одну и ту же сферу вечно, а истории
+// про людей выбираются под самую слабую сферу — значит двадцать из двадцати
+// двух были недостижимы. Правда вскрылась на разборе 20 августа.
+//
+// Правило простое и мягкое: смотрим две недели. Горела почти всегда — плюс
+// один. Не горела совсем — минус один. Между — стоит. Двигаем не чаще раза
+// в неделю, чтобы оценка не дёргалась от одного удачного дня.
+const WHEEL_WINDOW=14, WHEEL_UP=10, WHEEL_DOWN=1;
+// Сколько дней из последних N сфера горела. Серые дни не в счёт — они
+// не про эту сферу и не должны тянуть оценку вниз.
+function litDays(code,окно){
+  const дни=DAYS.slice(-окно).filter(d=>!d.grey);
+  return {горело:дни.filter(d=>(d.touched||[]).includes(code)).length,из:дни.length};
+}
+function moveWheel(){
+  // Раз в неделю и только когда есть на чём считать: на трёх днях
+  // движение — это гадание, а не наблюдение.
+  const неделя=Math.floor(Date.now()/(7*864e5));
+  if(PET.wheelAt===String(неделя)) return;
+  if(DAYS.filter(d=>!d.grey).length<7){ PET.wheelAt=String(неделя); savePet(); return; }
+  const сдвиги=[];
+  SPHERES.forEach(sp=>{
+    const было=DATA.wheel[sp.code]||0;
+    if(!было) return;                       // неоценённую не трогаем, её спросят
+    const {горело,из}=litDays(sp.code,WHEEL_WINDOW);
+    let стало=было;
+    if(горело>=WHEEL_UP) стало=Math.min(10,было+1);
+    else if(горело<=WHEEL_DOWN) стало=Math.max(1,было-1);
+    if(стало!==было){
+      DATA.wheel[sp.code]=стало;
+      сдвиги.push({c:sp.code,было,стало,горело,из});
+    }
+  });
+  PET.wheelAt=String(неделя);
+  PET.wheelMoved=сдвиги;
+  if(сдвиги.length){
+    lsSet("wheel",JSON.stringify(DATA.wheel));
+    сдвиги.forEach(x=>{
+      const имя=byCode(x.c).name.toLowerCase();
+      летопись(`${имя}: ${x.было} → ${x.стало}, горело ${x.горело} ${plural(x.горело,"день","дня","дней")} из ${x.из}.`);
+    });
+  }
+  savePet();
+}
+
 // ── Счётчик попыток ──────────────────────────────────────────────────
 // Весь мир меряет результат: есть работа или нет. Девять месяцев поиска
 // при этом выглядят как пустота — хотя это сотни отправленных откликов,
@@ -1305,8 +1437,11 @@ function copyExport(тихо){
 // это подсказка, какой сегодня день — рабочий или бережный. Поэтому
 // показываем словами, а «рекорда готовности» здесь нет и не будет.
 const READY_MIN_DAYS=7;
+// Серые дни в норму не идут. Иначе одна больная неделя переписывает
+// личную мерку по сну и пульсу — и «готовность дня» начинает врать ровно
+// тогда, когда она важнее всего.
 function personalNorm(field,дней=28){
-  const все=DAYS.slice(-дней).map(d=>d[field]).filter(v=>v!=null&&v>0);
+  const все=DAYS.slice(-дней).filter(d=>!d.grey).map(d=>d[field]).filter(v=>v!=null&&v>0);
   return все.length>=3?avg(все):null;
 }
 function readiness(){
@@ -1680,84 +1815,7 @@ const RESPONSES=[
 // Два правила, и они важнее звучания: играет только по нажатию (само
 // никогда), и выключить можно навсегда — в кабинете. Звук в приложении,
 // которое открывают в транспорте, без выключателя — это грубость.
-const SOUNDS=[
-  {f:600, q:0.7, lfo:0.08, d:220, g:0.16},              // ближний лес — листва
-  {f:1700,q:0.6, lfo:0.55, d:520, g:0.20, hp:320},      // река — вода
-  {f:450, q:0.7, lfo:0.05, d:120, g:0.13},              // старая просека
-  {f:300, q:0.8, lfo:0.03, d:80,  g:0.13},              // болото — глухо
-  {f:900, q:0.9, lfo:0.22, d:520, g:0.18},              // гряда — порывы
-  {f:250, q:0.8, lfo:0.04, d:60,  g:0.11},              // ночной лес
-  {f:700, q:0.7, lfo:0.12, d:250, g:0.14},              // поле на рассвете
-  {f:200, q:0.9, lfo:0.02, d:50,  g:0.10},              // первый снег — тише всего
-  {f:1100,q:1.0, lfo:0.35, d:700, g:0.21}               // перевал — ветер
-];
-const SOUND_MAX_MS=3*60*1000;      // забыл выключить — сам замолчит через три минуты
-let AC=null, SND=null, SNDLand=null, SNDTimer=null;
-
-function noiseBuffer(ac){
-  // Коричневый шум: белый, проинтегрированный. Он мягче белого и звучит
-  // как ветер и вода, а не как ненастроенное радио.
-  const n=ac.sampleRate*4, b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0);
-  let last=0;
-  for(let i=0;i<n;i++){ const w=Math.random()*2-1; last=(last+0.02*w)/1.02; d[i]=last*3.4; }
-  return b;
-}
-
-function soundStop(){
-  clearTimeout(SNDTimer);
-  if(!SND)return;
-  const s=SND; SND=null; SNDLand=null;
-  try{
-    s.gain.gain.setTargetAtTime(0,AC.currentTime,0.2);
-    setTimeout(()=>{try{s.src.stop();}catch(e){}},900);
-  }catch(e){}
-  soundButtons();
-}
-
-function soundPlay(i){
-  const p=SOUNDS[i]||SOUNDS[0];
-  try{
-    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
-    if(AC.state==="suspended") AC.resume();
-    const src=AC.createBufferSource();
-    src.buffer=noiseBuffer(AC); src.loop=true;
-    let node=src;
-    if(p.hp){ const hp=AC.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=p.hp;
-              node.connect(hp); node=hp; }
-    const lp=AC.createBiquadFilter(); lp.type="lowpass";
-    lp.frequency.value=p.f; lp.Q.value=p.q;
-    // Ветер не ровный: медленная волна водит частоту среза вверх-вниз.
-    // Без неё получается ровное шипение, и это слышно как брак.
-    const lfo=AC.createOscillator(), amp=AC.createGain();
-    lfo.frequency.value=p.lfo; amp.gain.value=p.d;
-    lfo.connect(amp); amp.connect(lp.frequency); lfo.start();
-    const gain=AC.createGain(); gain.gain.value=0;
-    node.connect(lp); lp.connect(gain); gain.connect(AC.destination);
-    src.start();
-    gain.gain.setTargetAtTime(p.g,AC.currentTime,0.9);   // вплывает, а не бьёт по ушам
-    SND={src,gain,lfo}; SNDLand=i;
-    SNDTimer=setTimeout(soundStop,SOUND_MAX_MS);
-    return true;
-  }catch(e){ return false; }
-}
-
-// Одна кнопка на все экраны: нажал на землю — слышно её, нажал ещё раз —
-// тихо. Другая земля переключает звук, а не запускает второй поверх.
-function soundToggle(i){
-  if(!PET.sound){ toast("Звук выключен в кабинете"); return; }
-  if(SND&&SNDLand===i){ soundStop(); return; }
-  soundStop();
-  if(!soundPlay(i)) toast("Звук здесь не заводится");
-  soundButtons();
-}
-const soundBtn=i=>`<div class="sound-btn" data-land="${i}" onclick="event.stopPropagation();soundToggle(${i})"
-   title="Звук места">${SND&&SNDLand===i?"◼":"▶"}</div>`;
-function soundButtons(){
-  document.querySelectorAll(".sound-btn").forEach(el=>{
-    el.textContent=(SND&&SNDLand===+el.dataset.land)?"◼":"▶";
-  });
-}
-// Свернул приложение — звук замолкает. Иначе он остаётся играть в кармане.
+// Звук места (SOUNDS, soundPlay, soundToggle, soundBtn) живёт в data.js
 document.addEventListener("visibilitychange",()=>{ if(document.hidden) soundStop(); });
 
 // ── Земли ────────────────────────────────────────────────────────────
@@ -1867,13 +1925,16 @@ function walkLoot(){
   const пик=PET.walkPick??0;
   if(r>0.82)return null;                       // просто гуляла
   if(r>0.55){
-    const w=weakest().code;
-    const свои=STORIES.filter(s=>s.sphere===w);
-    const пул=свои.length?свои:STORIES;
-    return {story:пул[пик%пул.length]};
+    const выбор=pickStory(weakest().code,пик);
+    return {story:выбор.s,storyIndex:выбор.i};
   }
-  const p=PET.walkPick??0, rare=(p%100)/100;
-  const редкость=rare<0.05?2:rare<0.30?1:0;
+  const p=PET.walkPick??0;
+  // Удача дня сдвигает пороги вверх и только вверх: в обычный день шансы
+  // ровно те же, что были всегда, в удачный — выше. Хуже не становится
+  // никогда, иначе это было бы наказание за случайность.
+  const бонус=luckToday().k*0.06;
+  const rare=(p%100)/100;
+  const редкость=rare<0.05+бонус?2:rare<0.30+бонус*2?1:0;
   const земля=PET.walkLand??0;
   // Сначала ищем в той земле, куда она ходила. Если там такой редкости нет —
   // берём общий пул, чтобы прогулка не осталась пустой из-за арифметики.
@@ -2019,7 +2080,7 @@ function answerWalk(trait){
   let камни=2;                                   // за саму прогулку, всегда
   if(лут&&лут.story){
     камни+=6;
-    PET.heard=(PET.heard||0)+1;
+    rememberStory(лут.storyIndex);
     летопись(`С прогулки она принесла историю — ${лут.story.name}.`);
   }else if(лут){
     PET.finds=PET.finds||[];
@@ -2334,7 +2395,8 @@ function renderTotem(){
   // Проверяем в самом начале — иначе ветка «Знакомство» ниже выходит раньше.
   if(PET.pendingStory){
     const _s=PET.pendingStory;
-    PET.pendingStory=null;
+    rememberStory(PET.pendingStoryIndex);
+    PET.pendingStory=null; PET.pendingStoryIndex=null;
     savePet();
     setTimeout(()=>showStory(_s),500);
   }
@@ -2408,6 +2470,15 @@ function renderTotem(){
          ? `Зверь собран из твоих двенадцати сфер. Пока не проросли: ${слабые.join(", ")}. Поднимешь сферу — вырастет её часть.`
          : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`}`;
 
+  {
+    // Удача дня — рядом с прогулкой, а не в отдельном блоке: она про то,
+    // что рысь принесёт, и читаться должна вместе с ней.
+    const л=luckToday();
+    document.getElementById("totem-state").innerHTML+=
+      `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
+      `<b>Сегодня ${л.t}.</b> ${л.x}<br>`+
+      `Придёт ли она — решаешь ты. Что принесёт — решает не ты.</div>`;
+  }
   {
     // Часов до следующего подроста больше не пишем: он теперь случается
     // не по таймеру на глазах, а за ночь. Число в подписи тикало бы,
@@ -2664,6 +2735,25 @@ function renderToday(){
 
   document.getElementById("puzzle-title").style.display="";
   renderPuzzle();
+
+  // Серый день — тихой строкой в самом низу, без вида кнопки. Это не
+  // предложение и не совет: приложение никогда не заговаривает об этом
+  // первым, «может, отметишь день серым?» читается как «ты всё равно
+  // не сделаешь». Просто дверь, которая есть, если понадобится.
+  {
+    const серый=isGrey(todayKey());
+    let box=document.getElementById("grey-day");
+    if(!box){
+      box=document.createElement("div");
+      box.id="grey-day";
+      box.style.cssText="margin:18px 0 4px;text-align:center;cursor:pointer";
+      document.getElementById("v-today").appendChild(box);
+      box.onclick=toggleGrey;
+    }
+    box.innerHTML=серый
+      ? `<span class="dim" style="font-size:13px">Этот день не в счёт · <u>вернуть обычный</u></span>`
+      : `<span class="dim" style="font-size:13px;opacity:.55">сегодня не мой день</span>`;
+  }
 }
 
 // ── Чек-ин по шагам ──────────────────────────────────────────────────
@@ -2692,8 +2782,10 @@ function renderDays(){
     const d=new Date(now);d.setDate(d.getDate()-i);
     const k=keyOf(d),есть=!!LOG[k];
     const имя=i===0?"сегодня":i===1?"вчера":d.toLocaleDateString("ru-RU",{weekday:"short"});
+    const сер=isGrey(k);
     html+=`<div class="day ${k===dayKey()?"sel":""}" data-k="${k}">
-      ${имя}<b>${d.getDate()}</b><span class="dot ${есть?"":"no"}"></span></div>`;
+      ${имя}<b>${d.getDate()}</b><span class="dot ${есть&&!сер?"":"no"}"${
+        сер?' style="background:rgba(255,255,255,.28);border-color:transparent"':""}></span></div>`;
   }
   box.innerHTML=html;
   box.querySelectorAll(".day").forEach(el=>el.onclick=()=>{
@@ -2776,9 +2868,9 @@ function save(){
     return;
   }
   if(Math.random()<0.15){
-    const matched=STORIES.filter(s=>s.sphere===weakest().code);
-    const pool=matched.length?matched:STORIES;
-    PET.pendingStory=pool[Math.floor(Math.random()*pool.length)];
+    const выбор=pickStory(weakest().code,Math.floor(Math.random()*1e9));
+    PET.pendingStory=выбор.s;
+    PET.pendingStoryIndex=выбор.i;
     savePet();
   }
   // Сначала показываем, что записано, и только потом шлём боту. Раньше было
@@ -2905,6 +2997,10 @@ function renderWheel(){
        <div class="dim" style="flex:1">${!hasData()?"дней ещё не записано":dm===0?"сегодня уже задета":dm===1?"не трогал вчера":"не трогал "+dm+" "+plural(dm,"день","дня","дней")}</div>
        <div class="pts">+${ptsFor(d.code)}</div></div>
      ${v?`<div class="dim" style="margin-top:16px;padding-top:13px;border-top:1px solid var(--brd)">
+            ${(()=>{const л=litDays(d.code,WHEEL_WINDOW);
+              const сдвиг=(PET.wheelMoved||[]).find(x=>x.c===d.code);
+              return (сдвиг?`Было ${сдвиг.было}, стало ${сдвиг.стало}. `:"")+
+                `Горело ${л.горело} ${plural(л.горело,"день","дня","дней")} из ${л.из}.`;})()}<br>
             Оценка двигается сама: от того, сколько дней эта сфера горела.
             Колесо показывает, где ты сейчас, а не спрашивает заново.</div>`
         :`<div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
@@ -3071,6 +3167,7 @@ let VIEW="totem";
 if(CONFIRM) confirmFromBot(CONFIRM);   // что дошло до бота — помечаем и чистим
 prune();
 mergeLog();
+moveWheel();                 // колесо подтягивается само, раз в неделю
 DATA.today=todayState();     // новый день начинается с чистого листа
 go("totem");
 setInterval(applyTheme,60000);
