@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=56"></script>
-<script src="data.js?v=56"></script>
-<script src="deck.js?v=56"></script>
+<script src="photos/list.js?v=57"></script>
+<script src="data.js?v=57"></script>
+<script src="deck.js?v=57"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -44,6 +44,12 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
 .btn.saved{background:#7fc0a4;color:#0f1714}
 /* Карточки подряд без отступа читались как один слипшийся блок */
 #ready,#quest,#card,#den-box,#season-box,#walk-box{margin-bottom:12px}
+/* Кнопка звука лежит поверх снимка земли, в правом верхнем углу. Маленькая
+   и полупрозрачная: звук здесь не главное, а предложение. */
+.sound-btn{position:absolute;top:10px;right:10px;z-index:3;width:34px;height:34px;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  font-size:12px;color:#fff;background:rgba(6,8,14,.55);border:1px solid rgba(255,255,255,.22);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);user-select:none}
 .quote .q{font:400 18.5px/1.45 var(--fd)}
 .quote .a{font-size:12.5px;color:var(--ink2);margin-top:9px}
 .quote .tag{font-size:11px;color:var(--ink2);opacity:.8;margin-top:11px}
@@ -234,6 +240,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <div id="walk-card" style="border-radius:20px;overflow:hidden;background:var(--card);
          border:1px solid var(--brd)">
       <div style="position:relative;height:196px;background:#0b1014">
+        <div id="walk-sound"></div>
         <img id="walk-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
         <div style="position:absolute;inset:0;background:linear-gradient(transparent 30%,rgba(6,8,14,.92))"></div>
         <div style="position:absolute;left:16px;right:16px;bottom:13px">
@@ -284,6 +291,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div style="width:100%;max-width:360px;border-radius:20px;overflow:hidden;
        background:var(--card);border:1px solid var(--brd)">
     <div style="position:relative;height:186px;background:#0b1014">
+      <div id="find-sound"></div>
       <img id="find-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
       <div style="position:absolute;inset:0;background:linear-gradient(transparent 32%,rgba(6,8,14,.92))"></div>
       <div style="position:absolute;left:16px;right:16px;bottom:13px">
@@ -361,6 +369,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
         <div id="away-fallback" style="position:absolute;inset:0;z-index:0"></div>
         <img id="away-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;
           z-index:1;transition:opacity 1.2s ease">
+        <div id="away-sound"></div>
         <div style="position:absolute;left:0;right:0;bottom:0;padding:16px;z-index:2;
           background:linear-gradient(transparent,rgba(6,8,14,.72))">
           <div id="away-where" style="font:600 15px var(--fu);color:#fff"></div>
@@ -381,6 +390,11 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <h2>Оформление</h2>
   <div class="themes" id="themes"></div>
   <div class="g" id="me-info"></div>
+  <h2>Звук мест</h2>
+  <div class="g">
+    <div class="dim">У каждой земли свой звук — ветер, вода, глухая тишина. Он не включается сам никогда: только когда нажмёшь ▶ на снимке. Здесь можно убрать и саму кнопку.</div>
+    <button class="btn ghost" style="margin-top:12px" id="sound-switch" onclick="toggleSound()"></button>
+  </div>
   <h2>Начать заново</h2>
   <div class="g">
     <div class="dim">Стереть всё и начать с чистого листа: новый зверь, пустая летопись, ноль находок. Отменить будет нельзя — сначала выгрузи копию себе.</div>
@@ -484,7 +498,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="56 · 19.08.2026 07:51";
+const APP_VERSION="57 · 19.08.2026 07:57";
 
 let toastTimer=null;
 function toast(text){
@@ -866,6 +880,8 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          finds:LS.finds||[], traits:LS.traits||{},
          // где и когда нашлась каждая вещь: {номер:{d:день,l:земля}}
          findAt:LS.findAt||{},
+         // звук места: 1 — можно, 0 — выключен насовсем
+         sound:LS.sound??1,
          // земли, камни, капсулы, летопись, задачки
          stones:LS.stones||0, lands:LS.lands||[0], capsules:LS.capsules||[],
          chronicle:LS.chronicle||[], slow:LS.slow||[], questOn:LS.questOn||"",
@@ -1403,6 +1419,7 @@ function openFind(i){
   document.getElementById("find-where").textContent=
     (LANDS[где]||LANDS[0]).n+(когда?" · "+датаСловами(когда):"");
   document.getElementById("find-text").textContent=f.x;
+  document.getElementById("find-sound").innerHTML=PET.sound?soundBtn(где):"";
   denButton();
   document.getElementById("find-modal").style.display="flex";
 }
@@ -1419,6 +1436,7 @@ function denFromScene(){
 }
 function closeFind(){
   findOpen=null;
+  soundStop();
   document.getElementById("find-modal").style.display="none";
 }
 
@@ -1472,6 +1490,18 @@ function renderMe(){
     `<div class="dim">Земель открыто: ${земель} из ${LANDS.length} · камней: ${PET.stones||0}</div>`+
     `<div class="dim">Запечатано писем: ${(PET.capsules||[]).length}</div>`+
     `<div class="dim" style="margin-top:10px">Версия ${APP_VERSION}</div>`;
+  const sw=document.getElementById("sound-switch");
+  if(sw) sw.textContent=PET.sound?"Звук мест включён — выключить":"Звук мест выключен — включить";
+}
+
+// Выключатель насовсем: вместе со звуком исчезают и кнопки со снимков.
+// Полумеры вроде «тише» тут не нужны — либо человеку это интересно,
+// либо он не хочет видеть даже предложения.
+function toggleSound(){
+  PET.sound=PET.sound?0:1;
+  if(!PET.sound) soundStop();
+  savePet(); renderMe(); renderTotem();
+  toast(PET.sound?"Звук мест включён":"Звук мест выключен");
 }
 
 // ── Летопись ─────────────────────────────────────────────────────────
@@ -1571,6 +1601,95 @@ const RESPONSES=[
   [{t:"Рассмотреть всё вместе",k:"любопытство"},{t:"Просто посидеть рядом",k:"спокойствие"}],
   [{t:"Похвалить за смелость",k:"смелость"},{t:"Погладить и ничего не говорить",k:"нежность"}]
 ];
+
+// ── Звук места ───────────────────────────────────────────────────────
+// Ни одного файла: звук считается на месте из шума и фильтров. Скачивать
+// чужие записи леса и реки — это и лишний вес, и чужие права; а разница
+// между землями всё равно не в записи, а в характере — как быстро ходит
+// ветер и насколько глухо. Девять профилей, по одному на землю.
+//
+// Два правила, и они важнее звучания: играет только по нажатию (само
+// никогда), и выключить можно навсегда — в кабинете. Звук в приложении,
+// которое открывают в транспорте, без выключателя — это грубость.
+const SOUNDS=[
+  {f:600, q:0.7, lfo:0.08, d:220, g:0.16},              // ближний лес — листва
+  {f:1700,q:0.6, lfo:0.55, d:520, g:0.20, hp:320},      // река — вода
+  {f:450, q:0.7, lfo:0.05, d:120, g:0.13},              // старая просека
+  {f:300, q:0.8, lfo:0.03, d:80,  g:0.13},              // болото — глухо
+  {f:900, q:0.9, lfo:0.22, d:520, g:0.18},              // гряда — порывы
+  {f:250, q:0.8, lfo:0.04, d:60,  g:0.11},              // ночной лес
+  {f:700, q:0.7, lfo:0.12, d:250, g:0.14},              // поле на рассвете
+  {f:200, q:0.9, lfo:0.02, d:50,  g:0.10},              // первый снег — тише всего
+  {f:1100,q:1.0, lfo:0.35, d:700, g:0.21}               // перевал — ветер
+];
+const SOUND_MAX_MS=3*60*1000;      // забыл выключить — сам замолчит через три минуты
+let AC=null, SND=null, SNDLand=null, SNDTimer=null;
+
+function noiseBuffer(ac){
+  // Коричневый шум: белый, проинтегрированный. Он мягче белого и звучит
+  // как ветер и вода, а не как ненастроенное радио.
+  const n=ac.sampleRate*4, b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0);
+  let last=0;
+  for(let i=0;i<n;i++){ const w=Math.random()*2-1; last=(last+0.02*w)/1.02; d[i]=last*3.4; }
+  return b;
+}
+
+function soundStop(){
+  clearTimeout(SNDTimer);
+  if(!SND)return;
+  const s=SND; SND=null; SNDLand=null;
+  try{
+    s.gain.gain.setTargetAtTime(0,AC.currentTime,0.2);
+    setTimeout(()=>{try{s.src.stop();}catch(e){}},900);
+  }catch(e){}
+  soundButtons();
+}
+
+function soundPlay(i){
+  const p=SOUNDS[i]||SOUNDS[0];
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==="suspended") AC.resume();
+    const src=AC.createBufferSource();
+    src.buffer=noiseBuffer(AC); src.loop=true;
+    let node=src;
+    if(p.hp){ const hp=AC.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=p.hp;
+              node.connect(hp); node=hp; }
+    const lp=AC.createBiquadFilter(); lp.type="lowpass";
+    lp.frequency.value=p.f; lp.Q.value=p.q;
+    // Ветер не ровный: медленная волна водит частоту среза вверх-вниз.
+    // Без неё получается ровное шипение, и это слышно как брак.
+    const lfo=AC.createOscillator(), amp=AC.createGain();
+    lfo.frequency.value=p.lfo; amp.gain.value=p.d;
+    lfo.connect(amp); amp.connect(lp.frequency); lfo.start();
+    const gain=AC.createGain(); gain.gain.value=0;
+    node.connect(lp); lp.connect(gain); gain.connect(AC.destination);
+    src.start();
+    gain.gain.setTargetAtTime(p.g,AC.currentTime,0.9);   // вплывает, а не бьёт по ушам
+    SND={src,gain,lfo}; SNDLand=i;
+    SNDTimer=setTimeout(soundStop,SOUND_MAX_MS);
+    return true;
+  }catch(e){ return false; }
+}
+
+// Одна кнопка на все экраны: нажал на землю — слышно её, нажал ещё раз —
+// тихо. Другая земля переключает звук, а не запускает второй поверх.
+function soundToggle(i){
+  if(!PET.sound){ toast("Звук выключен в кабинете"); return; }
+  if(SND&&SNDLand===i){ soundStop(); return; }
+  soundStop();
+  if(!soundPlay(i)) toast("Звук здесь не заводится");
+  soundButtons();
+}
+const soundBtn=i=>`<div class="sound-btn" data-land="${i}" onclick="event.stopPropagation();soundToggle(${i})"
+   title="Звук места">${SND&&SNDLand===i?"◼":"▶"}</div>`;
+function soundButtons(){
+  document.querySelectorAll(".sound-btn").forEach(el=>{
+    el.textContent=(SND&&SNDLand===+el.dataset.land)?"◼":"▶";
+  });
+}
+// Свернул приложение — звук замолкает. Иначе он остаётся играть в кармане.
+document.addEventListener("visibilitychange",()=>{ if(document.hidden) soundStop(); });
 
 // ── Земли ────────────────────────────────────────────────────────────
 // Раньше все находки лежали в одном мешке: рысь ходила «куда-то», и через
@@ -1808,6 +1927,7 @@ function openWalk(){
   document.getElementById("walk-sign").innerHTML=
     `<span>${PET.name||"Рысь"} · ${земля.n.toLowerCase()}</span>`+
     `<span>${датаСловами(todayKey())}</span>`;
+  document.getElementById("walk-sound").innerHTML=PET.sound?soundBtn(PET.walkLand??0):"";
   document.getElementById("walk-answers").innerHTML=пара.map((o,i)=>
     `<button class="btn${i?" ghost":""}" style="margin-top:8px" onclick="answerWalk('${o.k}')">${o.t}</button>`).join("");
   m.style.display="flex";
@@ -1840,6 +1960,7 @@ function answerWalk(trait){
   PET.walks=(PET.walks||0)+1;
   PET.walkStart=0;PET.walkRoll=null;PET.walkPick=null;PET.walkBack=0;PET.walkNight=0;
   savePet();
+  soundStop();
   document.getElementById("walk-modal").style.display="none";
   document.getElementById("legend-modal").style.display="none";
   // Подрост показываем сразу после встречи, а не пока её нет дома: смысл
@@ -2060,6 +2181,8 @@ function updateAway(){
   document.getElementById("away-where").textContent=LANDS[i]?LANDS[i].n:"Где-то далеко";
   const sub=document.getElementById("away-sub");
   if(sub) sub.textContent=PET.walkNight?"Ушла на ночь · вернётся к утру":"Её здесь нет";
+  const зв=document.getElementById("away-sound");
+  if(зв) зв.innerHTML=PET.sound?soundBtn(i):"";
   // Пока снимков земель нет — рисуем пейзаж градиентом по времени суток.
   // Небо сверху, земля снизу, зверя нет. Это не заглушка «серый квадрат»,
   // а нормальный вид, который сам сменится на фото, когда оно появится.
