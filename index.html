@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=50"></script>
-<script src="data.js?v=50"></script>
-<script src="deck.js?v=50"></script>
+<script src="photos/list.js?v=51"></script>
+<script src="data.js?v=51"></script>
+<script src="deck.js?v=51"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -41,6 +41,7 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
   -webkit-backdrop-filter:blur(24px) saturate(1.25);
   border:1px solid var(--brd);border-radius:20px;padding:17px}
 .quote{margin-bottom:12px}
+.btn.saved{background:#7fc0a4;color:#0f1714}
 /* Карточки подряд без отступа читались как один слипшийся блок */
 #ready,#quest,#card,#den-box,#season-box,#walk-box{margin-bottom:12px}
 .quote .q{font:400 18.5px/1.45 var(--fd)}
@@ -371,7 +372,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="sub" id="note-sub" style="margin-bottom:8px"></div>
   <textarea id="note" rows="2" placeholder="Необязательно"></textarea>
 
-  <button class="btn" onclick="save()">Сохранить и закрыть</button>
+  <button class="btn" id="save-btn" onclick="save()">Сохранить день</button>
   <button class="btn ghost" onclick="go('totem')">Отмена</button>
 </section>
 
@@ -404,7 +405,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="50 · 18.08.2026 14:22";
+const APP_VERSION="51 · 19.08.2026 06:56";
 
 let toastTimer=null;
 function toast(text){
@@ -630,9 +631,13 @@ function cloudSave(){
 
 function cloudLoad(done){
   if(!CLOUD){done&&done(false);return;}
+  // Раньше всё восстановление висело на одном ключе log_n: не прочитался —
+  // выходили сразу, и зверь, колесо и цели не грузились вовсе. Приложение
+  // выглядело как новый аккаунт, а перезаход «чинил», потому что со второго
+  // раза ключ читался. Теперь дни и остальное грузятся независимо.
   CLOUD.getItem("log_n",(err,n)=>{
-    if(err||!n){cloudReady=true;done&&done(false);return;}
-    const parts=+n||1, keys=[];
+    const parts=(!err&&n)?(+n||1):0;
+    const keys=[];
     for(let i=0;i<parts;i++) keys.push("log_"+i);
     CLOUD.getItems(keys.concat(["wheel","goals","pet"]),(e2,got)=>{
       cloudReady=true;
@@ -1367,7 +1372,11 @@ const stageNow=()=>{
   const per=GROWTH_STEPS/PHOTO_FRAMES;
   return Math.min(PHOTO_FRAMES,Math.max(1,Math.ceil(growthStepsPassed()/per)||1));
 };
-const walkCost=()=>40+stageNow()*6;
+// Было 40+стадия*6 — на третьей стадии 58, а за обычный день капает 20-30.
+// Александр: «прошли почти сутки, а заполнено 10 из 58, теряется интерес».
+// Он прав: прогулка — не награда за неделю подвигов, а обычное событие дня.
+// Теперь даже в слабый день она выходит примерно раз в сутки.
+const walkCost=()=>18+stageNow()*3;
 const energyNow=()=>Math.max(0,earned()+(PET.cardEnergy||0)-(PET.walkSpent||0));
 const isWalking=()=>!!PET.walkStart;
 const walkDone=()=>isWalking()&&Date.now()-PET.walkStart>=WALK_MIN_MS;
@@ -2032,7 +2041,7 @@ function renderTotem(){
   // лавку. Число, которое только растёт и ничего не делает, — пустой шум.
   // Само начисление осталось: оно уезжает боту в отчёте (поле pt).
   document.getElementById("totem-state").innerHTML=
-    `<div><div class="lead">${сколько?`Сферы в среднем — ${maturity().toFixed(1)} из 10`:"Сферы ещё не оценены"}</div>
+    `<div>${сколько?"":`<div class="lead">Сферы ещё не оценены</div>`}
         <div class="fname" style="margin:5px 0 0">${PET.name||state}</div>
         ${PET.name?`<div class="dim" style="margin-top:3px">${state}</div>`:""}</div>
      ${nameBlock()}
@@ -2416,10 +2425,29 @@ function save(){
     PET.pendingStory=pool[Math.floor(Math.random()*pool.length)];
     savePet();
   }
+  // Сначала показываем, что записано, и только потом шлём боту. Раньше было
+  // наоборот: sendData закрывает мини-апп, код выходил сразу — и если
+  // закрытия не происходило, человек не видел вообще ничего и решал,
+  // что кнопка не работает. Данные при этом сохранялись.
+  savedTick();
   const out=logPacket();
-  if(inTelegram){tg.sendData(out.packet);return;}
-  renderTotem();go("totem");
+  if(inTelegram){ setTimeout(()=>tg.sendData(out.packet),700); return; }
+  renderTotem();
+}
+
+// Отметка «сохранено» прямо на кнопке: видно, что день записан, и можно
+// поправить и сохранить снова — кнопка вернётся в обычный вид.
+function savedTick(){
+  const b=document.getElementById("save-btn");
+  if(!b)return;
+  b.textContent="Сохранено ✓";
+  b.classList.add("saved");
+  clearTimeout(window.__savedT);
+  window.__savedT=setTimeout(()=>{
+    b.textContent="Сохранить день"; b.classList.remove("saved");
+  },2500);
   toast("День записан");
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
 }
 
 // ── Колесо: неделя / месяц / год ─────────────────────────────────────
@@ -2489,23 +2517,18 @@ function renderWheel(){
      <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--brd)">
        <div class="dim" style="flex:1">${!hasData()?"дней ещё не записано":dm===0?"сегодня уже задета":dm===1?"не трогал вчера":"не трогал "+dm+" "+plural(dm,"день","дня","дней")}</div>
        <div class="pts">+${ptsFor(d.code)}</div></div>
-     <div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
-     <div class="dim" style="margin-top:4px">Из этой оценки растёт ${BODY[d.code]} зверя</div>
-     <div class="scale" id="wheel-scale"></div>
-     <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--brd)">
-       <div style="display:flex;justify-content:space-between;align-items:baseline">
-         <div class="lead">Попытки</div>
-         <div style="font:600 26px var(--fd);color:${d.color}">${triesOf(d.code)}</div>
-       </div>
-       <div class="dim" style="margin-top:6px">
-         ${triesOf(d.code)
-           ? "Столько раз ты здесь что-то сделал. Это число не обнуляется никогда и не зависит от того, получилось или нет."
-           : "Отклик, звонок, переписанное резюме, разговор — всё, что ты здесь сделал. Результат может не приходить месяцами, попытки остаются твоими."}</div>
-       ${isSlow(d.code)?`<div class="dim" style="margin-top:8px">Здесь результат приходит не за неделю, и приложение это видит: эту сферу оно больше не называет самой слабой.</div>`:""}
-       <button class="btn" style="margin-top:10px" onclick="addTry('${d.code}')">Ещё одна попытка</button>
-     </div>`;
-  // Оценки ставятся здесь: без этого телу зверя нечем меняться
+     ${v?`<div class="dim" style="margin-top:16px;padding-top:13px;border-top:1px solid var(--brd)">
+            Оценка двигается сама: от того, сколько дней эта сфера горела.
+            Колесо показывает, где ты сейчас, а не спрашивает заново.</div>`
+        :`<div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
+          <div class="dim" style="margin-top:4px">Из этой оценки растёт ${BODY[d.code]} зверя</div>
+          <div class="scale" id="wheel-scale"></div>`}
+`;
+  // Оценки ставятся здесь: без этого телу зверя нечем меняться.
+  // Шкалы нет у уже оценённой сферы — колесо спрашивает один раз,
+  // дальше двигается само от чек-инов.
   const sc=document.getElementById("wheel-scale");
+  if(!sc)return;
   sc.innerHTML=[1,2,3,4,5,6,7,8,9,10].map(n=>
     `<div class="sn ${n===v?"on":""}" data-n="${n}">${n}</div>`).join("");
   sc.querySelectorAll(".sn").forEach(el=>el.onclick=()=>{
