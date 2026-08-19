@@ -161,3 +161,128 @@ const STORIES=[
   {sphere:"comm",name:"Ирена Сендлер",
    text:"Вывела из варшавского гетто около двух с половиной тысяч детей, записывая их имена на папиросной бумаге и пряча в банке под яблоней. Пережила пытки гестапо и дожила до девяноста восьми."}
 ];
+
+
+// ── Резервный зверь из сфер ───────────────────────────────────────────
+// Векторный зверь, собранный из двенадцати сфер: уши — друзья, хвост —
+// деньги, рога — карьера. Работает, только если пропали фотографии рыси
+// (webapp/pet/): тогда приложение молча возвращается к нему и остаётся
+// пользуемым. При живых фото не выполняется ни разу.
+//
+// Живёт здесь, а не в index.html, ровно поэтому: сто десять строк страховки
+// лежали посреди самой горячей функции главного экрана, и их приходилось
+// перечитывать при каждой правке. Файл data.js не запечатан, читать можно.
+function drawVectorTotem(m){
+  const cx=160,cy=168,step=2*Math.PI/12;
+  const gl=getComputedStyle(document.documentElement).getPropertyValue("--brd");
+  const dim=m==="red"?.4:m==="yellow"?.7:1;        // мир тускнеет вместе с тобой
+  const curl=m==="red"?.86:1;                      // в красном зверь сворачивается
+  const v=c=>(DATA.wheel[c]||0)/10;                // 0..1 — насколько выросла часть
+  const op=c=>(.12+v(c)*.88)*dim;                  // слабая часть полупрозрачна, не уродлива
+
+  // В фото-режиме вектор вообще не строим — раньше он просто прятался под
+  // фото (z-index), и это давало едва заметный «призрак» старого лиса поверх
+  // снимка в некоторых вебвью (включая телеграмный). Теперь при активных
+  // фото в SVG физически ничего нет, светиться нечему.
+  if(PHOTO_MODE){ document.getElementById("totem").innerHTML=""; }
+  else {
+  let s="";
+  // Мягкая подсветка сверху-слева — даёт телу объём вместо плоской заливки.
+  // stop-opacity, не stop-color: остаётся в цвете темы, просто гуще к краю.
+  s+=`<defs><radialGradient id="furGrad" cx="38%" cy="30%" r="75%">
+    <stop offset="0%" stop-color="currentColor" stop-opacity="1"/>
+    <stop offset="65%" stop-color="currentColor" stop-opacity=".94"/>
+    <stop offset="100%" stop-color="currentColor" stop-opacity=".8"/>
+  </radialGradient></defs>`;
+  // Земля под лапами — сфера «Дом»
+  s+=`<g class="bp" data-code="env"><ellipse cx="${cx}" cy="${cy+66}" rx="${52+v("env")*46}" ry="${9+v("env")*7}"
+      fill="currentColor" opacity="${op("env")*.28}"/></g>`;
+  // Звёзды-вехи: сколько календарных дней вы вместе — растут молча, назад не откатываются
+  s+=milestonesSVG(cx,cy);
+  // Свечение — «Духовность»
+  s+=`<g class="bp" data-code="spirit"><circle cx="${cx}" cy="${cy-6}" r="${74+v("spirit")*40}" fill="currentColor"
+      opacity="${op("spirit")*.1}"/></g>`;
+
+  const проявлен=0.18+0.82*(rated().length/SPHERES.length);   // силуэт наливается по мере оценок
+  s+=`<g transform="translate(${cx},${cy}) scale(${curl*growthScale()})" opacity="${проявлен}"><g class="idle-play"><g class="breathe">`;
+  // Сплошная база тела — зверь всегда целый, даже если все сферы слабые.
+  // Раньше части тела гасли по отдельности при низких оценках, и вместо
+  // целого зверя было видно голову с полупрозрачными обрывками — «конструктор».
+  // Теперь сферы добавляют размер и деталь поверх этой базы, а не решают,
+  // существует часть или нет.
+  s+=`<ellipse cx="0" cy="16" rx="26" ry="24" fill="url(#furGrad)" opacity="${.5+dim*.5}"/>
+      <ellipse cx="-20" cy="44" rx="9" ry="6" fill="url(#furGrad)" opacity="${.5+dim*.5}"/>
+      <ellipse cx="20" cy="44" rx="9" ry="6" fill="url(#furGrad)" opacity="${.5+dim*.5}"/>`;
+  // Хвост — «Деньги»: чем больше, тем пышнее
+  s+=`<g class="bp sway-tail" data-code="money"><path d="M30 12 Q${60+v("money")*40} ${4-v("money")*20} ${58+v("money")*26} ${-24-v("money")*26}
+      Q${86+v("money")*30} ${2-v("money")*10} ${58+v("money")*12} 36 Q44 44 30 34 Z"
+      fill="currentColor" opacity="${op("money")*.6}"/></g>`;
+  // Лапы — «Семья»: опора
+  s+=`<g class="bp" data-code="family"><ellipse cx="-20" cy="${44+v("family")*8}" rx="${9+v("family")*5}" ry="${6+v("family")*3}"
+      fill="currentColor" opacity="${op("family")}"/>
+      <ellipse cx="20" cy="${44+v("family")*8}" rx="${9+v("family")*5}" ry="${6+v("family")*3}"
+      fill="currentColor" opacity="${op("family")}"/></g>`;
+  // Корпус — «Здоровье»
+  s+=`<g class="bp" data-code="health"><ellipse cx="0" cy="16" rx="${26+v("health")*16}" ry="${24+v("health")*14}"
+      fill="url(#furGrad)" opacity="${op("health")}"/></g>`;
+  // Окрас — «Внешность»: светлая грудь
+  s+=`<g class="bp" data-code="look"><ellipse cx="0" cy="30" rx="${14+v("look")*12}" ry="${9+v("look")*8}"
+      fill="currentColor" opacity="${op("look")*.35}"/></g>`;
+  // Метка на груди — «Любовь»
+  s+=`<g class="bp" data-code="love"><path d="M0 ${22+8} C -6 ${14+8}, -12 ${20+8}, 0 ${30+8} C 12 ${20+8}, 6 ${14+8}, 0 ${22+8} Z"
+      transform="scale(${.5+v("love")*.9})" fill="currentColor" opacity="${op("love")*.5}"/></g>`;
+  // Грива — «Саморазвитие»
+  s+=`<g class="bp" data-code="self"><ellipse cx="0" cy="-14" rx="${24+v("self")*16}" ry="${16+v("self")*12}"
+      fill="currentColor" opacity="${op("self")*.4}"/></g>`;
+  // Рога — «Карьера»: то, что делает зверя не лисой, а химерой
+  if(v("career")>0.05) s+=`<g class="bp" data-code="career"><path d="M-14 -46 Q${-22-v("career")*16} ${-62-v("career")*30} ${-8-v("career")*10} ${-72-v("career")*34}"
+      stroke="currentColor" stroke-width="${2+v("career")*4}" fill="none" stroke-linecap="round" opacity="${op("career")}"/>
+      <path d="M14 -46 Q${22+v("career")*16} ${-62-v("career")*30} ${8+v("career")*10} ${-72-v("career")*34}"
+      stroke="currentColor" stroke-width="${2+v("career")*4}" fill="none" stroke-linecap="round" opacity="${op("career")}"/></g>`;
+  // Уши — «Друзья»
+  s+=`<g class="bp sway-ears" data-code="friends"><path d="M-24 -40 L${-28-v("friends")*10} ${-64-v("friends")*30} L-6 -52 Z"
+      fill="currentColor" opacity="${op("friends")}"/>
+      <path d="M24 -40 L${28+v("friends")*10} ${-64-v("friends")*30} L6 -52 Z"
+      fill="currentColor" opacity="${op("friends")}"/></g>`;
+  // Голова
+  s+=`<ellipse cx="0" cy="-30" rx="26" ry="23" fill="url(#furGrad)" opacity="${.55+dim*.45}"/>`;
+  // Глаза — «Отдых»: чем меньше отдыха, тем уже
+  const eye=m==="red"?1.6:2+v("rest")*3.4;
+  s+=`<g class="bp eyes" data-code="rest"><ellipse cx="-10" cy="-34" rx="3.6" ry="${eye}" fill="#0d1014"/>
+      <ellipse cx="10" cy="-34" rx="3.6" ry="${eye}" fill="#0d1014"/>`;
+  if(m!=="red"&&v("rest")>.4) s+=`<circle cx="-8.8" cy="-35.4" r="1.3" fill="#fff" opacity=".9"/>
+      <circle cx="11.2" cy="-35.4" r="1.3" fill="#fff" opacity=".9"/>`;
+  s+=`</g>`;
+  s+=`<path d="M-5 -20 L5 -20 L0 -15 Z" fill="#0d1014" opacity=".85"/>`;
+  // Усы — «Общение»
+  if(v("comm")>0.05){
+    const w=18+v("comm")*26;
+    s+=`<g class="bp" data-code="comm"><path d="M-26 -24 L${-26-w} -28 M-26 -19 L${-27-w} -17" stroke="#0d1014"
+        stroke-width="1.3" opacity="${op("comm")*.45}" stroke-linecap="round"/>
+        <path d="M26 -24 L${26+w} -28 M26 -19 L${27+w} -17" stroke="#0d1014"
+        stroke-width="1.3" opacity="${op("comm")*.45}" stroke-linecap="round"/></g>`;
+  }
+  s+=`</g></g></g>`;
+
+  // Подписи сфер по кругу — какая часть чья
+  SPHERES.forEach((d,i)=>{const a=-Math.PI/2+i*step+step/2;
+    s+=`<text x="${cx+140*Math.cos(a)}" y="${cy-12+140*Math.sin(a)}" font-size="8" fill="currentColor"
+      opacity="${(.25+v(d.code)*.5)*dim}" text-anchor="middle" dominant-baseline="middle">${d.name}</text>`;});
+
+  document.getElementById("totem").innerHTML=s;
+  }
+
+  // Однажды за сеанс подсвечиваем части, которые выросли со вчера —
+  // ощущение «что-то произошло, пока меня не было», без таймера и вины за пропуск.
+  if(!window.__flashed){
+    window.__flashed=true;
+    const tk=todayKey();
+    let вчера=null;
+    for(let i=DAYS.length-1;i>=0;i--){
+      if(keyOf(DAYS[i].date)!==tk){вчера=DAYS[i].touched||[];break;}
+    }
+    (вчера||[]).forEach(code=>{
+      document.querySelectorAll(`#totem .bp[data-code="${code}"]`).forEach(el=>el.classList.add("flash"));
+    });
+  }
+}
