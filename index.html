@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=52"></script>
-<script src="data.js?v=52"></script>
-<script src="deck.js?v=52"></script>
+<script src="photos/list.js?v=53"></script>
+<script src="data.js?v=53"></script>
+<script src="deck.js?v=53"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -232,6 +232,17 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <div id="walk-answers" style="margin-top:14px"></div>
   </div>
 </div>
+<div id="release-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(6,8,14,.72);
+     align-items:center;justify-content:center;padding:18px">
+  <div class="g" style="max-width:360px;padding:22px">
+    <div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">День закрыт</div>
+    <div class="fname" id="release-title" style="margin-top:6px"></div>
+    <div class="why" id="release-text" style="margin-top:10px"></div>
+    <button class="btn" style="margin-top:14px" onclick="releaseWalk(1)">Пусть идёт</button>
+    <button class="btn ghost" style="margin-top:8px" onclick="releaseWalk(0)">Пусть останется дома</button>
+    <div class="dim" id="release-note" style="margin-top:8px;font-size:12px"></div>
+  </div>
+</div>
 <div id="once-modal" style="display:none;position:fixed;inset:0;z-index:70;background:rgba(4,6,10,.92);
      align-items:center;justify-content:center;padding:18px">
   <div class="g" style="max-width:380px;padding:24px">
@@ -285,7 +296,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
         <div style="position:absolute;left:0;right:0;bottom:0;padding:16px;z-index:2;
           background:linear-gradient(transparent,rgba(6,8,14,.72))">
           <div id="away-where" style="font:600 15px var(--fu);color:#fff"></div>
-          <div style="font-size:12.5px;color:rgba(255,255,255,.72);margin-top:2px">Её здесь нет</div>
+          <div id="away-sub" style="font-size:12.5px;color:rgba(255,255,255,.72);margin-top:2px">Её здесь нет</div>
         </div>
       </div>
     </div>
@@ -405,7 +416,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="52 · 19.08.2026 07:14";
+const APP_VERSION="53 · 19.08.2026 07:40";
 
 let toastTimer=null;
 function toast(text){
@@ -701,7 +712,7 @@ function logPacket(){
   }
   // Когда рысь в пути, кладём в посылку время её возвращения: бот сам
   // не может ничего узнать у приложения, у него нет адреса в интернете.
-  const прогулка=(isWalking()&&!walkDone())?PET.walkStart+WALK_MIN_MS:0;
+  const прогулка=(isWalking()&&!walkDone())?walkBackTime():0;
   return {packet:JSON.stringify({type:"log",days,wheel:DATA.wheel,walk:прогулка}),days};
 }
 // Раньше день помечался отправленным ДО отправки, а подтверждения не было:
@@ -780,7 +791,9 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          // прогулка
          walkStart:LS.walkStart||0, walkRoll:LS.walkRoll??null, walkPick:LS.walkPick??null,
          walkSpent:LS.walkSpent||0, walks:LS.walks||0, walkLand:LS.walkLand||0,
-         walkTold:LS.walkTold||0,
+         walkTold:LS.walkTold||0, walkBack:LS.walkBack||0, walkNight:LS.walkNight||0,
+         // ночной цикл: какую стадию человек уже видел и когда её показали
+         stageSeen:LS.stageSeen||0, stageSeenOn:LS.stageSeenOn||"",
          // находки и характер
          finds:LS.finds||[], traits:LS.traits||{},
          // земли, камни, капсулы, летопись, задачки
@@ -1376,10 +1389,48 @@ function renderChronicle(){
 // больше. Отсчёта на экране намеренно нет — она возвращается сама, когда
 // ты в следующий раз откроешь приложение. Успевать к сроку не надо.
 const WALK_MIN_MS=2*3600*1000;
-const stageNow=()=>{
-  const per=GROWTH_STEPS/PHOTO_FRAMES;
-  return Math.min(PHOTO_FRAMES,Math.max(1,Math.ceil(growthStepsPassed()/per)||1));
-};
+
+// Ночной цикл. Закрыл день чек-ином вечером — она уходит в ночь и
+// возвращается к утру: с находкой и подросшая. Днём прогулка прежняя,
+// на два часа. Заставлять ждать до утра того, кто заполнил день в обед, —
+// не ритуал, а наказание за раннюю аккуратность.
+const NIGHT_FROM=19, NIGHT_TO=5, NIGHT_BACK_H=8;
+const isNightHour=h=>h>=NIGHT_FROM||h<NIGHT_TO;
+function walkBackAt(from){
+  const h=new Date(from).getHours();
+  if(!isNightHour(h)) return from+WALK_MIN_MS;
+  const back=new Date(from);
+  if(h>=NIGHT_FROM) back.setDate(back.getDate()+1);      // ушла вечером — утро уже завтра
+  back.setHours(NIGHT_BACK_H,0,0,0);
+  return Math.max(back.getTime(),from+WALK_MIN_MS);      // ушла в 7 утра — не встречать через час
+}
+// Прогулки, начатые до этой версии, записаны без времени возвращения:
+// им прежние два часа, иначе старая прогулка зависла бы навсегда.
+const walkBackTime=()=>PET.walkBack||PET.walkStart+WALK_MIN_MS;
+
+// Стадия, которая насчиталась по времени, и стадия, которую человек уже
+// видел, — это теперь две разные вещи. Рост идёт как шёл, раз в 6 часов и
+// только вверх; переехал момент показа. Рысь не подрастает на глазах
+// в середине дня — она подрастает за ночь, и утром её видно другой.
+const stageOf=steps=>Math.min(PHOTO_FRAMES,Math.max(1,Math.ceil(steps/(GROWTH_STEPS/PHOTO_FRAMES))||1));
+const stageReal=()=>stageOf(growthStepsPassed());
+const stageNow=()=>Math.min(stageReal(),PET.stageSeen||stageReal());
+
+// Утренний переход: за ночь подросла. Один раз в день, не во время прогулки
+// (иначе подрост случится на пустом экране, пока её нет дома) и не раньше
+// пяти утра. Если человек заходит только вечерами — покажется вечером:
+// «за ночь» здесь про ночь, которая прошла с прошлого раза, а не про часы.
+function maybeGrowOvernight(){
+  const real=stageReal();
+  if(!PET.stageSeen){                       // первый заход: догоняем молча
+    PET.stageSeen=real; PET.stageSeenOn=todayKey(); savePet(); return;
+  }
+  if(real<=PET.stageSeen||isWalking()) return;
+  if(new Date().getHours()<NIGHT_TO||PET.stageSeenOn===todayKey()) return;
+  PET.stageSeen=real; PET.stageSeenOn=todayKey(); savePet();
+  летопись(`За ночь она подросла — стадия ${real} из ${PHOTO_FRAMES}.`);
+  setTimeout(()=>toast("За ночь она подросла"),900);
+}
 // Было 40+стадия*6 — на третьей стадии 58, а за обычный день капает 20-30.
 // Александр: «прошли почти сутки, а заполнено 10 из 58, теряется интерес».
 // Он прав: прогулка — не награда за неделю подвигов, а обычное событие дня.
@@ -1387,7 +1438,7 @@ const stageNow=()=>{
 const walkCost=()=>18+stageNow()*3;
 const energyNow=()=>Math.max(0,earned()+(PET.cardEnergy||0)-(PET.walkSpent||0));
 const isWalking=()=>!!PET.walkStart;
-const walkDone=()=>isWalking()&&Date.now()-PET.walkStart>=WALK_MIN_MS;
+const walkDone=()=>isWalking()&&Date.now()>=walkBackTime();
 
 const TRAITS={смелость:"смелая",нежность:"ласковая",любопытство:"любопытная",спокойствие:"спокойная"};
 const RESPONSES=[
@@ -1476,6 +1527,8 @@ function startWalk(){
   // то есть механика показала бы себя худшей стороной в первый же день.
   PET.walkSpent=(PET.walkSpent||0)+energyNow();
   PET.walkStart=Date.now();
+  PET.walkBack=walkBackAt(PET.walkStart);
+  PET.walkNight=PET.walkBack-PET.walkStart>WALK_MIN_MS?1:0;
   PET.walkTold=0;
   PET.walkRoll=Math.random();          // что она принесёт — решается на выходе
   PET.walkPick=Math.floor(Math.random()*1e9);
@@ -1484,7 +1537,7 @@ function startWalk(){
   PET.walkLand=открытые[Math.floor(Math.random()*открытые.length)];
   savePet();renderWalk();renderTotem();
   if(!PET.walks)летопись("Она впервые ушла бродить одна.");
-  toast("Ушла бродить");
+  toast(PET.walkNight?"Ушла на ночь":"Ушла бродить");
 }
 
 // Что нашлось. Находка выпадает НЕ всегда — иногда рысь просто гуляла.
@@ -1529,8 +1582,10 @@ function renderWalk(){
     return;
   }
   if(isWalking()){
-    box.innerHTML=`<div class="fname">Рысь бродит</div>`+
-      `<div class="dim" style="margin-top:6px">Вернётся сама — загляни попозже. Ждать у экрана не надо.</div>`+
+    box.innerHTML=`<div class="fname">${PET.walkNight?"Рысь ушла на ночь":"Рысь бродит"}</div>`+
+      `<div class="dim" style="margin-top:6px">${PET.walkNight
+        ? "Вернётся к утру. Ждать у экрана не надо — утром просто загляни."
+        : "Вернётся сама — загляни попозже. Ждать у экрана не надо."}</div>`+
       // Приложение не может позвать бота в фоне: единственный канал —
       // посылка через телеграм, а она закрывает мини-апп. Поэтому это
       // отдельная кнопка с честным предупреждением, а не тихое действие.
@@ -1549,7 +1604,8 @@ function renderWalk(){
       `<div style="height:100%;width:${(доля*100).toFixed(1)}%;border-radius:6px;background:linear-gradient(90deg,#f0b429,#f6d365);transition:width .6s ease"></div>`+
     `</div>`+
     (доля>=1
-      ? `<button class="btn" style="margin-top:12px" onclick="startWalk()">Отпустить бродить</button>`
+      ? `<button class="btn" style="margin-top:12px" onclick="startWalk()">${
+           isNightHour(new Date().getHours())?"Отпустить на ночь":"Отпустить бродить"}</button>`
       : `<div class="dim" style="margin-top:8px">Зажигай сферы — энергия копится сама. Спящая сфера даёт втрое больше.</div>`);
 }
 
@@ -1558,7 +1614,7 @@ function renderWalk(){
 function tellBotAboutWalk(){
   if(!inTelegram||!isWalking())return;
   PET.walkTold=1; savePet();
-  tg.sendData(JSON.stringify({type:"walk",walk:PET.walkStart+WALK_MIN_MS}));
+  tg.sendData(JSON.stringify({type:"walk",walk:walkBackTime()}));
 }
 
 function openWalk(){
@@ -1607,9 +1663,12 @@ function answerWalk(trait){
   }
   PET.stones=(PET.stones||0)+камни;
   PET.walks=(PET.walks||0)+1;
-  PET.walkStart=0;PET.walkRoll=null;PET.walkPick=null;
+  PET.walkStart=0;PET.walkRoll=null;PET.walkPick=null;PET.walkBack=0;PET.walkNight=0;
   savePet();
   document.getElementById("walk-modal").style.display="none";
+  // Подрост показываем сразу после встречи, а не пока её нет дома: смысл
+  // ночного цикла в том, чтобы разницу увидели глазами.
+  maybeGrowOvernight();
   renderWalk();renderTotem();
   toast(`+${камни} 💎`);
 }
@@ -1750,6 +1809,10 @@ const growthScale=()=>0.55+0.45*(growthStepsPassed()/GROWTH_STEPS);
 function withinStageScale(){
   const steps=growthStepsPassed(), perStage=GROWTH_STEPS/PHOTO_FRAMES;
   if(steps>=GROWTH_STEPS) return 1.06;          // вырос полностью — не откатываем
+  // Стадия уже насчиталась, но ещё не показана: держим её на верхнем краю
+  // масштаба. Иначе рысь продолжала бы пухнуть внутри стадии, которую
+  // человек как раз ещё не видел, и утренний подрост стал бы незаметным.
+  if(stageReal()>stageNow()) return 1.06;
   // Смена кадра считается через ceil, поэтому шаг 12 — ещё первая стадия,
   // а шаг 13 — уже вторая. Без этого сдвига масштаб обнулялся на шаг раньше
   // снимка: рысь на глазах уменьшалась, и прикрыть это было нечем.
@@ -1788,7 +1851,7 @@ function showPhoto(key){
 // «Сердитая» и «грустная» специально не подключены: пет не должен
 // осуждать за плохой день, это противоречит духу проекта.
 function currentPhotoKey(){
-  const stage=Math.min(PHOTO_FRAMES,Math.max(1,Math.ceil(growthStepsPassed()/GROWTH_STEPS*PHOTO_FRAMES)||1));
+  const stage=stageNow();          // показанная, не насчитанная: см. ночной цикл
   if(stage<PHOTO_FRAMES) return String(stage);
   const m=mode();
   // Красный режим — не «грустная стоя», а честный отдых: свернулась, спит.
@@ -1811,6 +1874,8 @@ function updateAway(){
 
   const i=(PET.walkLand??0);
   document.getElementById("away-where").textContent=LANDS[i]?LANDS[i].n:"Где-то далеко";
+  const sub=document.getElementById("away-sub");
+  if(sub) sub.textContent=PET.walkNight?"Ушла на ночь · вернётся к утру":"Её здесь нет";
   // Пока снимков земель нет — рисуем пейзаж градиентом по времени суток.
   // Небо сверху, земля снизу, зверя нет. Это не заглушка «серый квадрат»,
   // а нормальный вид, который сам сменится на фото, когда оно появится.
@@ -1851,7 +1916,7 @@ function updatePhoto(){
 // для текущего состояния. Без этого первая смена дёргается — картинка
 // секунду грузится посреди кроссфейда.
 function preloadNextPhoto(){
-  const stage=Math.min(PHOTO_FRAMES,Math.max(1,Math.ceil(growthStepsPassed()/GROWTH_STEPS*PHOTO_FRAMES)||1));
+  const stage=stageNow();
   if(stage<PHOTO_FRAMES) new Image().src=`pet/${stage+1}.jpg`;
   const blink=BLINK_MAP[photoBaseKey];
   if(blink) new Image().src=`pet/${blink}.jpg`;
@@ -1875,6 +1940,7 @@ function startBlinkLoop(){
 
 function renderTotem(){
   applyTheme();
+  maybeGrowOvernight();
   // Показываем находку, если она выпала при вчерашнем/сегодняшнем закрытии
   // дня — мини-апп в Телеграме закрывается сразу после сохранения (sendData),
   // так что показать её тогда же не получится, только при следующем заходе.
@@ -2067,13 +2133,17 @@ function renderTotem(){
          : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`}`;
 
   {
-    const done=growthStepsPassed(), hoursLeft=GROWTH_STEP_H-((Date.now()-(PET.bornAt||Date.now()))/3600000%GROWTH_STEP_H);
+    // Часов до следующего подроста больше не пишем: он теперь случается
+    // не по таймеру на глазах, а за ночь. Число в подписи тикало бы,
+    // а картинка при этом не менялась — это и раздражало.
+    const done=growthStepsPassed();
     document.getElementById("totem-state").innerHTML+=
       `<div class="dim" style="margin-top:8px">${done>=GROWTH_STEPS
         ? "Выросла полностью — тридцать дней позади"
         : done===0
           ? "Первый день вместе. Растёт сама, ничего делать не надо"
-          : `Стадия ${stageNow()} из ${PHOTO_FRAMES} · следующий подрост примерно через ${Math.ceil(hoursLeft)} ч`}</div>`;
+          : `Стадия ${stageNow()} из ${PHOTO_FRAMES}`
+            +(stageReal()>stageNow()?" · за ночь подрастёт":" · растёт сама, ничего делать не надо")}</div>`;
   }
   updatePhoto();
 }
@@ -2429,9 +2499,42 @@ function save(){
   // закрытия не происходило, человек не видел вообще ничего и решал,
   // что кнопка не работает. Данные при этом сохранялись.
   savedTick();
+  // Прогулка теперь начинается отсюда. Раньше кнопка «Отпустить бродить»
+  // жила отдельно на «Тотеме», и порядок был случайный: можно было отпустить
+  // рысь, не закрыв день. Теперь это одно движение — закрыл день, отпустил
+  // её; вечером она уходит в ночь и возвращается к утру подросшей.
+  // Спрашиваем, а не отправляем молча: решение остаётся человеку, и заодно
+  // становится понятно, почему приложение сейчас закроется.
+  if(!isWalking()&&energyNow()>=walkCost()){ askRelease(); return; }
+  sendDay();
+}
+
+// Отправка боту вынесена отдельно: посылка закрывает мини-апп, поэтому
+// уходит последней — после того как человек ответил про прогулку.
+// Пакет собирается здесь же, уже зная про начатую прогулку: соберись он
+// раньше, бот не узнал бы, когда её встречать.
+function sendDay(){
   const out=logPacket();
   if(inTelegram){ setTimeout(()=>tg.sendData(out.packet),700); return; }
   renderTotem();
+}
+
+function askRelease(){
+  const ночь=isNightHour(new Date().getHours());
+  document.getElementById("release-title").textContent=
+    ночь?"Отпустить её на ночь?":"Отпустить её бродить?";
+  document.getElementById("release-text").textContent=ночь
+    ? "Уйдёт затемно, вернётся к утру — с находкой, историей или просто довольная. За ночь она ещё и подрастает."
+    : "Вернётся часа через два. Ждать у экрана не надо.";
+  document.getElementById("release-note").textContent=
+    inTelegram?"Приложение после ответа закроется — так уходит запись дня боту":"";
+  document.getElementById("release-modal").style.display="flex";
+}
+
+function releaseWalk(yes){
+  document.getElementById("release-modal").style.display="none";
+  if(yes) startWalk();
+  sendDay();
 }
 
 // Отметка «сохранено» прямо на кнопке: видно, что день записан, и можно
