@@ -882,3 +882,144 @@ function renderArc(){
       (вечер?`, сегодня ${a.сегодня}.`:`, в остальные ${a.общая.toFixed(1)}.`)+
       `<br>Это то, что совпадало, а не то, что чему-то причина.</div>`;
 }
+
+
+// ── Живая прогулка ────────────────────────────────────────────────────
+// Раньше прогулка выглядела одинаково от начала до конца: пейзаж и строка
+// «её здесь нет». Человек заходил днём и не понимал, идёт ли вообще что-то.
+//
+// Теперь три этапа по доле пройденного пути, без таймера на экране:
+// пусто → далёкий силуэт → рысь ближе. Часы не показываем намеренно —
+// успевать никуда не надо, а отсчёт превращает прогулку в ожидание.
+function walkStage(){
+  if(!isWalking()) return 0;
+  const всего=walkBackTime()-PET.walkStart;
+  if(всего<=0) return 2;
+  const доля=(Date.now()-PET.walkStart)/всего;
+  return доля<0.45?0:доля<0.8?1:2;
+}
+
+// Возвращение всегда имеет развязку, но не обязано давать предмет.
+// Пять исходов вместо трёх: к находке, истории и «просто гуляла»
+// добавлены след и наблюдение — они ничего не кладут в витрину,
+// но день не остаётся пустым.
+//
+// След — редкая сцена: по той же земле можно посмотреть ещё дважды,
+// каждое касание добавляет строку. Неправильного ответа нет, наказания нет,
+// и если человек закроет после первого — ничего не потеряно.
+const TRACES=[
+  ["Следы у самой воды. Кто-то пил и ушёл.",
+   "След глубже с одной стороны — тот, кто пил, торопился.",
+   "Дальше следы теряются в траве. Она проверила и вернулась."],
+  ["Примятая трава под кустом. Здесь лежали.",
+   "Тепла уже нет, но трава не распрямилась.",
+   "Рядом ни одного следа. Кто бы это ни был, он был лёгкий."],
+  ["Перья на камне. Не её.",
+   "Перья лежат кругом, ровно. Ветер так не кладёт.",
+   "Она долго нюхала камень и ничего не взяла."],
+  ["Кора ободрана на высоте её роста.",
+   "Царапины свежие, смола ещё липкая.",
+   "Она померилась рядом. Тот, кто драл кору, был выше."]
+];
+const OBSERVE=[
+  "Она долго сидела и смотрела на воду. Ничего не произошло.",
+  "Ветер шёл против неё, и она стояла, пока он не кончился.",
+  "Нашла место, где солнце достаёт до земли, и грелась там.",
+  "Слушала. Что именно — не показала.",
+  "Легла у самой кромки и смотрела, как темнеет."
+];
+
+
+// ── Список земель на экране ───
+function renderLands(){
+  const box=document.getElementById("lands");
+  if(!box)return;
+  box.innerHTML=LANDS.map((l,i)=>{
+    const открыта=landOpen(i), хватает=(PET.stones||0)>=l.c;
+    const мои=new Set(PET.finds||[]);
+    const всего=FINDS.filter((_,j)=>landOf(j)===i).length;
+    const собрано=[...мои].filter(j=>landOf(j)===i).length;
+    // Закрытая земля показана размытой: видно, что там что-то есть, но не что
+    // именно. Пустая серая плашка не тянет её открывать, а такая — тянет.
+    return `<div class="g" style="margin-bottom:8px;padding:0;overflow:hidden">`+
+      `<div style="position:relative;height:132px">`+
+        `<img src="${landPhoto(i)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;
+           object-fit:cover;${открыта?"":"filter:blur(5px) saturate(.85) brightness(.8);transform:scale(1.06)"}">`+
+        `<div style="position:absolute;inset:0;background:linear-gradient(transparent 30%,rgba(6,8,14,.82))"></div>`+
+        (открыта&&PET.sound?soundBtn(i):"")+
+        `<div style="position:absolute;left:14px;right:14px;bottom:11px;display:flex;
+           justify-content:space-between;align-items:flex-end;gap:10px">`+
+          `<div>`+
+            `<div style="font:600 16px var(--fu);color:#fff">${l.n}</div>`+
+            `<div style="font-size:12.5px;color:rgba(255,255,255,.74);margin-top:2px">`+
+              `${открыта?l.o:"Она туда ещё не ходила"}</div>`+
+          `</div>`+
+          `<div style="font:600 13px var(--fu);color:#fff;white-space:nowrap">`+
+            `${открыта?`${собрано} из ${всего}`:`${l.c} 💎`}</div>`+
+        `</div>`+
+      `</div>`+
+      (открыта?"":`<div style="padding:12px 14px"><button class="btn${хватает?"":" ghost"}"
+         onclick="openLand(${i})"${хватает?"":" disabled"}>${хватает?"Открыть":`Нужно ещё ${l.c-(PET.stones||0)} камней`}</button></div>`)+
+    `</div>`;
+  }).join("");
+}
+
+// ── Куда пойдём ──────────────────────────────────────────────────────
+// Единственное решение за день, которое ничего не стоит и ни за что
+// не наказывает. Девять снимков земель до сих пор были ценником в списке;
+// теперь это выбор, куда её отпустить.
+//
+// «Пусть решит сама» — не отговорка, а полноправный вариант. И примерно
+// в четверти случаев она уходит своей дорогой даже когда ты выбрал:
+// иначе выбор превратился бы в оптимизацию, где есть выгодные земли.
+const SVOYA_DOROGA=0.25;
+function aimWalk(i){
+  PET.walkAim=i;
+  document.querySelectorAll("#aim-list .aim").forEach(el=>
+    el.classList.toggle("sel",+el.dataset.i===i));
+  const b=document.getElementById("aim-go");
+  // Без предлога: «отпустить в река» — падежей в русском шесть, а склонять
+  // девять названий ради одной строки не стоит.
+  if(b) b.textContent=i===null?"Пусть решит сама":`Отпустить · ${(LANDS[i]||LANDS[0]).n}`;
+}
+function openAim(){
+  if(isWalking()||energyNow()<walkCost())return;
+  if(!walkAllowedNow()){toast("Она ещё спит. С восьми утра");return;}
+  const открытые=(PET.lands||[0]).slice().sort((a,b)=>a-b);
+  document.getElementById("aim-list").innerHTML=открытые.map(i=>{
+    const l=LANDS[i]||LANDS[0];
+    return `<div class="aim" data-i="${i}" onclick="aimWalk(${i})"
+       style="position:relative;height:78px;border-radius:12px;overflow:hidden;cursor:pointer">
+      <img src="${landPhoto(i)}" loading="lazy" style="position:absolute;inset:0;width:100%;
+        height:100%;object-fit:cover">
+      <div style="position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(6,8,14,.85))"></div>
+      <div style="position:absolute;left:11px;bottom:8px;font:600 13.5px var(--fu);color:#fff">${l.n}</div>
+    </div>`;}).join("");
+  PET.walkAim=null; aimWalk(null);
+  document.getElementById("aim-modal").style.display="flex";
+}
+function goAim(){
+  document.getElementById("aim-modal").style.display="none";
+  startWalk(PET.walkAim);
+}
+
+
+// ── Сцена находки ───
+function openFind(i){
+  const f=FINDS[i];
+  if(!f||!(PET.finds||[]).includes(i))return;
+  findOpen=i;
+  const где=findPlace(i), когда=((PET.findAt||{})[i]||{}).d;
+  const img=document.getElementById("find-photo");
+  img.onerror=()=>{img.style.opacity=0;};
+  img.style.opacity=1; img.src=landPhoto(где);
+  document.getElementById("find-rare").textContent=
+    ["находка","редкая находка","легендарная находка"][f.r];
+  document.getElementById("find-name").textContent=f.n;
+  document.getElementById("find-where").textContent=
+    (LANDS[где]||LANDS[0]).n+(когда?" · "+датаСловами(когда):"");
+  document.getElementById("find-text").textContent=f.x;
+  document.getElementById("find-sound").innerHTML=PET.sound?soundBtn(где):"";
+  denButton();
+  document.getElementById("find-modal").style.display="flex";
+}

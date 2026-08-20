@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=66"></script>
-<script src="data.js?v=66"></script>
-<script src="deck.js?v=66"></script>
+<script src="photos/list.js?v=67"></script>
+<script src="data.js?v=67"></script>
+<script src="deck.js?v=67"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -532,7 +532,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="66 · 20.08.2026 14:57";
+const APP_VERSION="67 · 20.08.2026 15:05";
 
 let toastTimer=null;
 function toast(text){
@@ -970,7 +970,7 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          walkStart:LS.walkStart||0, walkRoll:LS.walkRoll??null, walkPick:LS.walkPick??null,
          walkSpent:LS.walkSpent||0, walks:LS.walks||0, walkLand:LS.walkLand||0,
          walkTold:LS.walkTold||0, walkBack:LS.walkBack||0, walkNight:LS.walkNight||0,
-         walkLuck:LS.walkLuck??null, walkAim:LS.walkAim??null,
+         walkLuck:LS.walkLuck??null, walkAim:LS.walkAim??null, traceStep:LS.traceStep||0,
          // сны: что снилось и когда показали, чтобы не повторять
          dreamOn:LS.dreamOn||"", dreamSeen:LS.dreamSeen||[], dreamText:LS.dreamText||"",
          // одно событие входа: в какой день его уже показали
@@ -1611,24 +1611,6 @@ const датаСловами=k=>{
 // вычисляется по её месту в колоде, а день честно не показывается.
 const findPlace=i=>((PET.findAt||{})[i]||{}).l??landOf(i);
 let findOpen=null;
-function openFind(i){
-  const f=FINDS[i];
-  if(!f||!(PET.finds||[]).includes(i))return;
-  findOpen=i;
-  const где=findPlace(i), когда=((PET.findAt||{})[i]||{}).d;
-  const img=document.getElementById("find-photo");
-  img.onerror=()=>{img.style.opacity=0;};
-  img.style.opacity=1; img.src=landPhoto(где);
-  document.getElementById("find-rare").textContent=
-    ["находка","редкая находка","легендарная находка"][f.r];
-  document.getElementById("find-name").textContent=f.n;
-  document.getElementById("find-where").textContent=
-    (LANDS[где]||LANDS[0]).n+(когда?" · "+датаСловами(когда):"");
-  document.getElementById("find-text").textContent=f.x;
-  document.getElementById("find-sound").innerHTML=PET.sound?soundBtn(где):"";
-  denButton();
-  document.getElementById("find-modal").style.display="flex";
-}
 function denButton(){
   const b=document.getElementById("find-den");
   if(!b||findOpen===null)return;
@@ -1846,78 +1828,6 @@ function openLand(i){
   savePet();renderFinds();toast("Земля открыта");
 }
 
-function renderLands(){
-  const box=document.getElementById("lands");
-  if(!box)return;
-  box.innerHTML=LANDS.map((l,i)=>{
-    const открыта=landOpen(i), хватает=(PET.stones||0)>=l.c;
-    const мои=new Set(PET.finds||[]);
-    const всего=FINDS.filter((_,j)=>landOf(j)===i).length;
-    const собрано=[...мои].filter(j=>landOf(j)===i).length;
-    // Закрытая земля показана размытой: видно, что там что-то есть, но не что
-    // именно. Пустая серая плашка не тянет её открывать, а такая — тянет.
-    return `<div class="g" style="margin-bottom:8px;padding:0;overflow:hidden">`+
-      `<div style="position:relative;height:132px">`+
-        `<img src="${landPhoto(i)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;
-           object-fit:cover;${открыта?"":"filter:blur(5px) saturate(.85) brightness(.8);transform:scale(1.06)"}">`+
-        `<div style="position:absolute;inset:0;background:linear-gradient(transparent 30%,rgba(6,8,14,.82))"></div>`+
-        (открыта&&PET.sound?soundBtn(i):"")+
-        `<div style="position:absolute;left:14px;right:14px;bottom:11px;display:flex;
-           justify-content:space-between;align-items:flex-end;gap:10px">`+
-          `<div>`+
-            `<div style="font:600 16px var(--fu);color:#fff">${l.n}</div>`+
-            `<div style="font-size:12.5px;color:rgba(255,255,255,.74);margin-top:2px">`+
-              `${открыта?l.o:"Она туда ещё не ходила"}</div>`+
-          `</div>`+
-          `<div style="font:600 13px var(--fu);color:#fff;white-space:nowrap">`+
-            `${открыта?`${собрано} из ${всего}`:`${l.c} 💎`}</div>`+
-        `</div>`+
-      `</div>`+
-      (открыта?"":`<div style="padding:12px 14px"><button class="btn${хватает?"":" ghost"}"
-         onclick="openLand(${i})"${хватает?"":" disabled"}>${хватает?"Открыть":`Нужно ещё ${l.c-(PET.stones||0)} камней`}</button></div>`)+
-    `</div>`;
-  }).join("");
-}
-
-// ── Куда пойдём ──────────────────────────────────────────────────────
-// Единственное решение за день, которое ничего не стоит и ни за что
-// не наказывает. Девять снимков земель до сих пор были ценником в списке;
-// теперь это выбор, куда её отпустить.
-//
-// «Пусть решит сама» — не отговорка, а полноправный вариант. И примерно
-// в четверти случаев она уходит своей дорогой даже когда ты выбрал:
-// иначе выбор превратился бы в оптимизацию, где есть выгодные земли.
-const SVOYA_DOROGA=0.25;
-function aimWalk(i){
-  PET.walkAim=i;
-  document.querySelectorAll("#aim-list .aim").forEach(el=>
-    el.classList.toggle("sel",+el.dataset.i===i));
-  const b=document.getElementById("aim-go");
-  // Без предлога: «отпустить в река» — падежей в русском шесть, а склонять
-  // девять названий ради одной строки не стоит.
-  if(b) b.textContent=i===null?"Пусть решит сама":`Отпустить · ${(LANDS[i]||LANDS[0]).n}`;
-}
-function openAim(){
-  if(isWalking()||energyNow()<walkCost())return;
-  if(!walkAllowedNow()){toast("Она ещё спит. С восьми утра");return;}
-  const открытые=(PET.lands||[0]).slice().sort((a,b)=>a-b);
-  document.getElementById("aim-list").innerHTML=открытые.map(i=>{
-    const l=LANDS[i]||LANDS[0];
-    return `<div class="aim" data-i="${i}" onclick="aimWalk(${i})"
-       style="position:relative;height:78px;border-radius:12px;overflow:hidden;cursor:pointer">
-      <img src="${landPhoto(i)}" loading="lazy" style="position:absolute;inset:0;width:100%;
-        height:100%;object-fit:cover">
-      <div style="position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(6,8,14,.85))"></div>
-      <div style="position:absolute;left:11px;bottom:8px;font:600 13.5px var(--fu);color:#fff">${l.n}</div>
-    </div>`;}).join("");
-  PET.walkAim=null; aimWalk(null);
-  document.getElementById("aim-modal").style.display="flex";
-}
-function goAim(){
-  document.getElementById("aim-modal").style.display="none";
-  startWalk(PET.walkAim);
-}
-
 function startWalk(куда){
   if(isWalking()||energyNow()<walkCost())return;
   if(!walkAllowedNow()){toast("Она ещё спит. С восьми утра");return;}
@@ -1961,7 +1871,12 @@ function startWalk(куда){
 function walkLoot(){
   const r=PET.walkRoll??Math.random();
   const пик=PET.walkPick??0;
-  if(r>0.82)return null;                       // просто гуляла
+  // Возвращение всегда имеет развязку, но не обязано давать предмет.
+  // «Просто гуляла» осталось, но рядом встали след и наблюдение: они
+  // ничего не кладут в витрину, а день не остаётся пустым.
+  if(r>0.94)return null;                       // совсем ничего, редко
+  if(r>0.88)return {trace:TRACES[пик%TRACES.length]};
+  if(r>0.82)return {see:OBSERVE[пик%OBSERVE.length]};
   if(r>0.55){
     const выбор=pickStory(weakest().code,пик);
     return {story:выбор.s,storyIndex:выбор.i};
@@ -2087,7 +2002,19 @@ function openWalk(){
   if(лут&&лут.f&&лут.f.r===2){ openLegend(лут,пара); return; }
   const m=document.getElementById("walk-modal");
   let шапка,имя,текст;
-  if(лут&&лут.story){
+  if(лут&&лут.trace){
+    шапка="она нашла след";
+    имя="Здесь кто-то был";
+    // Показываем ту строку, на которой человек остановился. Раньше здесь
+    // стояло безусловное traceStep=1, и «посмотреть ближе» возвращало
+    // к первой строке — след не раскрывался никогда.
+    if(!PET.traceStep) PET.traceStep=1;
+    текст=лут.trace[Math.min(PET.traceStep,лут.trace.length)-1];
+  }else if(лут&&лут.see){
+    шапка="она просто была там";
+    имя="Ничего не принесла";
+    текст=лут.see;
+  }else if(лут&&лут.story){
     шапка="она принесла историю";
     имя=лут.story.name;
     текст=лут.story.text;
@@ -2113,9 +2040,26 @@ function openWalk(){
     `<span>${PET.name||"Рысь"} · ${земля.n.toLowerCase()}</span>`+
     `<span>${датаСловами(todayKey())}</span>`;
   document.getElementById("walk-sound").innerHTML=PET.sound?soundBtn(PET.walkLand??0):"";
-  document.getElementById("walk-answers").innerHTML=пара.map((o,i)=>
-    `<button class="btn${i?" ghost":""}" style="margin-top:8px" onclick="answerWalk('${o.k}')">${o.t}</button>`).join("");
+  // У следа своя кнопка: посмотреть ещё раз, максимум три касания.
+  // Неправильного ответа нет — можно закрыть на первом, ничего не потеряно.
+  const шаг=PET.traceStep||0;
+  document.getElementById("walk-answers").innerHTML=
+    (лут&&лут.trace&&шаг<лут.trace.length
+      ? `<button class="btn" style="margin-top:8px" onclick="nextTrace()">Посмотреть ближе</button>`
+      : "")+
+    пара.map((o,i)=>
+      `<button class="btn${(i||(лут&&лут.trace&&шаг<лут.trace.length))?" ghost":""}" style="margin-top:8px" onclick="answerWalk('${o.k}')">${o.t}</button>`).join("");
   m.style.display="flex";
+}
+
+// Следующая строка следа. Три штуки, дальше кнопка исчезает сама.
+function nextTrace(){
+  const лут=walkLoot();
+  if(!лут||!лут.trace)return;
+  const шаг=PET.traceStep||1;
+  if(шаг>=лут.trace.length)return;
+  PET.traceStep=шаг+1; savePet();
+  openWalk();          // перерисует текст и уберёт кнопку, когда строки кончатся
 }
 
 function answerWalk(trait){
@@ -2123,7 +2067,12 @@ function answerWalk(trait){
   PET.traits=PET.traits||{};
   PET.traits[trait]=(PET.traits[trait]||0)+1;
   let камни=2;                                   // за саму прогулку, всегда
-  if(лут&&лут.story){
+  if(лут&&лут.trace){
+    камни+=4;
+    летопись(`Она нашла след — ${LANDS[PET.walkLand??0].n.toLowerCase()}.`);
+  }else if(лут&&лут.see){
+    камни+=3;
+  }else if(лут&&лут.story){
     камни+=6;
     rememberStory(лут.storyIndex);
     летопись(`С прогулки она принесла историю — ${лут.story.name}.`);
@@ -2144,6 +2093,7 @@ function answerWalk(trait){
   PET.stones=(PET.stones||0)+камни;
   PET.walks=(PET.walks||0)+1;
   PET.walkStart=0;PET.walkRoll=null;PET.walkPick=null;PET.walkBack=0;PET.walkNight=0;
+  PET.traceStep=0;
   savePet();
   soundStop();
   document.getElementById("walk-modal").style.display="none";
@@ -2359,9 +2309,21 @@ function updateAway(){
 
   const i=(PET.walkLand??0);
   document.getElementById("away-where").textContent=LANDS[i]?LANDS[i].n:"Где-то далеко";
+  // Три этапа прогулки, без таймера на экране. Человек не считает минуты,
+  // он видит, что за день что-то изменилось: сначала пусто, потом вдалеке
+  // мелькнуло, потом она уже близко. Этап считается по доле пройденного
+  // пути, а не по часам, поэтому короткая и длинная прогулка выглядят
+  // одинаково осмысленно.
+  const этап=walkStage();
   const sub=document.getElementById("away-sub");
-  if(sub) sub.textContent=walkBackTime()-Date.now()<45*60*1000
-    ? "Уже возвращается" : "Её здесь нет";
+  if(sub) sub.textContent=["Её здесь нет","Кто-то мелькнул вдалеке","Уже возвращается"][этап];
+  // Силуэт: тот же снимок земли, но на дальнем этапе чуть светлее и ближе.
+  const сцена=document.getElementById("away-photo");
+  if(сцена){
+    сцена.style.transition="transform 2.5s ease, filter 2.5s ease";
+    сцена.style.transform=`scale(${[1,1.03,1.07][этап]})`;
+    сцена.style.filter=этап?`brightness(${[1,1.04,1.1][этап]})`:"none";
+  }
   const зв=document.getElementById("away-sound");
   if(зв) зв.innerHTML=PET.sound?soundBtn(i):"";
   // Пока снимков земель нет — рисуем пейзаж градиентом по времени суток.
