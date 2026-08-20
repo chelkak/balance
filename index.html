@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=67"></script>
-<script src="data.js?v=67"></script>
-<script src="deck.js?v=67"></script>
+<script src="photos/list.js?v=68"></script>
+<script src="data.js?v=68"></script>
+<script src="deck.js?v=68"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -332,7 +332,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
      onclick="if(event.target===this)this.style.display='none'">
   <div class="g" style="width:100%;max-width:360px;padding:20px">
     <div class="fname">Куда её отпустить?</div>
-    <div class="dim" style="margin-top:6px">Она может свернуть своей дорогой — так бывает.</div>
+    <div class="dim" id="aim-fork" style="margin-top:6px"></div>
     <div id="aim-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px"></div>
     <button class="btn" id="aim-go" style="margin-top:14px" onclick="goAim()"></button>
     <button class="btn ghost" style="margin-top:8px"
@@ -532,7 +532,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="67 · 20.08.2026 15:05";
+const APP_VERSION="68 · 20.08.2026 15:17";
 
 let toastTimer=null;
 function toast(text){
@@ -979,6 +979,8 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          stageSeen:LS.stageSeen||0, stageSeenOn:LS.stageSeenOn||"",
          // находки и характер
          finds:LS.finds||[], traits:LS.traits||{}, triedOn:LS.triedOn||{},
+         // характер: когда ответили и что уже вернулось
+         traitAt:LS.traitAt||{}, traitBack:LS.traitBack||{},
          // где и когда нашлась каждая вещь: {номер:{d:день,l:земля}}
          findAt:LS.findAt||{},
          // звук места: 1 — можно, 0 — выключен насовсем
@@ -2027,6 +2029,15 @@ function openWalk(){
     имя="Она просто гуляла";
     текст="Ничего не принесла. Ходила, смотрела, вернулась — тоже дело.";
   }
+  // Ушла своей дорогой — это сцена, а не сноска мелким шрифтом. Но она
+  // ДОПОЛНЯЕТ исход, а не заменяет его: находка, которую она принесла
+  // из чужой земли, никуда не девается. Сначала я вклинил это в середину
+  // цепочки исходов и потерял и находку, и историю.
+  if(PET.walkAim!=null&&PET.walkLand!==PET.walkAim){
+    шапка="она свернула по-своему";
+    текст=`Ты отпускал её в другую сторону, а она ушла сюда — `+
+      `${(LANDS[PET.walkLand??0]||LANDS[0]).n.toLowerCase()}. `+текст;
+  }
   document.getElementById("walk-rare").textContent=шапка;
   document.getElementById("walk-title").textContent=имя;
   document.getElementById("walk-text").textContent=текст;
@@ -2066,6 +2077,9 @@ function answerWalk(trait){
   const лут=walkLoot();
   PET.traits=PET.traits||{};
   PET.traits[trait]=(PET.traits[trait]||0)+1;
+  // Помним, когда это было: черта возвращается в поведении через
+  // несколько дней, а не сразу — иначе это не память, а эхо.
+  PET.traitAt={...(PET.traitAt||{}),[trait]:Date.now()};
   let камни=2;                                   // за саму прогулку, всегда
   if(лут&&лут.trace){
     камни+=4;
@@ -2124,6 +2138,9 @@ function renderFinds(){
     `</div>`+
     (marksText()?`<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
       `<b>Из чего сложился твой зверь</b><br>${marksText()}</div>`:"")+
+    // Тропа долгих сфер: то, что раньше было невидимым числом попыток,
+    // теперь видно как след в мире. Ни порога, ни награды, ни обнуления.
+    (trailWords()?`<div class="dim" style="margin-top:10px">${trailWords()}</div>`:"")+
     (legendCount()
       ? `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
         `<b>Легендарных: ${legendCount()} из ${LEGENDS().length}</b><br>`+

@@ -652,6 +652,8 @@ function dayEvent(){
   if(stageReal()>(PET.stageSeen||stageReal()) && !isWalking())
     return {k:"grow",c:"за ночь",t:"Она подросла",
             h:"Ты не увидишь, как это происходит. Только что стало.",b:"Посмотреть"};
+  const черта=traitDue();
+  if(черта) return {k:"trait",c:"она запомнила",t:черта.t,h:"",b:"Вот как",x:черта.k};
   const сон=dreamToday();
   if(сон) return {k:"dream",c:"ей снилось",t:сон,h:"",b:"Хорошо"};
   const карта=cardToday();
@@ -670,7 +672,7 @@ function showEvent(){
   document.getElementById("event-hint").textContent=e.h;
   const b=document.getElementById("event-open");
   b.textContent=e.b;
-  b.onclick=()=>openEvent(e.k);
+  b.onclick=()=>{ if(e.k==="trait") markTraitBack(e.x); openEvent(e.k); };
   document.getElementById("event-modal").style.display="flex";
 }
 
@@ -995,6 +997,11 @@ function openAim(){
       <div style="position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(6,8,14,.85))"></div>
       <div style="position:absolute;left:11px;bottom:8px;font:600 13.5px var(--fu);color:#fff">${l.n}</div>
     </div>`;}).join("");
+  // Развилка: у дороги сегодня два следа. Это не выбор с последствиями,
+  // а видимое напоминание, что решает не только человек.
+  const f=forkToday();
+  const fb=document.getElementById("aim-fork");
+  if(fb) fb.textContent=`Сегодня от развилки ${f[0]} и ${f[1]}. Она может свернуть своей дорогой — так бывает.`;
   PET.walkAim=null; aimWalk(null);
   document.getElementById("aim-modal").style.display="flex";
 }
@@ -1022,4 +1029,65 @@ function openFind(i){
   document.getElementById("find-sound").innerHTML=PET.sound?soundBtn(где):"";
   denButton();
   document.getElementById("find-modal").style.display="flex";
+}
+
+
+// ── Характер виден ────────────────────────────────────────────────────
+// Характер складывался из ответов после прогулок и оставался двумя словами
+// на вкладке «Находки». Он ни на что не влиял: человек отвечал, а мир
+// не менялся.
+//
+// Теперь у каждой из четырёх черт есть один отложенный возврат: то, что
+// ты сказал ей несколько дней назад, однажды проявляется в её поведении.
+// Возврат один на черту — не поток событий, а редкое «она запомнила».
+const TRAIT_BACK={
+  нежность:{д:3,t:"Она первым делом подошла и села рядом. Ты как-то раз её обнял, и, кажется, это запомнилось."},
+  любопытство:{д:4,t:"Она принесла показать место, а не вещь. Ты когда-то расспрашивал её — теперь рассказывает сама."},
+  смелость:{д:5,t:"Она ушла дальше обычного и вернулась спокойной. Ты однажды сказал ей звать дальше."},
+  спокойствие:{д:4,t:"Она никуда не спешила и просто была рядом. Ты как-то сказал, что можно и отдохнуть."}
+};
+
+// Пора ли вернуть черту. Условия мягкие: черта должна набраться хотя бы
+// дважды, с ответа прошло сколько положено, и каждая возвращается один раз.
+function traitDue(){
+  const т=PET.traits||{}, было=PET.traitBack||{};
+  const когда=PET.traitAt||{};
+  for(const k of Object.keys(TRAIT_BACK)){
+    if(было[k]||!(т[k]>=2)) continue;
+    const с=когда[k];
+    if(!с) continue;
+    if(Date.now()-с >= TRAIT_BACK[k].д*864e5) return {k,t:TRAIT_BACK[k].t};
+  }
+  return null;
+}
+function markTraitBack(k){
+  PET.traitBack={...(PET.traitBack||{}),[k]:1};
+  savePet();
+}
+
+// Развилка при выборе земли. Два следа вместо одного списка: видно, что
+// у дороги есть варианты, и что выбирает в итоге не только человек.
+// Порога, награды и серии тут нет — это про вкус, а не про оптимизацию.
+const FORKS=[
+  ["след уходит к воде","след уходит вверх"],
+  ["натоптанная тропа","обход стороной"],
+  ["по солнцу","в тень"],
+  ["короткой дорогой","длинной дорогой"]
+];
+function forkToday(){
+  const d=todayKey().replace(/-/g,"");
+  let h=(PET.deckSeed||1)>>>0;
+  for(let i=0;i<d.length;i++){h=(h^d.charCodeAt(i))>>>0;h=Math.imul(h,0x01000193)>>>0;}
+  return FORKS[(h>>>0)%FORKS.length];
+}
+
+// Тропа долгих сфер. Раньше «долгая сфера» была числом попыток, которое
+// нигде не показывалось. Теперь это след в мире: чем дольше человек ходит
+// в одну сферу без видимого результата, тем заметнее протоптана тропа.
+// Порога нет, награды нет, обнуления нет — только строка о том, что видно.
+function trailWords(){
+  const долгие=SPHERES.filter(s=>isSlow(s.code));
+  if(!долгие.length) return "";
+  const имена=долгие.slice(0,2).map(s=>s.name.toLowerCase()).join(" и ");
+  return `В одну сторону тропа протоптана заметнее других — ${имена}. Она ходит туда чаще всего.`;
 }
