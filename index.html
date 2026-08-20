@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=70"></script>
-<script src="data.js?v=70"></script>
-<script src="deck.js?v=70"></script>
-<script src="expedition.js?v=70"></script>
+<script src="photos/list.js?v=71"></script>
+<script src="data.js?v=71"></script>
+<script src="deck.js?v=71"></script>
+<script src="expedition.js?v=71"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -576,7 +576,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="70 · 21.08.2026 00:57";
+const APP_VERSION="71 · 21.08.2026 01:10";
 
 let toastTimer=null;
 function toast(text){
@@ -1874,7 +1874,9 @@ const walkDone=()=>isWalking()&&Date.now()>=walkBackTime();
 // f — номер снимка в webapp/land. Порядок земель повествовательный (от
 // ближнего леса к перевалу), номера файлов идут своим чередом — поэтому
 // связь задана явно, а не индексом массива.
-const landPhoto=i=>`land/${(LANDS[i]||LANDS[0]).f}.webp`;
+const landPhoto=i=>(typeof landPhotoNow==="function")
+  ? landPhotoNow(i)                       // ночью отдаст ночной, если он приехал
+  : `land/${(LANDS[i]||LANDS[0]).f}.webp`;
 // Земля находки вычисляется из её места внутри своей редкости — так каждой
 // земле достаётся и обычное, и редкое, и своя легендарная. Файл колоды
 // при этом трогать не нужно: он запечатан.
@@ -2491,10 +2493,10 @@ function updatePhoto(){
   // там своё небо. День закончился, мир затих.
   // Приехал настоящий ночной снимок — рисованные звёзды гасим: на фото
   // своё небо, и два слоя звёзд разной яркости спорят друг с другом.
-  const своёНебо=(typeof NIGHT_ART!=="undefined") && NIGHT_ART.pet;
+  const своёНебо=(photoBaseKey||"").startsWith("10-night");
   const stars=document.getElementById("totem-stars");
   if(stars) stars.classList.toggle("on",
-    timeKey()==="night" && !isWalking() && stageNow()>=PHOTO_FRAMES && !своёНебо);
+    timeKey()==="night" && !isWalking() && !своёНебо);
   // Масштаб вешаем на сами снимки, а не на обёртку: обёртку уже занимают
   // дыхание и «прогулка», два transform на одном элементе затирают друг друга.
   const sc=withinStageScale();

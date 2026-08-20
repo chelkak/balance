@@ -855,18 +855,23 @@ const NIGHT_ART = {pet:false, land:{}};
   img.onload  = () => { NIGHT_ART.pet = true;
     if(typeof updatePhoto === "function") updatePhoto(); };
   img.onerror = () => { NIGHT_ART.pet = false; };
-  img.src = "pet/10-night.jpg";
+  // Метку версии берём из адреса самого файла: проба идёт по путям, где
+  // до этой недели лежал 404, и браузер мог его запомнить. APP_VERSION здесь
+  // ещё не объявлена — expedition.js подключён раньше неё.
+  const мет = (document.currentScript && document.currentScript.src.split("?")[1]);
+  const в = мет ? "?" + мет : "";
+  img.src = "pet/10-night.jpg" + в;
   // Земли проверяем по одной: часть снимков может приехать раньше других.
   for(let i = 1; i <= 9; i++){
     const l = new Image();
     l.onload = ((n) => () => { NIGHT_ART.land[n] = true; })(i);
-    l.src = `land/${i}n.webp`;
+    l.src = `land/${i}n.webp` + в;
   }
 })();
 
 // Ночью и дома — ночной кадр рыси, если он есть.
 function nightPetKey(){
-  return (NIGHT_ART.pet && typeof timeKey === "function" && timeKey() === "night")
+  return (nightPetReady() && typeof timeKey === "function" && timeKey() === "night")
     ? "10-night" : null;
 }
 // Снимок земли: ночью берём ночной, если он приехал.
@@ -874,4 +879,10 @@ function landPhotoNow(i){
   const f = (typeof LANDS !== "undefined" && LANDS[i]) ? LANDS[i].f : 1;
   const ночь = (typeof timeKey === "function") && timeKey() === "night";
   return (ночь && NIGHT_ART.land[f]) ? `land/${f}n.webp` : `land/${f}.webp`;
+}
+// Ночной кадр рыси нарисован взрослой. Пока зверь младше — ночь у него
+// остаётся затемнением, подменять малыша взрослой рысью нельзя.
+function nightPetReady(){
+  return NIGHT_ART.pet && typeof stageNow === "function"
+      && stageNow() >= (typeof PHOTO_FRAMES !== "undefined" ? PHOTO_FRAMES : 10);
 }
