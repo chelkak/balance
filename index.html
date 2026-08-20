@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=65"></script>
-<script src="data.js?v=65"></script>
-<script src="deck.js?v=65"></script>
+<script src="photos/list.js?v=66"></script>
+<script src="data.js?v=66"></script>
+<script src="deck.js?v=66"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -461,6 +461,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <section id="v-today" class="hidden">
   <div class="head"><h1>Сегодня</h1><div class="sub" id="today-date"></div></div>
   <div class="g" id="ready"></div>
+  <div class="g" id="arc" style="display:none;margin-bottom:12px"></div>
   <div id="today-body"></div>
   <h2 id="quest-title">Одно дело</h2>
   <div class="g" id="quest"></div>
@@ -531,7 +532,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="65 · 20.08.2026 14:51";
+const APP_VERSION="66 · 20.08.2026 14:57";
 
 let toastTimer=null;
 function toast(text){
@@ -2750,6 +2751,7 @@ function renderToday(){
   document.getElementById("puzzle-title").style.display="";
   renderPuzzle();
 
+  renderArc();
   greyRow();
 }
 

@@ -795,3 +795,90 @@ function renderDen(){
         `<div class="dim" style="font-size:10.5px;margin-top:3px">${LANDS[findPlace(i)].n}</div></div>`;
     }).join("")+`</div>`;
 }
+
+
+// ── Дуга дня ──────────────────────────────────────────────────────────
+// Утром одно осторожное ожидание, вечером — развязка. Смысл в том, что
+// проверяется приложение, а не человек: оно сказало, что похожие утра
+// чаще шли так, и вечером честно признаёт, сошлось или нет.
+//
+// Правила жёсткие. Малая выборка — молчим, ничего не «примерно» и не
+// «возможно» на трёх днях. Пишем «совпадало», а не «вызвало»: связи
+// из этих данных не достать, и делать вид, что достали, нельзя.
+// Серый день без дуги. Красный день без продуктивного прогноза.
+// Никаких процентов, диагнозов и длинных отчётов в первой фразе.
+const ARC_MIN=8;            // меньше восьми похожих дней — не говорим ничего
+
+// Похожие дни: те, где утренний показатель был в ту же сторону от нормы.
+// Сравниваем сон, потому что он единственный меряется до дня, а не по итогу.
+function arcSimilar(){
+  const норма=personalNorm("sleep");
+  const сегодня=(DATA.today||{}).sleep;
+  if(норма==null||сегодня==null) return null;
+  const короче=сегодня<норма;
+  const дни=DAYS.filter(d=>!d.grey&&d.sleep!=null&&d.energy!=null
+                          &&(d.sleep<норма)===короче);
+  return {норма,сегодня,короче,дни};
+}
+
+// Утреннее ожидание. Появляется, только когда сон уже внесён, а энергия
+// ещё нет: это и есть утро — тело померили, день не прожили.
+function arcMorning(){
+  if(isGrey(todayKey())||mode()==="red") return null;
+  const д=DATA.today||{};
+  if(д.sleep==null||д.energy!=null) return null;
+  const s=arcSimilar();
+  if(!s||s.дни.length<ARC_MIN) return null;
+  const своя=avg(s.дни.map(d=>d.energy));
+  const все=DAYS.filter(d=>!d.grey&&d.energy!=null).map(d=>d.energy);
+  if(все.length<ARC_MIN) return null;
+  const общая=avg(все);
+  const разница=своя-общая;
+  if(Math.abs(разница)<0.8) return null;      // разница меньше — это шум
+  return {ниже:разница<0,дней:s.дни.length,своя,общая,
+    t:s.короче
+      ? `После таких же коротких ночей энергия к вечеру ${разница<0?"чаще проседала":"чаще держалась"}.`
+      : `После таких же ночей энергия к вечеру ${разница<0?"чаще проседала":"чаще держалась"}.`};
+}
+
+// Развязка. Считается по уже введённым вечерним цифрам — отдельного
+// вопроса «получилось?» нет и не будет.
+function arcEvening(){
+  if(isGrey(todayKey())) return null;
+  const д=DATA.today||{};
+  if(д.sleep==null||д.energy==null) return null;
+  const s=arcSimilar();
+  if(!s||s.дни.length<ARC_MIN) return null;
+  const своя=avg(s.дни.filter(d=>keyOf(d.date)!==todayKey()).map(d=>d.energy));
+  if(своя==null) return null;
+  const разница=д.energy-своя;
+  return {дней:s.дни.length,своя,сегодня:д.energy,
+    t:Math.abs(разница)<0.8
+      ? "Вышло примерно как в такие же дни."
+      : разница>0
+        ? "Сегодня вышло иначе: энергия удержалась."
+        : "Сегодня вышло как обычно в такие дни."};
+}
+
+// Одна строка на «Сегодня»: утром ожидание, вечером развязка.
+// Кухня расчёта — по нажатию, как принято во всём проекте.
+function renderArc(){
+  const box=document.getElementById("arc");
+  if(!box) return;
+  const a=arcEvening()||arcMorning();
+  if(!a){ box.style.display="none"; return; }
+  box.style.display="";
+  const вечер=!!a.сегодня;
+  box.innerHTML=
+    `<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">${
+      вечер?"как вышло":"чего ждать"}</div>`+
+    `<div class="fname" style="margin-top:6px">${a.t}</div>`+
+    (вечер?"":`<div class="dim" style="margin-top:6px">Сегодня посмотрим, повторится ли.</div>`)+
+    `<div class="dim" id="arc-why" style="margin-top:8px;font-size:12px;cursor:pointer"
+       onclick="this.nextElementSibling.style.display='';this.style.display='none'">Откуда это</div>`+
+    `<div class="dim" style="display:none;margin-top:8px;font-size:12px">`+
+      `Считаю по ${a.дней} ${plural(a.дней,"дню","дням","дням")} с похожим сном. `+
+      `В них энергия к вечеру была ${a.своя.toFixed(1)}`+
+      (вечер?`, сегодня ${a.сегодня}.`:`, в остальные ${a.общая.toFixed(1)}.`)+
+      `<br>Это то, что совпадало, а не то, что чему-то причина.</div>`;
+}
