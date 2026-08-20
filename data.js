@@ -587,7 +587,15 @@ const MARKS={"1-1":"Год начался заново.","12-21":"Самая д�
 function exportText(){
   const м=["января","февраля","марта","апреля","мая","июня","июля",
            "августа","сентября","октября","ноября","декабря"];
-  const дата=k=>{const[г,мм,д]=k.split("-");return `${+д} ${м[+мм-1]} ${г}`;};
+  // Выгрузка — последняя страховка: письмо на год теряется навсегда, если
+  // её не забрать. Поэтому она обязана дожить до конца при любых данных.
+  // Записи, сделанные до появления поля даты (или пришедшие из старого
+  // облака), не должны ронять весь текст из-за одной строки.
+  const дата=k=>{
+    if(typeof k!=="string"||!k.includes("-")) return "дата не записана";
+    const[г,мм,д]=k.split("-");
+    return `${+д} ${м[+мм-1]||""} ${г}`.trim();
+  };
   const L=[];
   L.push("БАЛАНС — копия всего, что накопилось");
   L.push("Выгружено "+new Date().toLocaleString("ru-RU"));
@@ -720,10 +728,14 @@ function renderChronicle(){
   const месяц=["января","февраля","марта","апреля","мая","июня","июля",
                "августа","сентября","октября","ноября","декабря"];
   box.innerHTML=все.slice(0,40).map(z=>{
-    const [г,м,д]=z.d.split("-");
+    // Одна запись без даты не должна ронять весь экран. Такие приезжают
+    // из старого облака и от механик, которые писали в летопись раньше,
+    // чем у записей появилось поле дня.
+    const дн=(typeof z.d==="string"&&z.d.includes("-"))?z.d.split("-"):null;
+    const когда=дн?`${+дн[2]} ${месяц[+дн[1]-1]||""}`.trim():"";
     return `<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)">`+
-      `<div class="dim" style="font-size:11px">${+д} ${месяц[+м-1]}</div>`+
-      `<div style="margin-top:3px;line-height:1.4">${z.t}</div></div>`;
+      (когда?`<div class="dim" style="font-size:11px">${когда}</div>`:"")+
+      `<div style="margin-top:3px;line-height:1.4">${z.t||""}</div></div>`;
   }).join("")+
   (все.length>40?`<div class="dim" style="margin-top:10px">И ещё ${все.length-40} записей раньше.</div>`:"");
 }
@@ -1090,4 +1102,63 @@ function trailWords(){
   if(!долгие.length) return "";
   const имена=долгие.slice(0,2).map(s=>s.name.toLowerCase()).join(" и ");
   return `В одну сторону тропа протоптана заметнее других — ${имена}. Она ходит туда чаще всего.`;
+}
+
+
+// ── Экран «Динамика» ───
+function renderTrend(){
+  applyTheme();
+  if(!hasData()){
+    document.getElementById("trend-sub").textContent="Пока пусто";
+    document.getElementById("goals").innerHTML=
+      `<div class="why">Графики появятся, когда наберётся неделя записей.
+        Цели тоже — сначала нужно, с чем сравнивать.</div>`;
+    document.getElementById("charts").innerHTML="";
+    return;
+  }
+  const g=DATA.goals,wl=DAYS.map(d=>d.weight).filter(v=>v),cur=wl.length?wl[wl.length-1]:0;
+  const first=wl.length>=7?avg(wl.slice(0,7)):cur,perWeek=wl.length>=14?(first-avg(wl.slice(-7)))/2:0;
+  const left=cur-g.weight,weeks=perWeek>.05?Math.ceil(left/perWeek):null;
+  const сИсторией=DAYS.filter(d=>d.sleep!=null);
+  const nights=сИсторией.filter(d=>d.sleep>=g.sleep).length;
+  document.getElementById("trend-sub").textContent=
+    `${DAYS.length} ${plural(DAYS.length,"день","дня","дней")} истории. Неделя врёт, месяц — нет`;
+  document.getElementById("goals").innerHTML=`
+    <div class="fields">
+      <div class="field"><label>цель по весу, кг</label>
+        <input id="g-weight" type="number" inputmode="decimal" step="0.1" value="${g.weight}"></div>
+      <div class="field"><label>цель по сну, ч</label>
+        <input id="g-sleep" type="number" inputmode="decimal" step="0.5" value="${g.sleep}"></div>
+    </div>
+    <div class="row" style="margin-top:14px"><div class="rlabel">Вес</div>
+      <div class="track"><div class="fill" style="width:${Math.max(0,Math.min(100,cur?(first-cur)/Math.max(.1,first-g.weight)*100:0))}%;background:var(--accent)"></div></div>
+      <div class="rval">${cur?cur.toFixed(1):"—"}</div></div>
+    <div class="dim">${cur?`Осталось ${left.toFixed(1)} кг. ${weeks?`Уходит ${perWeek.toFixed(2)} кг в неделю — при таком темпе цель примерно через ${weeks} ${plural(weeks,"неделю","недели","недель")}.`:"Темп пока не набрался, копим данные."}`:"Веса ещё не было — впиши его в чек-ине."}</div>
+    <div class="row" style="margin-top:14px"><div class="rlabel">Сон</div>
+      <div class="track"><div class="fill" style="width:${сИсторией.length?nights/сИсторией.length*100:0}%;background:var(--accent)"></div></div>
+      <div class="rval">${nights}/${DAYS.length}</div></div>
+    <div class="dim">Ночей по твоей мерке: ${nights} из ${сИсторией.length}${
+      сИсторией.length<DAYS.length?" дней со сном":""}.</div>`;
+  document.getElementById("g-weight").onchange=e=>setGoal("weight",e.target);
+  document.getElementById("g-sleep").onchange=e=>setGoal("sleep",e.target);
+
+  const ac=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  const series=[{l:"Настроение",k:"mood",f:1},{l:"Сон, ч",k:"sleep",f:1,goal:g.sleep},
+    {l:"Пульс покоя",k:"pulse",f:0},{l:"Вес, кг",k:"weight",f:1,goal:g.weight},{l:"Шаги",k:"steps",f:0}];
+  document.getElementById("charts").innerHTML=series.map(s=>{
+    // Раньше пустой день превращался в ноль (`d[s.k]||0`), и график падал
+    // в пол там, где человек просто не мерился. Теперь считаем только
+    // по дням с данными и честно пишем, сколько их.
+    const все=DAYS.map(d=>d[s.k]).filter(x=>x!=null);
+    if(все.length<2) return "";
+    const v=DAYS.map(d=>d[s.k]);
+    const первые=все.slice(0,7), последние=все.slice(-7);
+    const diff=avg(последние)-avg(первые);
+    return `<div class="chart"><div class="ctitle"><span>${s.l}</span>
+      <span>сейчас ${все[все.length-1].toLocaleString("ru-RU")} · сдвиг ${diff>=0?"+":""}${diff.toFixed(s.f)}</span></div>
+      ${spark2(v,ac,s.goal)}
+      <div class="dim" style="font-size:11px;margin-top:4px">по ${все.length} ${
+        plural(все.length,"дню","дням","дням")} с данными</div></div>`;}).join("")
+    ||`<div class="dim">Графики появятся, когда наберётся два дня.</div>`;
+
 }

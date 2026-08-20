@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=68"></script>
-<script src="data.js?v=68"></script>
-<script src="deck.js?v=68"></script>
+<script src="photos/list.js?v=69"></script>
+<script src="data.js?v=69"></script>
+<script src="deck.js?v=69"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -439,6 +439,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <div class="dim">Капсулы, летопись, находки и цифры живут в облаке Телеграма. Облако можно потерять — письмо, запечатанное на год, потерять нельзя. Забирай копию себе когда захочешь.</div>
     <button class="btn" style="margin-top:12px" onclick="exportAll()">Выгрузить всё</button>
     <div class="dim" id="export-note" style="margin-top:8px"></div>
+    <div class="dim" id="export-when" style="margin-top:6px;font-size:12px"></div>
   </div>
   <button class="btn ghost" style="margin-top:12px" onclick="go('totem')">Назад</button>
 </section>
@@ -532,7 +533,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="68 · 20.08.2026 15:17";
+const APP_VERSION="69 · 20.08.2026 15:37";
 
 let toastTimer=null;
 function toast(text){
@@ -845,6 +846,26 @@ function cloudLoad(done){
           };
           PET.chronicle=слить(PET.chronicle,cp.chronicle).slice(-500);
           PET.capsules=слить(PET.capsules,cp.capsules);
+          // Звук: выключенный побеждает. Ноль здесь не пустота, а решение
+          // человека, и общее правило ниже приняло бы его за «не заполнено».
+          if(PET.sound===0||cp.sound===0) PET.sound=0;
+
+          // Всё остальное — общим правилом, а не списком. Список полей
+          // приходилось дописывать руками при каждой новой механике, и
+          // 20 августа выяснилось, что двенадцать полей его не дождались:
+          // при переезде на другой телефон терялись память характера,
+          // услышанные истории, показанные сны и выключенный звук.
+          // Теперь любое новое поле подхватывается само.
+          // Правило прежнее: своё сильнее облачного, облачное берётся
+          // только туда, где у себя пусто.
+          const пусто=v=>v==null||v===""||v===0||
+            (Array.isArray(v)&&!v.length)||
+            (typeof v==="object"&&!Array.isArray(v)&&!Object.keys(v).length);
+          Object.keys(cp).forEach(k=>{
+            if(k in PET&&!пусто(PET[k])) return;    // своё на месте — не трогаем
+            if(cp[k]===undefined) return;
+            PET[k]=cp[k];
+          });
           lsSet("pet",JSON.stringify(PET));
         }
         mergeLog();
@@ -960,8 +981,11 @@ if(savedWheel) DATA.wheel={...DATA.wheel,...savedWheel};
 const LS=JSON.parse(lsGet("pet")||"{}");
 // Все поля перечислены явно: то, чего здесь нет, после перезахода пропадёт.
 // Добавляешь механику — добавляй её поле сюда же, иначе оно живёт до закрытия.
-let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
-         days:LS.days||{}, spent:LS.spent||0, owned:LS.owned||[], bornAt:LS.bornAt||Date.now(),
+// fed, fedOn (кормление) и owned (магазин) убраны 20 августа: обе механики
+// сняты давно, а поля продолжали ездить в облако и занимать место.
+// spent остался — он приезжает из облака и участвует в слиянии зверя.
+let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
+         days:LS.days||{}, spent:LS.spent||0, bornAt:LS.bornAt||Date.now(),
          doneTasks:(LS.tasksOn===todayKey()?LS.doneTasks:[])||[], tasksOn:todayKey(),
          name:LS.name||"",
          // запечатанная колода
@@ -991,7 +1015,7 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          storiesSeen:LS.storiesSeen||[], pendingStoryIndex:LS.pendingStoryIndex??null,
          // земли, камни, капсулы, летопись, задачки
          stones:LS.stones||0, lands:LS.lands||[0], capsules:LS.capsules||[],
-         chronicle:LS.chronicle||[], slow:LS.slow||[], questOn:LS.questOn||"",
+         chronicle:LS.chronicle||[], questOn:LS.questOn||"",
          den:LS.den||[], heard:LS.heard||0, tries:LS.tries||{}, exportedAt:LS.exportedAt||0, once:LS.once||0, seasonSeen:LS.seasonSeen||"", puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0,
          puzzleKinds:(LS.puzzleOn===todayKey()?LS.puzzleKinds:[])||[]};
 const savePet=()=>{lsSet("pet",JSON.stringify(PET));cloudSave();};
@@ -1021,7 +1045,10 @@ function plural(n,o,f,m){const a=Math.abs(n)%100,b=a%10;
 // в сфере делает, а оценка не растёт — значит результат от него не зависит,
 // и тыкать в эту сферу каждый день незачем. Пять попыток — достаточный знак.
 const SLOW_TRIES=5;
-const isSlow=c=>(PET.slow||[]).includes(c)||triesOf(c)>=SLOW_TRIES;
+// Половина условия была мёртвой: PET.slow не записывалось нигде с тех пор,
+// как 19 августа убрали ручной переключатель долгих сфер. Осталось то,
+// что работает само: пять попыток без роста оценки — сфера долгая.
+const isSlow=c=>triesOf(c)>=SLOW_TRIES;
 const weakest=()=>{
   const оценённые=SPHERES.filter(s=>(DATA.wheel[s.code]||0)>0);
   const база=оценённые.length?оценённые:SPHERES;
@@ -1236,7 +1263,6 @@ function creditDay(key,touched){
   PET.days[key]=dayPoints(touched);
   savePet();
 }
-const balance=()=>earned()-(PET.spent||0);
 
 // ══ Карта дня, прогулка, находки, характер ═══════════════════════════
 // Содержимое лежит в запечатанном deck.js. Порядок карт перемешивается
@@ -1666,6 +1692,20 @@ function renderMe(){
     `<div class="dim">Запечатано писем: ${(PET.capsules||[]).length}</div>`+
     `<div class="dim" style="margin-top:10px">Версия ${APP_VERSION}</div>`;
   renderAhead();
+  // Когда была последняя копия. Дата уже писалась в PET.exportedAt
+  // и не читалась нигде — то есть поле копилось впустую. Письмо,
+  // запечатанное на год, потерять нельзя, и одна строка тут стоит
+  // дешевле, чем разговор «а я думал, оно само сохранилось».
+  {
+    const w=document.getElementById("export-when");
+    if(w){
+      const t=PET.exportedAt||0;
+      const дней=t?Math.floor((Date.now()-t)/864e5):null;
+      w.textContent=!t?"Копию себе ещё ни разу не забирал."
+        :дней===0?"Последняя копия — сегодня."
+        :`Последняя копия — ${дней} ${plural(дней,"день","дня","дней")} назад.`;
+    }
+  }
   const sw=document.getElementById("sound-switch");
   if(sw) sw.textContent=PET.sound?"Звук мест включён — выключить":"Звук мест выключен — включить";
 }
@@ -2218,8 +2258,6 @@ function hardDays(){
 // Зрелость — среднее по двенадцати сферам, слабейшая показывает, куда расти.
 const scores=()=>SPHERES.map(s=>DATA.wheel[s.code]||0);
 const rated=()=>scores().filter(v=>v>0);                 // сколько сфер оценено
-const maturity=()=>{const v=rated();return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;};
-const allRated=()=>rated().length===SPHERES.length;
 
 // «Путь с тобой» — сколько календарных дней прошло с первой записи, не больше
 // тридцати. Считаем по календарю, не по активности: пропуски не откатывают
@@ -3069,62 +3107,7 @@ function setGoal(key,el){
   if(!isNaN(v)&&v>0){DATA.goals[key]=v;lsSet("goals",JSON.stringify(DATA.goals));}
   renderTrend();
 }
-function renderTrend(){
-  applyTheme();
-  if(!hasData()){
-    document.getElementById("trend-sub").textContent="Пока пусто";
-    document.getElementById("goals").innerHTML=
-      `<div class="why">Графики появятся, когда наберётся неделя записей.
-        Цели тоже — сначала нужно, с чем сравнивать.</div>`;
-    document.getElementById("charts").innerHTML="";
-    return;
-  }
-  const g=DATA.goals,wl=DAYS.map(d=>d.weight).filter(v=>v),cur=wl.length?wl[wl.length-1]:0;
-  const first=wl.length>=7?avg(wl.slice(0,7)):cur,perWeek=wl.length>=14?(first-avg(wl.slice(-7)))/2:0;
-  const left=cur-g.weight,weeks=perWeek>.05?Math.ceil(left/perWeek):null;
-  const сИсторией=DAYS.filter(d=>d.sleep!=null);
-  const nights=сИсторией.filter(d=>d.sleep>=g.sleep).length;
-  document.getElementById("trend-sub").textContent=
-    `${DAYS.length} ${plural(DAYS.length,"день","дня","дней")} истории. Неделя врёт, месяц — нет`;
-  document.getElementById("goals").innerHTML=`
-    <div class="fields">
-      <div class="field"><label>цель по весу, кг</label>
-        <input id="g-weight" type="number" inputmode="decimal" step="0.1" value="${g.weight}"></div>
-      <div class="field"><label>цель по сну, ч</label>
-        <input id="g-sleep" type="number" inputmode="decimal" step="0.5" value="${g.sleep}"></div>
-    </div>
-    <div class="row" style="margin-top:14px"><div class="rlabel">Вес</div>
-      <div class="track"><div class="fill" style="width:${Math.max(0,Math.min(100,cur?(first-cur)/Math.max(.1,first-g.weight)*100:0))}%;background:var(--accent)"></div></div>
-      <div class="rval">${cur?cur.toFixed(1):"—"}</div></div>
-    <div class="dim">${cur?`Осталось ${left.toFixed(1)} кг. ${weeks?`Уходит ${perWeek.toFixed(2)} кг в неделю — при таком темпе цель примерно через ${weeks} ${plural(weeks,"неделю","недели","недель")}.`:"Темп пока не набрался, копим данные."}`:"Веса ещё не было — впиши его в чек-ине."}</div>
-    <div class="row" style="margin-top:14px"><div class="rlabel">Сон</div>
-      <div class="track"><div class="fill" style="width:${сИсторией.length?nights/сИсторией.length*100:0}%;background:var(--accent)"></div></div>
-      <div class="rval">${nights}/${DAYS.length}</div></div>
-    <div class="dim">Ночей по твоей мерке: ${nights} из ${сИсторией.length}${
-      сИсторией.length<DAYS.length?" дней со сном":""}.</div>`;
-  document.getElementById("g-weight").onchange=e=>setGoal("weight",e.target);
-  document.getElementById("g-sleep").onchange=e=>setGoal("sleep",e.target);
 
-  const ac=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
-  const series=[{l:"Настроение",k:"mood",f:1},{l:"Сон, ч",k:"sleep",f:1,goal:g.sleep},
-    {l:"Пульс покоя",k:"pulse",f:0},{l:"Вес, кг",k:"weight",f:1,goal:g.weight},{l:"Шаги",k:"steps",f:0}];
-  document.getElementById("charts").innerHTML=series.map(s=>{
-    // Раньше пустой день превращался в ноль (`d[s.k]||0`), и график падал
-    // в пол там, где человек просто не мерился. Теперь считаем только
-    // по дням с данными и честно пишем, сколько их.
-    const все=DAYS.map(d=>d[s.k]).filter(x=>x!=null);
-    if(все.length<2) return "";
-    const v=DAYS.map(d=>d[s.k]);
-    const первые=все.slice(0,7), последние=все.slice(-7);
-    const diff=avg(последние)-avg(первые);
-    return `<div class="chart"><div class="ctitle"><span>${s.l}</span>
-      <span>сейчас ${все[все.length-1].toLocaleString("ru-RU")} · сдвиг ${diff>=0?"+":""}${diff.toFixed(s.f)}</span></div>
-      ${spark2(v,ac,s.goal)}
-      <div class="dim" style="font-size:11px;margin-top:4px">по ${все.length} ${
-        plural(все.length,"дню","дням","дням")} с данными</div></div>`;}).join("")
-    ||`<div class="dim">Графики появятся, когда наберётся два дня.</div>`;
-
-}
 
 // ── Навигация ────────────────────────────────────────────────────────
 // «Мир зверя» — отдельный модуль, не в нижней навигации: открывается кнопкой
