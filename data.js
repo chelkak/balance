@@ -579,3 +579,50 @@ const seasonNow=()=>SEASONS.find(s=>s.m.includes(new Date().getMonth()+1))||SEAS
 const MARKS={"1-1":"Год начался заново.","12-21":"Самая длинная ночь в году.",
              "6-21":"Самый длинный день в году.","3-20":"День сравнялся с ночью.",
              "9-22":"День сравнялся с ночью, дальше темнее."};
+
+
+// ── Выгрузка всего себе ───
+// Формирование текста для кабинета: длинная простыня, которую человек
+// выделяет и копирует. Логики в ней нет, только сборка строк.
+function exportText(){
+  const м=["января","февраля","марта","апреля","мая","июня","июля",
+           "августа","сентября","октября","ноября","декабря"];
+  const дата=k=>{const[г,мм,д]=k.split("-");return `${+д} ${м[+мм-1]} ${г}`;};
+  const L=[];
+  L.push("БАЛАНС — копия всего, что накопилось");
+  L.push("Выгружено "+new Date().toLocaleString("ru-RU"));
+  L.push("Зверь: "+(PET.name||"без имени")+", дней вместе: "+daysWithMe());
+  L.push("");
+  L.push("═══ ПИСЬМА СЕБЕ ═══");
+  const кап=(PET.capsules||[]);
+  if(!кап.length)L.push("(пока ни одного)");
+  кап.forEach(k=>{
+    L.push("");
+    L.push("Написано: "+дата(k.d));
+    L.push("Открыть: "+new Date(k.open).toLocaleDateString("ru-RU")+(k.read?" (прочитано)":""));
+    L.push(k.t);
+  });
+  L.push("");
+  L.push("═══ ЛЕТОПИСЬ ═══");
+  (PET.chronicle||[]).forEach(z=>L.push(дата(z.d)+" — "+z.t));
+  L.push("");
+  L.push("═══ ПОПЫТКИ ═══");
+  SPHERES.forEach(s=>{const n=triesOf(s.code);if(n)L.push(s.name+": "+n);});
+  L.push("");
+  L.push("═══ НАХОДКИ ═══");
+  (PET.finds||[]).forEach(i=>{const f=FINDS[i];
+    if(f)L.push(f.n+" — "+LANDS[landOf(i)].n+(f.r?" ("+["","редкая","легендарная"][f.r]+")":""));});
+  L.push("");
+  L.push("═══ ДНИ ═══");
+  L.push("дата; сон; настроение; энергия; пульс; вес; шаги; км; сфер горело; строка про день");
+  // У дня поле называется date и хранит момент времени, а не строку «2026-08-17».
+  // Без keyOf в выгрузке была пустая первая колонка — файл без дат бесполезен.
+  DAYS.forEach(d=>{
+    const к=keyOf(new Date(d.date));
+    // Строка про день живёт в LOG, а не в DAYS — иначе колонка была бы пустой
+    const заметка=((LOG[к]||{}).n||"").replace(/[;\r\n]+/g," ");
+    L.push([к,d.sleep,d.mood,d.energy,d.pulse,d.weight,d.steps,d.dist,
+            (d.touched||[]).length,заметка].map(v=>v==null?"":v).join("; "));
+  });
+  return L.join("\n");
+}

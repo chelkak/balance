@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=62"></script>
-<script src="data.js?v=62"></script>
-<script src="deck.js?v=62"></script>
+<script src="photos/list.js?v=63"></script>
+<script src="data.js?v=63"></script>
+<script src="deck.js?v=63"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -514,7 +514,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="62 · 20.08.2026 08:20";
+const APP_VERSION="63 · 20.08.2026 13:07";
 
 let toastTimer=null;
 function toast(text){
@@ -840,7 +840,12 @@ function cloudLoad(done){
 
 function logPacket(){
   const size=days=>JSON.stringify({type:"log",days}).length;
-  const готов=e=>e&&e.s!=null&&e.m!=null&&e.e!=null;   // черновик от галочек не шлём
+  // День уезжает, если в нём есть хоть один настоящий показатель тела:
+  // утром человек вносит пульс и вес, и это уже данные, а не черновик.
+  // Одни галочки сфер без единой цифры не шлём — это ещё не запись дня,
+  // и бот принял бы её за закрытый день с пустыми показателями.
+  const готов=e=>!!e&&(e.s!=null||e.m!=null||e.e!=null||
+                       e.p!=null||e.w!=null||e.st!=null||e.di!=null);
   const today=готов(LOG[todayKey()])?LOG[todayKey()]:null;
   let days=today?[today]:[];
   // Только то, что ещё не уезжало. Повторная отправка старой копии
@@ -873,9 +878,18 @@ function prune(){
 function mergeLog(){
   const keys=Object.keys(LOG).sort();
   if(!keys.length) return;
-  const make=e=>({date:new Date(e.d+"T12:00:00"),sleep:e.s??7,mood:e.m??5,energy:e.e??5,
-    touched:e.t||[],pulse:e.p??null,weight:e.w??null,steps:e.st??0,dist:e.di??0,
-    grey:!!e.grey});
+  // Ничего не подставляем. Раньше здесь стояли sleep??7, mood??5, energy??5,
+  // steps??0, dist??0 — и день, в котором человек внёс только вес, приезжал
+  // в расчёты как «спал семь часов, настроение пять». Средние, режим и связи
+  // считались по цифрам, которых никто не вводил. Пустое поле — это null,
+  // и каждый расчёт обязан сам решить, что с ним делать.
+  // grey хранится тремя состояниями: 1, явный 0 и «ключа нет» (undefined),
+  // иначе снять отметку было бы нечем.
+  const make=e=>({date:new Date(e.d+"T12:00:00"),
+    sleep:e.s??null,mood:e.m??null,energy:e.e??null,
+    touched:e.t||[],pulse:e.p??null,weight:e.w??null,
+    steps:e.st??null,dist:e.di??null,
+    grey:e.grey===undefined?undefined:(e.grey?1:0)});
   if(!DEMO_ON){
     DAYS=keys.slice(-LOG_DAYS).map(k=>make(LOG[k]));
     IS_DEMO=false;
@@ -888,12 +902,16 @@ function mergeLog(){
     keys.forEach(k=>byDate[k]=make(LOG[k]));
     DAYS=Object.keys(byDate).sort().slice(-21).map(k=>byDate[k]);
   }
+  // Протяжка пульса и веса вперёд: их меряют не каждый день, и между
+  // замерами значение честно считается прежним. Но выдумывать первое
+  // значение нельзя — раньше здесь стояли p??60 и w??0, то есть пульс 60
+  // и вес ноль у человека, который ещё ни разу не мерился. Теперь до
+  // первого замера остаётся null, и графики просто не рисуют этот кусок.
   let p=null,w=null;
-  DAYS.forEach(d=>{if(d.pulse!=null)p=d.pulse;else d.pulse=p; if(d.weight)w=d.weight;else d.weight=w;});
-  for(let i=DAYS.length-1;i>=0;i--){
-    if(DAYS[i].pulse!=null)p=DAYS[i].pulse;else DAYS[i].pulse=p??60;
-    if(DAYS[i].weight)w=DAYS[i].weight;else DAYS[i].weight=w??0;
-  }
+  DAYS.forEach(d=>{
+    if(d.pulse!=null)p=d.pulse; else d.pulse=p;
+    if(d.weight!=null)w=d.weight; else d.weight=w;
+  });
 }
 
 // Пустой день. Вчерашние числа сюда не переносим: иначе в базу попадёт
@@ -1382,48 +1400,7 @@ function resetAll(){
   setTimeout(()=>location.reload(),900);
 }
 
-function exportText(){
-  const м=["января","февраля","марта","апреля","мая","июня","июля",
-           "августа","сентября","октября","ноября","декабря"];
-  const дата=k=>{const[г,мм,д]=k.split("-");return `${+д} ${м[+мм-1]} ${г}`;};
-  const L=[];
-  L.push("БАЛАНС — копия всего, что накопилось");
-  L.push("Выгружено "+new Date().toLocaleString("ru-RU"));
-  L.push("Зверь: "+(PET.name||"без имени")+", дней вместе: "+daysWithMe());
-  L.push("");
-  L.push("═══ ПИСЬМА СЕБЕ ═══");
-  const кап=(PET.capsules||[]);
-  if(!кап.length)L.push("(пока ни одного)");
-  кап.forEach(k=>{
-    L.push("");
-    L.push("Написано: "+дата(k.d));
-    L.push("Открыть: "+new Date(k.open).toLocaleDateString("ru-RU")+(k.read?" (прочитано)":""));
-    L.push(k.t);
-  });
-  L.push("");
-  L.push("═══ ЛЕТОПИСЬ ═══");
-  (PET.chronicle||[]).forEach(z=>L.push(дата(z.d)+" — "+z.t));
-  L.push("");
-  L.push("═══ ПОПЫТКИ ═══");
-  SPHERES.forEach(s=>{const n=triesOf(s.code);if(n)L.push(s.name+": "+n);});
-  L.push("");
-  L.push("═══ НАХОДКИ ═══");
-  (PET.finds||[]).forEach(i=>{const f=FINDS[i];
-    if(f)L.push(f.n+" — "+LANDS[landOf(i)].n+(f.r?" ("+["","редкая","легендарная"][f.r]+")":""));});
-  L.push("");
-  L.push("═══ ДНИ ═══");
-  L.push("дата; сон; настроение; энергия; пульс; вес; шаги; км; сфер горело; строка про день");
-  // У дня поле называется date и хранит момент времени, а не строку «2026-08-17».
-  // Без keyOf в выгрузке была пустая первая колонка — файл без дат бесполезен.
-  DAYS.forEach(d=>{
-    const к=keyOf(new Date(d.date));
-    // Строка про день живёт в LOG, а не в DAYS — иначе колонка была бы пустой
-    const заметка=((LOG[к]||{}).n||"").replace(/[;\r\n]+/g," ");
-    L.push([к,d.sleep,d.mood,d.energy,d.pulse,d.weight,d.steps,d.dist,
-            (d.touched||[]).length,заметка].map(v=>v==null?"":v).join("; "));
-  });
-  return L.join("\n");
-}
+
 // Скачать файл из мини-аппа в Телеграме нельзя: ссылка с download там
 // молча не срабатывает — ни файла, ни ошибки. Прежний код ловил исключение,
 // которого не бывает, поэтому запасной путь не включался никогда и кнопка
@@ -1490,10 +1467,10 @@ function personalNorm(field,дней=28){
   return все.length>=3?avg(все):null;
 }
 function readiness(){
-  const свежие=DAYS.slice(-14).filter(d=>d.sleep!=null||d.energy!=null);
+  const свежие=DAYS.slice(-14).filter(d=>!d.grey&&(d.sleep!=null||d.energy!=null));
   if(DAYS.length<READY_MIN_DAYS||!свежие.length)return null;
 
-  const последний=[...DAYS].reverse().find(d=>d.sleep!=null||d.energy!=null);
+  const последний=[...DAYS].reverse().find(d=>!d.grey&&(d.sleep!=null||d.energy!=null));
   if(!последний)return null;
 
   const части=[];
@@ -2270,7 +2247,9 @@ function renderFinds(){
 
 // Режим — не светофор, а состояние зверя. Считается по последним дням.
 function mode(){
-  const moods=DAYS.slice(-3).map(d=>d.mood).filter(v=>v!=null);
+  // Серый день человек сам пометил как выпавший — он не должен решать,
+  // в каком режиме приложение. Иначе неделя болезни включает красный.
+  const moods=DAYS.filter(d=>!d.grey).slice(-3).map(d=>d.mood).filter(v=>v!=null);
   if(!moods.length) return "green";
   const a=moods.reduce((x,y)=>x+y,0)/moods.length;
   // «тяжело» пишет 4, и раньше красный не включался никогда.
@@ -2914,7 +2893,10 @@ function save(){
     t:[...edit.touched],p:доп(edit.pulse,было.p),w:доп(edit.weight,было.w),
     st:доп(edit.steps,было.st),di:доп(edit.dist,было.di),
     tr:edit.train,n:доп((edit.note||"").slice(0,120),было.n),pt:got,
-    grey:было.grey||0};        // отметка «день не в счёт» не должна слетать
+    // Отметка «день не в счёт» не должна слетать при сохранении чек-ина,
+    // и она обязана уезжать боту явным нулём тоже: иначе снять её нечем —
+    // на стороне бота COALESCE оставит прежнюю единицу.
+    grey:было.grey?1:0};
   creditDay(key,edit.touched);   // сколько показали, столько и начислили
   countTries(key,edit.touched);  // отметка сферы — это и есть попытка по ней
   saveLog();
@@ -3134,7 +3116,8 @@ function renderTrend(){
   const g=DATA.goals,wl=DAYS.map(d=>d.weight).filter(v=>v),cur=wl.length?wl[wl.length-1]:0;
   const first=wl.length>=7?avg(wl.slice(0,7)):cur,perWeek=wl.length>=14?(first-avg(wl.slice(-7)))/2:0;
   const left=cur-g.weight,weeks=perWeek>.05?Math.ceil(left/perWeek):null;
-  const nights=DAYS.filter(d=>d.sleep>=g.sleep).length;
+  const сИсторией=DAYS.filter(d=>d.sleep!=null);
+  const nights=сИсторией.filter(d=>d.sleep>=g.sleep).length;
   document.getElementById("trend-sub").textContent=
     `${DAYS.length} ${plural(DAYS.length,"день","дня","дней")} истории. Неделя врёт, месяц — нет`;
   document.getElementById("goals").innerHTML=`
@@ -3149,9 +3132,10 @@ function renderTrend(){
       <div class="rval">${cur?cur.toFixed(1):"—"}</div></div>
     <div class="dim">${cur?`Осталось ${left.toFixed(1)} кг. ${weeks?`Уходит ${perWeek.toFixed(2)} кг в неделю — при таком темпе цель примерно через ${weeks} ${plural(weeks,"неделю","недели","недель")}.`:"Темп пока не набрался, копим данные."}`:"Веса ещё не было — впиши его в чек-ине."}</div>
     <div class="row" style="margin-top:14px"><div class="rlabel">Сон</div>
-      <div class="track"><div class="fill" style="width:${DAYS.length?nights/DAYS.length*100:0}%;background:var(--accent)"></div></div>
+      <div class="track"><div class="fill" style="width:${сИсторией.length?nights/сИсторией.length*100:0}%;background:var(--accent)"></div></div>
       <div class="rval">${nights}/${DAYS.length}</div></div>
-    <div class="dim">Ночей по твоей мерке: ${nights} из ${DAYS.length}.</div>`;
+    <div class="dim">Ночей по твоей мерке: ${nights} из ${сИсторией.length}${
+      сИсторией.length<DAYS.length?" дней со сном":""}.</div>`;
   document.getElementById("g-weight").onchange=e=>setGoal("weight",e.target);
   document.getElementById("g-sleep").onchange=e=>setGoal("sleep",e.target);
 
@@ -3159,12 +3143,19 @@ function renderTrend(){
   const series=[{l:"Настроение",k:"mood",f:1},{l:"Сон, ч",k:"sleep",f:1,goal:g.sleep},
     {l:"Пульс покоя",k:"pulse",f:0},{l:"Вес, кг",k:"weight",f:1,goal:g.weight},{l:"Шаги",k:"steps",f:0}];
   document.getElementById("charts").innerHTML=series.map(s=>{
-    const v=DAYS.map(d=>d[s.k]||0);
-    if(v.length<2) return "";
-    const diff=avg(v.slice(-7))-avg(v.slice(0,7));
+    // Раньше пустой день превращался в ноль (`d[s.k]||0`), и график падал
+    // в пол там, где человек просто не мерился. Теперь считаем только
+    // по дням с данными и честно пишем, сколько их.
+    const все=DAYS.map(d=>d[s.k]).filter(x=>x!=null);
+    if(все.length<2) return "";
+    const v=DAYS.map(d=>d[s.k]);
+    const первые=все.slice(0,7), последние=все.slice(-7);
+    const diff=avg(последние)-avg(первые);
     return `<div class="chart"><div class="ctitle"><span>${s.l}</span>
-      <span>сейчас ${v[v.length-1].toLocaleString("ru-RU")} · сдвиг ${diff>=0?"+":""}${diff.toFixed(s.f)}</span></div>
-      ${spark2(v,ac,s.goal)}</div>`;}).join("")
+      <span>сейчас ${все[все.length-1].toLocaleString("ru-RU")} · сдвиг ${diff>=0?"+":""}${diff.toFixed(s.f)}</span></div>
+      ${spark2(v,ac,s.goal)}
+      <div class="dim" style="font-size:11px;margin-top:4px">по ${все.length} ${
+        plural(все.length,"дню","дням","дням")} с данными</div></div>`;}).join("")
     ||`<div class="dim">Графики появятся, когда наберётся два дня.</div>`;
 
 }
