@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=73"></script>
-<script src="data.js?v=73"></script>
-<script src="deck.js?v=73"></script>
-<script src="expedition.js?v=73"></script>
+<script src="photos/list.js?v=74"></script>
+<script src="data.js?v=74"></script>
+<script src="deck.js?v=74"></script>
+<script src="expedition.js?v=74"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -541,6 +541,11 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   </div>
   <div class="sub" id="best-line" style="margin-top:8px"></div>
 
+  <h2 id="tmp-title">Ненадолго</h2>
+  <div class="sub" style="margin-bottom:8px">Заболело — отмечай, пока это есть. Через две недели уйдёт само</div>
+  <div id="tmp-fields" class="fields"></div>
+  <div class="pills" id="tmp-add" style="margin-top:8px"></div>
+
   <h2>Тренировка</h2><div class="pills" id="p-train"></div>
 
   <h2>Что сегодня горело</h2>
@@ -584,7 +589,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="73 · 21.08.2026 02:44";
+const APP_VERSION="74 · 21.08.2026 02:49";
 
 let toastTimer=null;
 function toast(text){
@@ -759,7 +764,9 @@ const NEUTRAL={};SPHERES.forEach(s=>NEUTRAL[s.code]=0);
 let DATA={today:{sleep:null,mood:null,energy:null,touched:[],note:"",
   pulse:null,weight:null,steps:null,dist:null,train:"нет"},
  wheel:DEMO_ON?{health:6,look:5,love:7,family:8,friends:4,career:6,money:5,self:3,spirit:2,rest:6,env:5,comm:4}:{...NEUTRAL},
- goals:{weight:78,sleep:7.5},spent:0};
+ goals:{weight:78,sleep:7.5},spent:0,
+ // Что человек отметил как временное и до какого числа это показывать.
+ temp:(()=>{try{return JSON.parse(lsGet("temp")||"{}");}catch(e){return {};}})()};
 
 let IS_DEMO=DEMO_ON, CONFIRM=null;
 function showDemo(on){
@@ -2854,6 +2861,7 @@ function openCheckin(){
   });
   document.getElementById("note").value=edit.note||"";
   renderBest();
+  if(typeof renderTemp==="function") renderTemp();
 }
 // Одним списком: раньше пары «ключ — поле» были выписаны в двух местах,
 // и добавление поля требовало помнить про оба.
@@ -2902,6 +2910,7 @@ function save(){
   // Теперь сохраняется то, что внесено. Пустое поле не затирает записанное
   // раньше: и в приложении, и в базе бота стоит COALESCE.
   readBody();
+  if(typeof readTemp==="function") readTemp();
   edit.note=document.getElementById("note").value.trim();
   const внесено=edit.sleep!=null||edit.mood!=null||edit.energy!=null||
                 edit.pulse!=null||edit.weight!=null||edit.steps!=null||edit.dist!=null||
@@ -2918,6 +2927,7 @@ function save(){
     t:[...edit.touched],p:доп(edit.pulse,было.p),w:доп(edit.weight,было.w),
     st:доп(edit.steps,было.st),di:доп(edit.dist,было.di),
     pu:доп(edit.push,было.pu),sq:доп(edit.squat,было.sq),kb:доп(edit.kettle,было.kb),
+    tmp:доп(edit.tmp,было.tmp),
     tr:edit.train,n:доп((edit.note||"").slice(0,120),было.n),pt:got,
     // Отметка «день не в счёт» не должна слетать при сохранении чек-ина,
     // и она обязана уезжать боту явным нулём тоже: иначе снять её нечем —
