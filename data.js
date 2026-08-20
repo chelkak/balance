@@ -626,3 +626,102 @@ function exportText(){
   });
   return L.join("\n");
 }
+
+
+// ── Одно событие входа ────────────────────────────────────────────────
+// Первый заход за день показывает одно главное событие, а не сыплет
+// окнами вперемешку. Раньше при входе могли одновременно сработать
+// «один раз за всю жизнь», созревшая капсула и отложенная история —
+// они дрались за экран, и сильное перекрывалось случайным.
+//
+// Очередь жёсткая, от самого редкого к обычному. Нового контента здесь
+// нет ни строчки: каждая ветка открывает то, что уже написано.
+// Если сегодня ничего не случилось — конверт не показывается вовсе.
+// Ежедневного «она что-то оставила» тут не будет никогда.
+function dayEvent(){
+  if(PET.eventOn===todayKey()) return null;      // одно событие в день
+  if(dueCapsules().length)
+    return {k:"capsule",c:"письмо вернулось",t:"Ты писал это себе",
+            h:"Оно ждало столько, сколько ты назначил.",b:"Прочитать"};
+  if(walkDone())
+    return {k:"walk",c:"она вернулась",t:(PET.name||"Рысь")+" дома",
+            h:"Ходила, смотрела. Хочет что-то показать.",b:"Встретить"};
+  if(onceDue())
+    return {k:"once",c:"один раз за всю жизнь",t:"Сегодня случилось то,",
+            h:"чего больше не повторится ни разу.",b:"Побыть с этим"};
+  if(stageReal()>(PET.stageSeen||stageReal()) && !isWalking())
+    return {k:"grow",c:"за ночь",t:"Она подросла",
+            h:"Ты не увидишь, как это происходит. Только что стало.",b:"Посмотреть"};
+  const сон=dreamToday();
+  if(сон) return {k:"dream",c:"ей снилось",t:сон,h:"",b:"Хорошо"};
+  const карта=cardToday();
+  if(карта&&PET.cardSeen!==todayKey())
+    return {k:"card",c:"сегодняшнее",t:"Карта дня",
+            h:"Одна на весь день, и она уже выбрана.",b:"Открыть"};
+  return null;
+}
+
+function showEvent(){
+  const e=dayEvent();
+  if(!e) return;
+  PET.eventOn=todayKey(); savePet();
+  document.getElementById("event-cap").textContent=e.c;
+  document.getElementById("event-title").textContent=e.t;
+  document.getElementById("event-hint").textContent=e.h;
+  const b=document.getElementById("event-open");
+  b.textContent=e.b;
+  b.onclick=()=>openEvent(e.k);
+  document.getElementById("event-modal").style.display="flex";
+}
+
+// Раскрытие — одно касание. Каждая ветка ведёт в уже существующий экран,
+// никакой новой сцены по дороге.
+function openEvent(k){
+  document.getElementById("event-modal").style.display="none";
+  if(k==="capsule") return showCapsule();
+  if(k==="walk")    { go("totem"); return openWalk(); }
+  if(k==="once")    return showOnce();
+  if(k==="grow")    { go("totem"); maybeGrowOvernight(); return renderTotem(); }
+  if(k==="card")    { go("today"); return; }
+  // сон уже прочитан на самом конверте, открывать нечего
+}
+function closeEvent(){ document.getElementById("event-modal").style.display="none"; }
+
+
+// ── Показ созревшего письма ───
+function showCapsule(){
+  const k=dueCapsules()[0];
+  if(!k)return;
+  const дней=Math.round((Date.now()-k.at)/86400000);
+  const д=new Date(k.at);
+  document.getElementById("cap-when").textContent=
+    `Письмо от ${д.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`;
+  document.getElementById("cap-ago").textContent=
+    `Ты писал это ${дней} ${plural(дней,"день","дня","дней")} назад.`;
+  document.getElementById("cap-text").textContent=k.t;
+  document.getElementById("cap-text").style.display="none";
+  document.getElementById("cap-open").style.display="";
+  document.getElementById("capsule-modal").style.display="flex";
+}
+
+
+// ── Летопись на экране ───
+function renderChronicle(){
+  const box=document.getElementById("chronicle");
+  if(!box)return;
+  const все=(PET.chronicle||[]).slice().reverse();
+  const пусто=!все.length;
+  ["h-chron","h-chron-sub"].forEach(id=>{const e=document.getElementById(id);
+    if(e)e.style.display=пусто?"none":"";});
+  box.style.display=пусто?"none":"";
+  if(пусто)return;
+  const месяц=["января","февраля","марта","апреля","мая","июня","июля",
+               "августа","сентября","октября","ноября","декабря"];
+  box.innerHTML=все.slice(0,40).map(z=>{
+    const [г,м,д]=z.d.split("-");
+    return `<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)">`+
+      `<div class="dim" style="font-size:11px">${+д} ${месяц[+м-1]}</div>`+
+      `<div style="margin-top:3px;line-height:1.4">${z.t}</div></div>`;
+  }).join("")+
+  (все.length>40?`<div class="dim" style="margin-top:10px">И ещё ${все.length-40} записей раньше.</div>`:"");
+}

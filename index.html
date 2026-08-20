@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=63"></script>
-<script src="data.js?v=63"></script>
-<script src="deck.js?v=63"></script>
+<script src="photos/list.js?v=64"></script>
+<script src="data.js?v=64"></script>
+<script src="deck.js?v=64"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -310,6 +310,23 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     </div>
   </div>
 </div>
+<!-- Одно событие входа. Первый заход за день открывается не списком
+     экранов, а одной сценой: что сегодня главное. Содержимое берётся
+     из уже существующего — капсула, прогулка, «один раз», рост, сон,
+     карта дня. Нового генератора подарков нет: если сегодня ничего
+     не случилось, конверт не показывается вовсе. -->
+<div id="event-modal" style="display:none;position:fixed;inset:0;z-index:75;
+     background:#05070c;align-items:center;justify-content:center;padding:22px">
+  <div style="width:100%;max-width:360px;text-align:center">
+    <div id="event-cap" style="letter-spacing:.16em;text-transform:uppercase;
+         font-size:10.5px;color:rgba(255,255,255,.55)"></div>
+    <div id="event-title" style="font:600 23px var(--fu);color:#fff;margin-top:12px;line-height:1.25"></div>
+    <div id="event-hint" style="font-size:13.5px;color:rgba(255,255,255,.62);margin-top:10px"></div>
+    <button class="btn" id="event-open" style="margin-top:22px"></button>
+    <div id="event-later" class="dim" style="margin-top:12px;font-size:12.5px;cursor:pointer"
+         onclick="closeEvent()">Потом</div>
+  </div>
+</div>
 <div id="aim-modal" style="display:none;position:fixed;inset:0;z-index:62;background:rgba(6,8,14,.82);
      align-items:center;justify-content:center;padding:18px;overflow:auto"
      onclick="if(event.target===this)this.style.display='none'">
@@ -514,7 +531,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="63 · 20.08.2026 13:07";
+const APP_VERSION="64 · 20.08.2026 14:43";
 
 let toastTimer=null;
 function toast(text){
@@ -955,6 +972,8 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          walkLuck:LS.walkLuck??null, walkAim:LS.walkAim??null,
          // сны: что снилось и когда показали, чтобы не повторять
          dreamOn:LS.dreamOn||"", dreamSeen:LS.dreamSeen||[], dreamText:LS.dreamText||"",
+         // одно событие входа: в какой день его уже показали
+         eventOn:LS.eventOn||"",
          // ночной цикл: какую стадию человек уже видел и когда её показали
          stageSeen:LS.stageSeen||0, stageSeenOn:LS.stageSeenOn||"",
          // находки и характер
@@ -1045,12 +1064,14 @@ const luckToday=()=>luckFor(todayKey());
 // где она вчера была и что принесла, поэтому сон каждый раз про вашу
 // собственную вчерашнюю жизнь, а не случайная красивость.
 //
-// Показывается один раз за день и только до полудня: сон — утреннее дело.
-// Тексты живут в data.js (DREAMS), сюда не тащим.
-const DREAM_UNTIL=12;
+// Один раз за день, в любое время. Сначала стояло ограничение до полудня
+// («сон — утреннее дело»), но Александр заходит в приложение около 21:30,
+// и при таком правиле не увидел бы ни одного сна вообще. Сон — событие
+// первого захода за день, а не время суток.
 function dreamToday(){
-  if(new Date().getHours()>=DREAM_UNTIL) return null;
-  if(PET.dreamOn===todayKey()) return PET.dreamText||null;
+  // Отметку дня ставим только вместе с текстом. Если по какой-то причине
+  // осталась отметка без текста — считаем заново, а не показываем пустоту.
+  if(PET.dreamOn===todayKey()&&PET.dreamText) return PET.dreamText;
   if(!(PET.walks||0)) return null;              // ещё не ходила — снов нет
   const земля=(LANDS[PET.walkLand??0]||LANDS[0]).n.toLowerCase();
   const последняя=(PET.finds||[]).slice(-1)[0];
@@ -1302,20 +1323,6 @@ function sealCapsule(срок){
 // не должно разворачиваться внезапно.
 const dueCapsules=()=>(PET.capsules||[]).filter(k=>!k.read&&Date.now()>=k.open);
 
-function showCapsule(){
-  const k=dueCapsules()[0];
-  if(!k)return;
-  const дней=Math.round((Date.now()-k.at)/86400000);
-  const д=new Date(k.at);
-  document.getElementById("cap-when").textContent=
-    `Письмо от ${д.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`;
-  document.getElementById("cap-ago").textContent=
-    `Ты писал это ${дней} ${plural(дней,"день","дня","дней")} назад.`;
-  document.getElementById("cap-text").textContent=k.t;
-  document.getElementById("cap-text").style.display="none";
-  document.getElementById("cap-open").style.display="";
-  document.getElementById("capsule-modal").style.display="flex";
-}
 function openCapsule(){
   document.getElementById("cap-text").style.display="";
   document.getElementById("cap-open").style.display="none";
@@ -1759,26 +1766,6 @@ function летопись(текст){
   if(PET.chronicle.length>500)PET.chronicle=PET.chronicle.slice(-500);
   savePet();
 }
-function renderChronicle(){
-  const box=document.getElementById("chronicle");
-  if(!box)return;
-  const все=(PET.chronicle||[]).slice().reverse();
-  const пусто=!все.length;
-  ["h-chron","h-chron-sub"].forEach(id=>{const e=document.getElementById(id);
-    if(e)e.style.display=пусто?"none":"";});
-  box.style.display=пусто?"none":"";
-  if(пусто)return;
-  const месяц=["января","февраля","марта","апреля","мая","июня","июля",
-               "августа","сентября","октября","ноября","декабря"];
-  box.innerHTML=все.slice(0,40).map(z=>{
-    const [г,м,д]=z.d.split("-");
-    return `<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)">`+
-      `<div class="dim" style="font-size:11px">${+д} ${месяц[+м-1]}</div>`+
-      `<div style="margin-top:3px;line-height:1.4">${z.t}</div></div>`;
-  }).join("")+
-  (все.length>40?`<div class="dim" style="margin-top:10px">И ещё ${все.length-40} записей раньше.</div>`:"");
-}
-
 // ── Прогулка ─────────────────────────────────────────────────────────
 // Энергия копится сама от зажжённых сфер (те же баллы) и от карт. Порог
 // растёт вместе со зверем: маленькой рыси хватает малого, взрослой нужно
@@ -2463,7 +2450,9 @@ function renderTotem(){
   // дня — мини-апп в Телеграме закрывается сразу после сохранения (sendData),
   // так что показать её тогда же не получится, только при следующем заходе.
   // Проверяем в самом начале — иначе ветка «Знакомство» ниже выходит раньше.
-  if(PET.pendingStory){
+  // Отложенная история ждёт, пока отыграет событие входа: иначе она
+  // выскакивает поверх письма или встречи с рысью и съедает их.
+  if(PET.pendingStory&&getComputedStyle(document.getElementById("event-modal")).display==="none"){
     const _s=PET.pendingStory;
     rememberStory(PET.pendingStoryIndex);
     PET.pendingStory=null; PET.pendingStoryIndex=null;
@@ -3230,11 +3219,14 @@ setInterval(applyTheme,60000);
   });
 })();
 
-// Капсула, которой пришёл срок, — самое сильное, что тут может случиться.
-// Показываем не сразу при загрузке, а через секунду: пусть экран сначала
-// нарисуется, иначе письмо выскакивает на пустое место.
-if(onceDue()) setTimeout(showOnce,1500);
-else if(dueCapsules().length) setTimeout(showCapsule,1200);
+// Одно событие входа. Раньше здесь дрались за экран «один раз за всю
+// жизнь» и созревшая капсула, а отложенная история выскакивала отдельно
+// из renderTotem — три окна на один заход, и сильное перекрывалось
+// случайным. Теперь очередь одна (dayEvent в data.js), показывается
+// ровно одно и ровно один раз за день.
+// Пауза прежняя: пусть экран сначала нарисуется, иначе письмо выскакивает
+// на пустое место.
+setTimeout(showEvent,1200);
 
 // Подтягиваем облако уже после первой отрисовки: экран показывается сразу
 // на местных данных, а когда придёт ответ Телеграма — обновляем.
