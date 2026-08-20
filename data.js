@@ -1012,7 +1012,11 @@ function openAim(планируем){
       <img src="${landPhoto(i)}" loading="lazy" style="position:absolute;inset:0;width:100%;
         height:100%;object-fit:cover">
       <div style="position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(6,8,14,.85))"></div>
-      <div style="position:absolute;left:11px;bottom:8px;font:600 13.5px var(--fu);color:#fff">${l.n}</div>
+      <div style="position:absolute;left:11px;bottom:8px;right:11px;color:#fff">
+        <div style="font:600 13.5px var(--fu)">${l.n}</div>
+        <div style="font-size:11px;opacity:.72;margin-top:1px">${
+          (typeof landWords==="function")?landWords(i):""}</div>
+      </div>
     </div>`;}).join("");
   // Развилка: у дороги сегодня два следа. Это не выбор с последствиями,
   // а видимое напоминание, что решает не только человек.
