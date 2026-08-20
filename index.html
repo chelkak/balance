@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=64"></script>
-<script src="data.js?v=64"></script>
-<script src="deck.js?v=64"></script>
+<script src="photos/list.js?v=65"></script>
+<script src="data.js?v=65"></script>
+<script src="deck.js?v=65"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -531,7 +531,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="64 · 20.08.2026 14:43";
+const APP_VERSION="65 · 20.08.2026 14:51";
 
 let toastTimer=null;
 function toast(text){
@@ -1662,22 +1662,7 @@ function toggleDen(i){
   savePet();renderFinds();renderDen();
   toast(есть?"Убрал с полки":"Поставил в логово");
 }
-function renderDen(){
-  const box=document.getElementById("den-box");
-  if(!box)return;
-  const вещи=(PET.den||[]).filter(i=>FINDS[i]);
-  if(!вещи.length){box.style.display="none";return;}   // пустую полку не показываем
-  box.style.display="";
-  const цвет=["rgba(255,255,255,.10)","rgba(120,190,255,.18)","rgba(246,211,101,.22)"];
-  box.innerHTML=`<div class="lead">Логово</div>`+
-    `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">`+
-    вещи.map(i=>{const f=FINDS[i];
-      return `<div onclick="openFind(${i})" style="cursor:pointer;border-radius:12px;padding:9px;
-        min-height:62px;background:${цвет[f.r]};border:1px solid rgba(255,255,255,.14)">`+
-        `<div style="font-size:12.5px;line-height:1.25">${f.n}</div>`+
-        `<div class="dim" style="font-size:10.5px;margin-top:3px">${LANDS[findPlace(i)].n}</div></div>`;
-    }).join("")+`</div>`;
-}
+
 
 // ── Кабинет ──────────────────────────────────────────────────────────
 // Отдельный экран под кнопкой в шапке «Тотема». Сюда уезжает всё, что
@@ -2355,10 +2340,7 @@ function showPhoto(key){
 function currentPhotoKey(){
   const stage=stageNow();          // показанная, не насчитанная: см. ночной цикл
   if(stage<PHOTO_FRAMES) return String(stage);
-  const m=mode();
-  // Красный режим — не «грустная стоя», а честный отдых: свернулась, спит.
-  // Ближе к «ничего от тебя не хочет, просто побудьте рядом», чем стоячая поза.
-  return m==="red"?"10-rest":m==="yellow"?"10-curious":"10-happy";
+  return petState().k;
 }
 // Пока рысь бродит — её на экране быть не должно. Иначе механика разваливается:
 // написано «ушла», а зверь лежит на месте. Показываем пейзаж той земли, куда
@@ -2407,8 +2389,12 @@ function updatePhoto(){
   photoBaseKey=currentPhotoKey();
   showPhoto(photoBaseKey);
   preloadNextPhoto();
+  // Ночью кадр «спит» теперь настоящий (petState), поэтому тёмный
+  // прямоугольник поверх бодрой рыси больше не нужен — оставляем ему
+  // только лёгкую подтемнёнку, и то лишь на младших стадиях, где
+  // спящего кадра не снято.
   const night=document.getElementById("totem-night");
-  if(night) night.style.opacity=timeKey()==="night"?"1":"0";
+  if(night) night.style.opacity=(timeKey()==="night"&&stageNow()<PHOTO_FRAMES)?"1":"0";
   // Масштаб вешаем на сами снимки, а не на обёртку: обёртку уже занимают
   // дыхание и «прогулка», два transform на одном элементе затирают друг друга.
   const sc=withinStageScale();
@@ -2529,6 +2515,16 @@ function renderTotem(){
          ? `Зверь собран из твоих двенадцати сфер. Пока не проросли: ${слабые.join(", ")}. Поднимешь сферу — вырастет её часть.`
          : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`}`;
 
+  {
+    // Почему она сегодня такая. Строка есть всегда, когда показан взрослый
+    // кадр: состояние не должно выглядеть случайным. Пока рысь гуляет,
+    // её нет на экране — и строки тоже нет, чтобы не спорить с пейзажем.
+    if(stageNow()>=PHOTO_FRAMES&&!isWalking()){
+      const п=petState();
+      document.getElementById("totem-state").innerHTML+=
+        `<div class="dim" style="margin-top:8px">${п.w[0].toUpperCase()+п.w.slice(1)}.</div>`;
+    }
+  }
   {
     const сон=dreamToday();
     if(сон) document.getElementById("totem-state").innerHTML+=
