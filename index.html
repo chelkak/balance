@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=72"></script>
-<script src="data.js?v=72"></script>
-<script src="deck.js?v=72"></script>
-<script src="expedition.js?v=72"></script>
+<script src="photos/list.js?v=73"></script>
+<script src="data.js?v=73"></script>
+<script src="deck.js?v=73"></script>
+<script src="expedition.js?v=73"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -533,6 +533,14 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   </div>
   <div class="sub" style="margin-top:8px">Бледным — вчерашние. Не мерил — оставь пустым</div>
 
+  <h2>Силовые — сколько сделал</h2>
+  <div class="fields">
+    <div class="field"><label>отжимания</label><input id="f-push" type="number" inputmode="numeric" oninput="readBody()"></div>
+    <div class="field"><label>приседания</label><input id="f-squat" type="number" inputmode="numeric" oninput="readBody()"></div>
+    <div class="field"><label>гиря</label><input id="f-kettle" type="number" inputmode="numeric" oninput="readBody()"></div>
+  </div>
+  <div class="sub" id="best-line" style="margin-top:8px"></div>
+
   <h2>Тренировка</h2><div class="pills" id="p-train"></div>
 
   <h2>Что сегодня горело</h2>
@@ -576,7 +584,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="72 · 21.08.2026 01:20";
+const APP_VERSION="73 · 21.08.2026 02:44";
 
 let toastTimer=null;
 function toast(text){
@@ -642,8 +650,47 @@ let theme=lsGet("theme")||"bw";
 if(theme==="photo"&&!hasPhotos) theme="bw";   // снимков нет — тема «Фото» не работает
 if(!THEMES[theme]) theme="bw";
 
-function timeKey(){const h=new Date().getHours();
-  return h<5?"night":h<9?"dawn":h<17?"day":h<21?"sunset":"night";}
+// ── Солнце над Москвой ───────────────────────────────────────────────
+// Часы стояли жёстко: ночь с 21 до 5 круглый год. В декабре темнеет в
+// половине пятого, в июне светло до одиннадцати — приложение показывало
+// день, когда за окном темно, и это сразу видно. Считаем сами: формула
+// короткая, интернет не нужен, разрешение на геолокацию тоже.
+const МОСКВА={ш:55.7558, д:37.6173, пояс:3};
+const J2000=946728000000;              // 1 января 2000, 12:00 UTC
+function солнце(дата){
+  const д=дата||new Date(), рад=Math.PI/180;
+  // Считаем от полуночи этого дня, а не от «сейчас»: иначе время восхода
+  // ползло бы в течение суток.
+  const сутки=new Date(д.getFullYear(),д.getMonth(),д.getDate());
+  const n=(сутки.getTime()-J2000)/86400000;
+  const L=(280.459+0.98564736*n)%360;                    // средняя долгота
+  const g=(357.529+0.98560028*n)*рад;                    // средняя аномалия
+  const λ=(L+1.915*Math.sin(g)+0.020*Math.sin(2*g))*рад; // истинная долгота
+  const ε=23.439*рад;
+  const скл=Math.asin(Math.sin(ε)*Math.sin(λ));
+  // Уравнение времени — через прямое восхождение. Подмена его эклиптической
+  // долготой давала осенью получасовую ошибку.
+  let RA=Math.atan2(Math.cos(ε)*Math.sin(λ),Math.cos(λ))/рад;
+  let урв=L-RA; while(урв>180)урв-=360; while(урв<-180)урв+=360;
+  урв*=4;
+  const cosЧ=(Math.cos(90.833*рад)-Math.sin(МОСКВА.ш*рад)*Math.sin(скл))
+             /(Math.cos(МОСКВА.ш*рад)*Math.cos(скл));
+  if(cosЧ>1) return {восход:null,закат:null};    // полярная ночь
+  if(cosЧ<-1) return {восход:0,закат:24};        // полярный день
+  const час=Math.acos(cosЧ)/рад/15;
+  const полдень=12-МОСКВА.д/15+МОСКВА.пояс-урв/60;
+  return {восход:полдень-час, закат:полдень+час};
+}
+function timeKey(){
+  const д=new Date(), ч=д.getHours()+д.getMinutes()/60;
+  const с=солнце(д);
+  if(с.восход==null) return ч<5?"night":ч<9?"dawn":ч<17?"day":ч<21?"sunset":"night";
+  // Час до восхода и час после — рассвет; час до заката и час после — закат.
+  if(ч<с.восход-1||ч>с.закат+1) return "night";
+  if(ч<с.восход+1) return "dawn";
+  if(ч>с.закат-1) return "sunset";
+  return "day";
+}
 function pickPhoto(){
   const k=timeKey(), list=(PH[k]&&PH[k].length?PH[k]:PH.any)||[];
   return list.length?list[new Date().getDate()%list.length]:null;
@@ -927,7 +974,8 @@ function logPacket(){
   // Одни галочки сфер без единой цифры не шлём — это ещё не запись дня,
   // и бот принял бы её за закрытый день с пустыми показателями.
   const готов=e=>!!e&&(e.s!=null||e.m!=null||e.e!=null||
-                       e.p!=null||e.w!=null||e.st!=null||e.di!=null);
+                       e.p!=null||e.w!=null||e.st!=null||e.di!=null||
+                       e.pu!=null||e.sq!=null||e.kb!=null);
   const today=готов(LOG[todayKey()])?LOG[todayKey()]:null;
   let days=today?[today]:[];
   // Только то, что ещё не уезжало. Повторная отправка старой копии
@@ -1731,51 +1779,6 @@ function toggleDen(i){
 }
 
 
-// ── Кабинет ──────────────────────────────────────────────────────────
-// Отдельный экран под кнопкой в шапке «Тотема». Сюда уезжает всё, что
-// настраивают раз в месяц: оформление, сведения о звере, версия. На главном
-// экране этому не место — там должна быть рысь, а не переключатели.
-function renderMe(){
-  applyTheme();                                   // перерисовать список тем
-  const д=daysWithMe();
-  document.getElementById("me-sub").textContent=
-    PET.name?`${PET.name} · ${д} ${plural(д,"день","дня","дней")} вместе`:"Настройки и сведения";
-  const мои=(PET.finds||[]).length, земель=(PET.lands||[0]).length;
-  document.getElementById("me-info").innerHTML=
-    `<div class="lead">Коротко</div>`+
-    `<div class="dim" style="margin-top:8px">Прогулок: ${PET.walks||0} · находок: ${мои} из ${FINDS.length}</div>`+
-    `<div class="dim">Земель открыто: ${земель} из ${LANDS.length} · камней: ${PET.stones||0}</div>`+
-    `<div class="dim">Запечатано писем: ${(PET.capsules||[]).length}</div>`+
-    `<div class="dim" style="margin-top:10px">Версия ${APP_VERSION}</div>`;
-  renderAhead();
-  // Когда была последняя копия. Дата уже писалась в PET.exportedAt
-  // и не читалась нигде — то есть поле копилось впустую. Письмо,
-  // запечатанное на год, потерять нельзя, и одна строка тут стоит
-  // дешевле, чем разговор «а я думал, оно само сохранилось».
-  {
-    const w=document.getElementById("export-when");
-    if(w){
-      const t=PET.exportedAt||0;
-      const дней=t?Math.floor((Date.now()-t)/864e5):null;
-      w.textContent=!t?"Копию себе ещё ни разу не забирал."
-        :дней===0?"Последняя копия — сегодня."
-        :`Последняя копия — ${дней} ${plural(дней,"день","дня","дней")} назад.`;
-    }
-  }
-  const sw=document.getElementById("sound-switch");
-  if(sw) sw.textContent=PET.sound?"Звук мест включён — выключить":"Звук мест выключен — включить";
-}
-
-// Что впереди. Только то, что придёт само: даты солнцестояний, начало
-// сезона, возвращение запечатанных писем, следующий подрост зверя.
-// Ни одной задачи и ни одного напоминания — это горизонт, а не список дел.
-// Человеку, у которого впереди пока ничего не назначено, важно видеть,
-// что время всё-таки к чему-то идёт.
-
-
-// Выключатель насовсем: вместе со звуком исчезают и кнопки со снимков.
-// Полумеры вроде «тише» тут не нужны — либо человеку это интересно,
-// либо он не хочет видеть даже предложения.
 function toggleSound(){
   PET.sound=PET.sound?0:1;
   if(!PET.sound) soundStop();
@@ -2239,67 +2242,6 @@ function natureWords(){
   const есть=Object.entries(t).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   return есть.slice(0,2).map(([k])=>TRAITS[k]).filter(Boolean);
 }
-function renderFinds(){
-  const слов=natureWords();
-  document.getElementById("nature").innerHTML=
-    `<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Какая она растёт</div>`+
-    `<div class="fname" style="margin-top:6px">`+
-      (слов.length?`${PET.name||"Рысь"} — ${слов.join(" и ")}`
-                  :`${PET.name||"Рысь"} ещё только начинает`)+`</div>`+
-    `<div class="dim" style="margin-top:6px">`+
-      (слов.length?`Характер складывается из твоих ответов после прогулок. Их было ${PET.walks||0}.`
-                  :"Отпусти её побродить и ответь, когда вернётся, — характер начнёт складываться.")+
-    `</div>`+
-    (marksText()?`<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
-      `<b>Из чего сложился твой зверь</b><br>${marksText()}</div>`:"")+
-    // Тропа долгих сфер: то, что раньше было невидимым числом попыток,
-    // теперь видно как след в мире. Ни порога, ни награды, ни обнуления.
-    (trailWords()?`<div class="dim" style="margin-top:10px">${trailWords()}</div>`:"")+
-    (legendCount()
-      ? `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
-        `<b>Легендарных: ${legendCount()} из ${LEGENDS().length}</b><br>`+
-        `Каждая находится один раз и больше не повторяется.</div>`
-      : "")+
-    `<div style="margin-top:12px;font:600 15px var(--fu)">${PET.stones||0} 💎 камней</div>`+
-    `<div class="dim" style="margin-top:3px">Копятся с прогулок: чем реже находка, тем больше. Тратятся на новые земли.</div>`;
-
-  // Первый день не должен выглядеть складом пустых полок: пока рысь никуда
-  // не ходила, показываем одну строчку о том, что здесь будет, и прячем
-  // земли с витриной. Появится первая прогулка — разделы возникнут сами.
-  const новичок=!(PET.walks||0)&&!(PET.finds||[]).length;
-  ["h-lands","h-lands-sub","h-grid"].forEach(id=>{const e=document.getElementById(id);
-    if(e)e.style.display=новичок?"none":"";});
-  document.getElementById("lands").style.display=новичок?"none":"";
-  document.getElementById("finds-grid").style.display=новичок?"none":"";
-  const intro=document.getElementById("finds-intro");
-  intro.style.display=новичок?"":"none";
-  if(новичок)intro.innerHTML=
-    `<div class="fname">Здесь будет то, что она приносит</div>`+
-    `<div class="dim" style="margin-top:6px">Отпусти её побродить — кнопка на вкладке «Тотем». Вернётся с находкой, историей или просто довольная.</div>`;
-
-  renderLands();renderChronicle();
-
-  const мои=new Set(PET.finds||[]);
-  document.getElementById("finds-sub").textContent=`Собрано ${мои.size} из ${FINDS.length}`;
-  const цвет=["rgba(255,255,255,.10)","rgba(120,190,255,.18)","rgba(246,211,101,.22)"];
-  document.getElementById("finds-grid").innerHTML=
-    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">`+
-    FINDS.map((f,i)=>{
-      const открыта=мои.has(i);
-      // Нажатие открывает сцену, а не кладёт вещь на полку молча: раньше
-      // тычок в плитку давал непонятный побочный эффект, а прочитать
-      // находку было нельзя вообще.
-      return `<div ${открыта?`onclick="openFind(${i})" style="cursor:pointer;`:'style="'}border-radius:12px;padding:10px;min-height:74px;background:${открыта?цвет[f.r]:"rgba(255,255,255,.04)"};
-        border:1px solid ${inDen(i)?"var(--accent)":открыта?"rgba(255,255,255,.14)":"rgba(255,255,255,.06)"}">`+
-        (открыта
-          ? `<div style="font-size:13px;line-height:1.25">${f.n}</div>`+
-            `<div class="dim" style="font-size:11px;margin-top:4px">${inDen(i)?"в логове":["","редкая","легендарная"][f.r]}</div>`
-          : `<div class="dim" style="font-size:20px;text-align:center;line-height:54px">?</div>`)+
-      `</div>`;
-    }).join("")+`</div>`;
-}
-
-// Режим — не светофор, а состояние зверя. Считается по последним дням.
 function mode(){
   // Серый день человек сам пометил как выпавший — он не должен решать,
   // в каком режиме приложение. Иначе неделя болезни включает красный.
@@ -2702,46 +2644,6 @@ function pokeTotem(){
 // превращается в жвачку, а завершённость видно. Сложность подрастает вместе
 // со зверем: на десятой стадии ряды с двумя правилами и умножение в столбик.
 const PUZZLES_PER_DAY=3;
-function renderPuzzle(){
-  const box=document.getElementById("puzzle"),title=document.getElementById("puzzle-title");
-  if(mode()==="red"){                      // в тяжёлые дни ничего не просим
-    box.style.display="none"; if(title) title.style.display="none"; return;
-  }
-  box.style.display=""; if(title) title.style.display="";
-  const решено=PET.puzzleOn===todayKey()?(PET.puzzleDone||0):0;
-
-  if(решено>=PUZZLES_PER_DAY){             // на сегодня всё — блок закрыт
-    if(title) title.textContent="Разминка";
-    box.innerHTML=`<div class="fname">На сегодня всё</div>`+
-      `<div class="dim" style="margin-top:6px">Три из трёх. Завтра будут новые и чуть сложнее.</div>`;
-    return;
-  }
-  if(title) title.textContent=`Разминка · ${решено+1} из ${PUZZLES_PER_DAY}`;
-  PZ=PZ||makePuzzle(PET.puzzleKinds||[]);
-  box.innerHTML=`<div class="lead">Внимание и логика</div>
-    <div style="font:600 18px var(--fd);margin-top:8px">${PZ.q}</div>
-    <div class="opts">${PZ.opts.map(o=>`<div class="opt" data-v="${o}">${o}</div>`).join("")}</div>
-    <div class="dim" style="margin-top:12px">Ошибся — не страшно, попробуй ещё.</div>
-    <button class="btn ghost" onclick="nextPuzzle()">Другая задачка</button>`;
-  box.querySelectorAll(".opt").forEach(el=>el.onclick=()=>{
-    const ok=+el.dataset.v===PZ.ans;
-    el.classList.add(ok?"ok":"no");
-    if(ok){
-      PET.puzzleOn=todayKey();
-      PET.puzzleDone=решено+1;
-      PET.puzzleKinds=[...(PET.puzzleKinds||[]),ПОСЛЕДНИЙ_ВИД].filter(Boolean);
-      // Было 20 — и три задачки давали больше энергии (60), чем целый день
-      // настоящей жизни (5 сфер × 10 = 50). Приложение платило за примеры
-      // больше, чем за «позвонил отцу». Теперь арифметика — приятная мелочь.
-      PET.bonus+=5;
-      PET.stones=(PET.stones||0)+4;        // и камни на земли
-      if(PET.puzzleDone>=PUZZLES_PER_DAY)летопись("Все три задачки дня решены.");
-      savePet();
-      setTimeout(()=>{PZ=null;renderPuzzle();renderWalk();},700);
-    }
-    if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred(ok?"success":"error");});
-}
-
 // ── Сегодня ──────────────────────────────────────────────────────────
 function spheresGrid(box,list,editable,showBonus){
   box.innerHTML=SPHERES.map(s=>{
@@ -2944,19 +2846,54 @@ function openCheckin(){
     под.textContent=в.x;
     поле.placeholder="Одной строкой, как есть. Можно пропустить";
   }
-  [["pulse","f-pulse"],["weight","f-weight"],["steps","f-steps"],["dist","f-dist"]].forEach(([k,id])=>{
+  ПОЛЯ_ТЕЛА.forEach(([k,id])=>{
     const el=document.getElementById(id);
     el.value=edit[k]??"";
     const prev=hasData()&&!IS_DEMO?lastKnown(k):null;
     el.placeholder=prev?`вчера ${prev}`:"—";   // подсказка, а не готовый ответ
   });
   document.getElementById("note").value=edit.note||"";
+  renderBest();
+}
+// Одним списком: раньше пары «ключ — поле» были выписаны в двух местах,
+// и добавление поля требовало помнить про оба.
+const ПОЛЯ_ТЕЛА=[["pulse","f-pulse"],["weight","f-weight"],["steps","f-steps"],
+  ["dist","f-dist"],["push","f-push"],["squat","f-squat"],["kettle","f-kettle"]];
+const СИЛОВЫЕ=["push","squat","kettle"];
+// Личный рекорд — единственное сравнение, где соперник ты сам. Ни среднего
+// по неделе, ни чужой нормы: только «сегодня больше, чем когда-либо было».
+const КЛЮЧ_В_ЛОГ={push:"pu",squat:"sq",kettle:"kb",steps:"st",dist:"di"};
+function рекорд(ключ,кроме){
+  const п=КЛЮЧ_В_ЛОГ[ключ]; let лучш=null, когда=null;
+  Object.keys(LOG).forEach(k=>{
+    if(k===кроме) return;
+    const v=LOG[k]&&LOG[k][п];
+    if(v!=null&&(лучш==null||v>лучш)){ лучш=v; когда=k; }
+  });
+  return лучш==null?null:{v:лучш,d:когда};
+}
+// Строка под силовыми: что было лучшим и побито ли это сегодня.
+function renderBest(){
+  const строка=document.getElementById("best-line");
+  if(!строка) return;
+  const имена={push:"отжимания",squat:"приседания",kettle:"гиря"};
+  const части=[];
+  СИЛОВЫЕ.forEach(k=>{
+    const р=рекорд(k,dayKey()), сегодня=edit[k];
+    if(сегодня!=null&&(р==null||сегодня>р.v)){
+      части.push(`<b>${имена[k]} — новый рекорд</b>`);
+    } else if(р!=null){
+      части.push(`${имена[k]}: лучшее ${р.v}`);
+    }
+  });
+  строка.innerHTML=части.length?части.join(" · "):"Первый раз — он и станет рекордом";
 }
 function readBody(){
-  [["pulse","f-pulse"],["weight","f-weight"],["steps","f-steps"],["dist","f-dist"]].forEach(([k,id])=>{
+  ПОЛЯ_ТЕЛА.forEach(([k,id])=>{
     const v=document.getElementById(id).value.trim();
     edit[k]=v===""?null:parseFloat(v);
   });
+  renderBest();          // рекорд виден сразу, а не после сохранения
 }
 function save(){
   // Раньше требовались сон, настроение и энергия разом, иначе день не
@@ -2980,6 +2917,7 @@ function save(){
   LOG[key]={d:key,s:доп(edit.sleep,было.s),m:доп(edit.mood,было.m),e:доп(edit.energy,было.e),
     t:[...edit.touched],p:доп(edit.pulse,было.p),w:доп(edit.weight,было.w),
     st:доп(edit.steps,было.st),di:доп(edit.dist,было.di),
+    pu:доп(edit.push,было.pu),sq:доп(edit.squat,было.sq),kb:доп(edit.kettle,было.kb),
     tr:edit.train,n:доп((edit.note||"").slice(0,120),было.n),pt:got,
     // Отметка «день не в счёт» не должна слетать при сохранении чек-ина,
     // и она обязана уезжать боту явным нулём тоже: иначе снять её нечем —

@@ -1405,3 +1405,156 @@ function renderWheel(){
     setTimeout(()=>go("checkin"),1600);
   });
 }
+
+// ── Экраны, переехавшие из index.html ────────────────────────────────
+// Файл упёрся в потолок размера: свободного места оставалось 2,6%.
+// Здесь только рисование экранов, ядро осталось на месте.
+
+function renderFinds(){
+  const слов=natureWords();
+  document.getElementById("nature").innerHTML=
+    `<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Какая она растёт</div>`+
+    `<div class="fname" style="margin-top:6px">`+
+      (слов.length?`${PET.name||"Рысь"} — ${слов.join(" и ")}`
+                  :`${PET.name||"Рысь"} ещё только начинает`)+`</div>`+
+    `<div class="dim" style="margin-top:6px">`+
+      (слов.length?`Характер складывается из твоих ответов после прогулок. Их было ${PET.walks||0}.`
+                  :"Отпусти её побродить и ответь, когда вернётся, — характер начнёт складываться.")+
+    `</div>`+
+    (marksText()?`<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
+      `<b>Из чего сложился твой зверь</b><br>${marksText()}</div>`:"")+
+    // Тропа долгих сфер: то, что раньше было невидимым числом попыток,
+    // теперь видно как след в мире. Ни порога, ни награды, ни обнуления.
+    (trailWords()?`<div class="dim" style="margin-top:10px">${trailWords()}</div>`:"")+
+    (legendCount()
+      ? `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
+        `<b>Легендарных: ${legendCount()} из ${LEGENDS().length}</b><br>`+
+        `Каждая находится один раз и больше не повторяется.</div>`
+      : "")+
+    `<div style="margin-top:12px;font:600 15px var(--fu)">${PET.stones||0} 💎 камней</div>`+
+    `<div class="dim" style="margin-top:3px">Копятся с прогулок: чем реже находка, тем больше. Тратятся на новые земли.</div>`;
+
+  // Первый день не должен выглядеть складом пустых полок: пока рысь никуда
+  // не ходила, показываем одну строчку о том, что здесь будет, и прячем
+  // земли с витриной. Появится первая прогулка — разделы возникнут сами.
+  const новичок=!(PET.walks||0)&&!(PET.finds||[]).length;
+  ["h-lands","h-lands-sub","h-grid"].forEach(id=>{const e=document.getElementById(id);
+    if(e)e.style.display=новичок?"none":"";});
+  document.getElementById("lands").style.display=новичок?"none":"";
+  document.getElementById("finds-grid").style.display=новичок?"none":"";
+  const intro=document.getElementById("finds-intro");
+  intro.style.display=новичок?"":"none";
+  if(новичок)intro.innerHTML=
+    `<div class="fname">Здесь будет то, что она приносит</div>`+
+    `<div class="dim" style="margin-top:6px">Отпусти её побродить — кнопка на вкладке «Тотем». Вернётся с находкой, историей или просто довольная.</div>`;
+
+  renderLands();renderChronicle();
+
+  const мои=new Set(PET.finds||[]);
+  document.getElementById("finds-sub").textContent=`Собрано ${мои.size} из ${FINDS.length}`;
+  const цвет=["rgba(255,255,255,.10)","rgba(120,190,255,.18)","rgba(246,211,101,.22)"];
+  document.getElementById("finds-grid").innerHTML=
+    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">`+
+    FINDS.map((f,i)=>{
+      const открыта=мои.has(i);
+      // Нажатие открывает сцену, а не кладёт вещь на полку молча: раньше
+      // тычок в плитку давал непонятный побочный эффект, а прочитать
+      // находку было нельзя вообще.
+      return `<div ${открыта?`onclick="openFind(${i})" style="cursor:pointer;`:'style="'}border-radius:12px;padding:10px;min-height:74px;background:${открыта?цвет[f.r]:"rgba(255,255,255,.04)"};
+        border:1px solid ${inDen(i)?"var(--accent)":открыта?"rgba(255,255,255,.14)":"rgba(255,255,255,.06)"}">`+
+        (открыта
+          ? `<div style="font-size:13px;line-height:1.25">${f.n}</div>`+
+            `<div class="dim" style="font-size:11px;margin-top:4px">${inDen(i)?"в логове":["","редкая","легендарная"][f.r]}</div>`
+          : `<div class="dim" style="font-size:20px;text-align:center;line-height:54px">?</div>`)+
+      `</div>`;
+    }).join("")+`</div>`;
+}
+
+// Режим — не светофор, а состояние зверя. Считается по последним дням.
+
+function renderPuzzle(){
+  const box=document.getElementById("puzzle"),title=document.getElementById("puzzle-title");
+  if(mode()==="red"){                      // в тяжёлые дни ничего не просим
+    box.style.display="none"; if(title) title.style.display="none"; return;
+  }
+  box.style.display=""; if(title) title.style.display="";
+  const решено=PET.puzzleOn===todayKey()?(PET.puzzleDone||0):0;
+
+  if(решено>=PUZZLES_PER_DAY){             // на сегодня всё — блок закрыт
+    if(title) title.textContent="Разминка";
+    box.innerHTML=`<div class="fname">На сегодня всё</div>`+
+      `<div class="dim" style="margin-top:6px">Три из трёх. Завтра будут новые и чуть сложнее.</div>`;
+    return;
+  }
+  if(title) title.textContent=`Разминка · ${решено+1} из ${PUZZLES_PER_DAY}`;
+  PZ=PZ||makePuzzle(PET.puzzleKinds||[]);
+  box.innerHTML=`<div class="lead">Внимание и логика</div>
+    <div style="font:600 18px var(--fd);margin-top:8px">${PZ.q}</div>
+    <div class="opts">${PZ.opts.map(o=>`<div class="opt" data-v="${o}">${o}</div>`).join("")}</div>
+    <div class="dim" style="margin-top:12px">Ошибся — не страшно, попробуй ещё.</div>
+    <button class="btn ghost" onclick="nextPuzzle()">Другая задачка</button>`;
+  box.querySelectorAll(".opt").forEach(el=>el.onclick=()=>{
+    const ok=+el.dataset.v===PZ.ans;
+    el.classList.add(ok?"ok":"no");
+    if(ok){
+      PET.puzzleOn=todayKey();
+      PET.puzzleDone=решено+1;
+      PET.puzzleKinds=[...(PET.puzzleKinds||[]),ПОСЛЕДНИЙ_ВИД].filter(Boolean);
+      // Было 20 — и три задачки давали больше энергии (60), чем целый день
+      // настоящей жизни (5 сфер × 10 = 50). Приложение платило за примеры
+      // больше, чем за «позвонил отцу». Теперь арифметика — приятная мелочь.
+      PET.bonus+=5;
+      PET.stones=(PET.stones||0)+4;        // и камни на земли
+      if(PET.puzzleDone>=PUZZLES_PER_DAY)летопись("Все три задачки дня решены.");
+      savePet();
+      setTimeout(()=>{PZ=null;renderPuzzle();renderWalk();},700);
+    }
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred(ok?"success":"error");});
+}
+
+// ── Кабинет ──────────────────────────────────────────────────────────
+// Отдельный экран под кнопкой в шапке «Тотема». Сюда уезжает всё, что
+// настраивают раз в месяц: оформление, сведения о звере, версия. На главном
+// экране этому не место — там должна быть рысь, а не переключатели.
+function renderMe(){
+  applyTheme();                                   // перерисовать список тем
+  const д=daysWithMe();
+  document.getElementById("me-sub").textContent=
+    PET.name?`${PET.name} · ${д} ${plural(д,"день","дня","дней")} вместе`:"Настройки и сведения";
+  const мои=(PET.finds||[]).length, земель=(PET.lands||[0]).length;
+  document.getElementById("me-info").innerHTML=
+    `<div class="lead">Коротко</div>`+
+    `<div class="dim" style="margin-top:8px">Прогулок: ${PET.walks||0} · находок: ${мои} из ${FINDS.length}</div>`+
+    `<div class="dim">Земель открыто: ${земель} из ${LANDS.length} · камней: ${PET.stones||0}</div>`+
+    `<div class="dim">Запечатано писем: ${(PET.capsules||[]).length}</div>`+
+    `<div class="dim" style="margin-top:10px">Версия ${APP_VERSION}</div>`;
+  renderAhead();
+  // Когда была последняя копия. Дата уже писалась в PET.exportedAt
+  // и не читалась нигде — то есть поле копилось впустую. Письмо,
+  // запечатанное на год, потерять нельзя, и одна строка тут стоит
+  // дешевле, чем разговор «а я думал, оно само сохранилось».
+  {
+    const w=document.getElementById("export-when");
+    if(w){
+      const t=PET.exportedAt||0;
+      const дней=t?Math.floor((Date.now()-t)/864e5):null;
+      w.textContent=!t?"Копию себе ещё ни разу не забирал."
+        :дней===0?"Последняя копия — сегодня."
+        :`Последняя копия — ${дней} ${plural(дней,"день","дня","дней")} назад.`;
+    }
+  }
+  const sw=document.getElementById("sound-switch");
+  if(sw) sw.textContent=PET.sound?"Звук мест включён — выключить":"Звук мест выключен — включить";
+}
+
+// Что впереди. Только то, что придёт само: даты солнцестояний, начало
+// сезона, возвращение запечатанных писем, следующий подрост зверя.
+// Ни одной задачи и ни одного напоминания — это горизонт, а не список дел.
+// Человеку, у которого впереди пока ничего не назначено, важно видеть,
+// что время всё-таки к чему-то идёт.
+
+
+// Выключатель насовсем: вместе со звуком исчезают и кнопки со снимков.
+// Полумеры вроде «тише» тут не нужны — либо человеку это интересно,
+// либо он не хочет видеть даже предложения.
+

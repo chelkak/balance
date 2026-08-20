@@ -835,7 +835,7 @@ function rememberExpedition(эксп, разбор){
 // нет, всё работает на дневных: код проверяет наличие сам и молча
 // остаётся на старом варианте. Положить файлы — и они подхватятся,
 // править ничего не придётся.
-const NIGHT_ART = {pet:false, land:{}};
+const NIGHT_ART = {pet:false, land:{}, stage:{}};
 (function пробаНочи(){
   const img = new Image();
   img.onload  = () => { NIGHT_ART.pet = true;
@@ -847,6 +847,7 @@ const NIGHT_ART = {pet:false, land:{}};
   const мет = (document.currentScript && document.currentScript.src.split("?")[1]);
   const в = мет ? "?" + мет : "";
   img.src = "pet/10-night.jpg" + в;
+  NIGHT_ART.метка = в;
   // Земли проверяем по одной: часть снимков может приехать раньше других.
   for(let i = 1; i <= 9; i++){
     const l = new Image();
@@ -857,8 +858,11 @@ const NIGHT_ART = {pet:false, land:{}};
 
 // Ночью и дома — ночной кадр рыси, если он есть.
 function nightPetKey(){
-  return (nightPetReady() && typeof timeKey === "function" && timeKey() === "night")
-    ? "10-night" : null;
+  if(!nightPetReady() || typeof timeKey !== "function" || timeKey() !== "night")
+    return null;
+  const ст = stageNow();
+  const взрослая = (typeof PHOTO_FRAMES !== "undefined" ? PHOTO_FRAMES : 10);
+  return ст >= взрослая ? "10-night" : `${ст}-night`;
 }
 // Снимок земли: ночью берём ночной, если он приехал.
 function landPhotoNow(i){
@@ -866,9 +870,26 @@ function landPhotoNow(i){
   const ночь = (typeof timeKey === "function") && timeKey() === "night";
   return (ночь && NIGHT_ART.land[f]) ? `land/${f}n.webp` : `land/${f}.webp`;
 }
-// Ночной кадр рыси нарисован взрослой. Пока зверь младше — ночь у него
-// остаётся затемнением, подменять малыша взрослой рысью нельзя.
+// Ночь — режим суток, а не награда за возраст: у каждой стадии роста свой
+// ночной кадр, ровно как есть свой дневной. Подставлять малышу взрослую рысь
+// нельзя, а осветлять её фильтром — подделка вместо снимка.
+//
+// Спрашиваем только ту стадию, на которой зверь сейчас. Проверять все девять
+// сразу — девять запросов и девять ошибок в консоли при каждом открытии,
+// ради кадров, которые понадобятся через недели.
+function пробаСтадии(ст){
+  if(ст in NIGHT_ART.stage) return;
+  NIGHT_ART.stage[ст] = false;                 // спросили, ждём ответа
+  const к = new Image();
+  к.onload = () => { NIGHT_ART.stage[ст] = true;
+    if(typeof updatePhoto === "function") updatePhoto(); };
+  к.src = `pet/${ст}-night.jpg` + (NIGHT_ART.метка || "");
+}
 function nightPetReady(){
-  return NIGHT_ART.pet && typeof stageNow === "function"
-      && stageNow() >= (typeof PHOTO_FRAMES !== "undefined" ? PHOTO_FRAMES : 10);
+  if(typeof stageNow !== "function") return false;
+  const ст = stageNow();
+  const взрослая = (typeof PHOTO_FRAMES !== "undefined" ? PHOTO_FRAMES : 10);
+  if(ст >= взрослая) return NIGHT_ART.pet;
+  пробаСтадии(ст);
+  return !!NIGHT_ART.stage[ст];
 }
