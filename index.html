@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=69"></script>
-<script src="data.js?v=69"></script>
-<script src="deck.js?v=69"></script>
+<script src="photos/list.js?v=70"></script>
+<script src="data.js?v=70"></script>
+<script src="deck.js?v=70"></script>
+<script src="expedition.js?v=70"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -46,6 +47,24 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
 #ready,#quest,#card,#den-box,#season-box,#walk-box{margin-bottom:12px}
 .aim{border:2px solid transparent;transition:border-color .2s}
 .aim.sel{border-color:var(--accent)}
+/* Ночная сцена: звёзды нарисованы градиентами, ни одной новой картинки.
+   Отдельные ночные фотографии — самостоятельный художественный транш. */
+#totem-stars{position:absolute;inset:0;pointer-events:none;opacity:0;
+  transition:opacity 2.5s ease;z-index:2;
+  background-image:
+    radial-gradient(1.4px 1.4px at 18% 22%, rgba(255,255,255,.9), transparent),
+    radial-gradient(1px 1px at 62% 14%, rgba(255,255,255,.75), transparent),
+    radial-gradient(1.6px 1.6px at 81% 31%, rgba(255,255,255,.85), transparent),
+    radial-gradient(1px 1px at 34% 9%, rgba(255,255,255,.6), transparent),
+    radial-gradient(1.2px 1.2px at 71% 47%, rgba(255,255,255,.5), transparent),
+    radial-gradient(1px 1px at 12% 44%, rgba(255,255,255,.45), transparent),
+    radial-gradient(1.5px 1.5px at 47% 26%, rgba(255,255,255,.8), transparent),
+    radial-gradient(1px 1px at 90% 12%, rgba(255,255,255,.55), transparent)}
+#totem-stars.on{opacity:1;animation:twinkle 6s ease-in-out infinite}
+@keyframes twinkle{0%,100%{opacity:.85}50%{opacity:1}}
+@media (prefers-reduced-motion: reduce){#totem-stars.on{animation:none}}
+.aim-r{background:var(--card);transition:border-color .2s}
+.aim-r.sel{border-color:var(--accent)!important}
 /* Кнопка звука лежит поверх снимка земли, в правом верхнем углу. Маленькая
    и полупрозрачная: звук здесь не главное, а предложение. */
 .sound-btn{position:absolute;top:10px;right:10px;z-index:3;width:34px;height:34px;
@@ -256,6 +275,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
         <div id="walk-sign" class="dim" style="margin-top:14px;padding-top:12px;
              border-top:1px solid var(--brd);display:flex;justify-content:space-between;
              gap:10px;font-size:12px"></div>
+        <div id="walk-swap"></div>
       </div>
     </div>
     <div id="walk-answers" style="margin-top:14px"></div>
@@ -305,6 +325,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     </div>
     <div style="padding:18px">
       <div class="why" id="find-text"></div>
+      <div id="find-gear"></div>
       <button class="btn" id="find-den" style="margin-top:14px" onclick="denFromScene()"></button>
       <button class="btn ghost" style="margin-top:8px" onclick="closeFind()">Закрыть</button>
     </div>
@@ -315,6 +336,25 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
      из уже существующего — капсула, прогулка, «один раз», рост, сон,
      карта дня. Нового генератора подарков нет: если сегодня ничего
      не случилось, конверт не показывается вовсе. -->
+<!-- Вечерний разбор экспедиции: один узел на нажатие. Главный игровой
+     момент дня — видно, как сработала собранная утром полка. -->
+<div id="exp-modal" style="display:none;position:fixed;inset:0;z-index:76;background:#05070c;
+     align-items:center;justify-content:center;padding:0">
+  <div style="position:absolute;inset:0;overflow:hidden">
+    <img id="exp-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55">
+    <div style="position:absolute;inset:0;background:linear-gradient(rgba(4,6,10,.55),rgba(4,6,10,.94))"></div>
+  </div>
+  <div style="position:relative;z-index:2;width:100%;max-width:360px;padding:24px;text-align:center">
+    <div id="exp-sound"></div>
+    <div id="exp-step" class="dim" style="letter-spacing:.14em;text-transform:uppercase;font-size:10.5px"></div>
+    <div id="exp-title" style="font:600 21px var(--fu);color:#fff;margin-top:10px;line-height:1.3"></div>
+    <div id="exp-text" style="font-size:14px;color:rgba(255,255,255,.78);margin-top:10px;line-height:1.5"></div>
+    <div id="exp-help" style="font-size:13.5px;margin-top:14px;min-height:20px"></div>
+    <button class="btn" id="exp-next" style="margin-top:20px"></button>
+    <div id="exp-skip" class="dim" style="margin-top:12px;font-size:12.5px;cursor:pointer"
+         onclick="expSkipAll()">Показать итог сразу</div>
+  </div>
+</div>
 <div id="event-modal" style="display:none;position:fixed;inset:0;z-index:75;
      background:#05070c;align-items:center;justify-content:center;padding:22px">
   <div style="width:100%;max-width:360px;text-align:center">
@@ -333,6 +373,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="g" style="width:100%;max-width:360px;padding:20px">
     <div class="fname">Куда её отпустить?</div>
     <div class="dim" id="aim-fork" style="margin-top:6px"></div>
+    <div id="aim-nodes" style="margin-top:12px"></div>
+    <div id="aim-route" style="display:grid;gap:8px;margin-top:12px"></div>
     <div id="aim-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px"></div>
     <button class="btn" id="aim-go" style="margin-top:14px" onclick="goAim()"></button>
     <button class="btn ghost" style="margin-top:8px"
@@ -391,6 +433,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
           <img id="photo-b" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s ease">
         </div></div>
         <div id="totem-marks" style="position:absolute;inset:0;pointer-events:none"></div>
+        <div id="totem-stars"></div>
         <div id="totem-night" style="position:absolute;inset:0;background:rgba(8,10,18,.4);opacity:0;
           transition:opacity 2s ease;pointer-events:none"></div>
       </div>
@@ -533,7 +576,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="69 · 20.08.2026 15:37";
+const APP_VERSION="70 · 21.08.2026 00:57";
 
 let toastTimer=null;
 function toast(text){
@@ -1005,6 +1048,10 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          finds:LS.finds||[], traits:LS.traits||{}, triedOn:LS.triedOn||{},
          // характер: когда ответили и что уже вернулось
          traitAt:LS.traitAt||{}, traitBack:LS.traitBack||{},
+         // экспедиции: мастерство вещей, знание земель, текущий поход
+         itemMastery:LS.itemMastery||{}, landKnowledge:LS.landKnowledge||{},
+         expedition:LS.expedition??null, nextPlan:LS.nextPlan??null,
+         lastExpedition:LS.lastExpedition??null,
          // где и когда нашлась каждая вещь: {номер:{d:день,l:земля}}
          findAt:LS.findAt||{},
          // звук места: 1 — можно, 0 — выключен насовсем
@@ -1103,6 +1150,15 @@ function dreamToday(){
   // осталась отметка без текста — считаем заново, а не показываем пустоту.
   if(PET.dreamOn===todayKey()&&PET.dreamText) return PET.dreamText;
   if(!(PET.walks||0)) return null;              // ещё не ходила — снов нет
+  // Сон продолжает вчерашний путь, если он был: земля, встреча, отступление.
+  // Это не выдуманная красивость, а то, что вчера действительно случилось.
+  if(typeof expMemory==="function"){
+    const память=expMemory();
+    if(память&&PET.lastExpedition&&PET.lastExpedition.d!==todayKey()){
+      PET.dreamOn=todayKey(); PET.dreamText=память; savePet();
+      return память;
+    }
+  }
   const земля=(LANDS[PET.walkLand??0]||LANDS[0]).n.toLowerCase();
   const последняя=(PET.finds||[]).slice(-1)[0];
   const вещь=последняя!=null&&FINDS[последняя]?FINDS[последняя].n.toLowerCase():null;
@@ -1715,44 +1771,7 @@ function renderMe(){
 // Ни одной задачи и ни одного напоминания — это горизонт, а не список дел.
 // Человеку, у которого впереди пока ничего не назначено, важно видеть,
 // что время всё-таки к чему-то идёт.
-function renderAhead(){
-  const box=document.getElementById("ahead");
-  if(!box)return;
-  const сейчас=new Date(), день=864e5;
-  const через=d=>Math.ceil((d-сейчас)/день);
-  const строки=[];
 
-  // Солнцестояния и равноденствия — из тех же дат, что уже отмечены в сезонах
-  const вехи=[[2,20,"день сравняется с ночью"],[5,21,"самый длинный день в году"],
-              [8,22,"день сравняется с ночью, дальше темнее"],[11,21,"самая длинная ночь в году"]];
-  вехи.forEach(([м,д,что])=>{
-    let дата=new Date(сейчас.getFullYear(),м,д);
-    if(дата<сейчас) дата=new Date(сейчас.getFullYear()+1,м,д);
-    строки.push({к:через(дата),т:`${что} — ${дата.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`});
-  });
-
-  // Запечатанные письма
-  (PET.capsules||[]).filter(k=>!k.read).forEach(k=>{
-    const д=new Date(k.open);
-    if(д>сейчас) строки.push({к:через(д),
-      т:`письмо вернётся ${д.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`});
-  });
-
-  // Следующий подрост зверя, пока он не вырос полностью
-  if(growthStepsPassed()<GROWTH_STEPS){
-    const перШаг=GROWTH_STEPS/PHOTO_FRAMES;
-    const доСтадии=(Math.ceil((growthStepsPassed()+1)/перШаг)*перШаг-growthStepsPassed())*GROWTH_STEP_H;
-    строки.push({к:Math.ceil(доСтадии/24),т:"она станет заметно больше"});
-  }
-
-  строки.sort((a,b)=>a.к-b.к);
-  const ближайшие=строки.slice(0,4);
-  box.innerHTML=`<div class="lead">Что впереди</div>`+
-    (ближайшие.length
-      ? ближайшие.map(x=>`<div class="dim" style="margin-top:7px">Через ${x.к} ${
-          plural(x.к,"день","дня","дней")} — ${x.т}</div>`).join("")
-      : `<div class="dim" style="margin-top:7px">Пока ничего не назначено. Это тоже нормально.</div>`);
-}
 
 // Выключатель насовсем: вместе со звуком исчезают и кнопки со снимков.
 // Полумеры вроде «тише» тут не нужны — либо человеку это интересно,
@@ -1798,6 +1817,11 @@ const WALK_FROM_H=8;                          // до восьми утра он
 const walkHoursFor=st=>8-Math.round((st-1)*4/9);   // стадия 1 → 8 ч, стадия 10 → 4 ч
 const MIN_PER_ENERGY=6;                       // одна энергия тянет домой на шесть минут
 const walkAllowedNow=()=>new Date().getHours()>=WALK_FROM_H;
+// После десяти вечера приложение умеет закончить день, а не требовать
+// ещё одну задачу: новая долгая экспедиция не предлагается. Чек-ин
+// при этом остаётся доступным — трекер нельзя запирать из-за времени.
+const НОЧЬ_С=22;
+const нДень=()=>walkAllowedNow()&&new Date().getHours()<НОЧЬ_С;
 
 // Сколько уже натикало ей навстречу. Энергию на выходе забирают всю
 // (walkSpent), поэтому energyNow() во время прогулки — это ровно то,
@@ -1872,7 +1896,8 @@ function openLand(i){
 
 function startWalk(куда){
   if(isWalking()||energyNow()<walkCost())return;
-  if(!walkAllowedNow()){toast("Она ещё спит. С восьми утра");return;}
+  if(!нДень()){toast(new Date().getHours()>=НОЧЬ_С
+    ? "День закончен. Утром отпустишь" : "Она ещё спит. С восьми утра");return;}
   // Забираем всё накопленное, а не только цену: у Александра за прошлые дни
   // скопился банк на семь прогулок, и полоска первые дни была бы всегда полной —
   // то есть механика показала бы себя худшей стороной в первый же день.
@@ -1888,6 +1913,14 @@ function startWalk(куда){
   // уже другого дня. Обещание «сегодня рыси везёт» не выполнялось чаще,
   // чем выполнялось.
   PET.walkLuck=luckToday().k;
+  // Игровой слой поверх прогулки: снимок полки и маршрут фиксируются
+  // на выходе. Время и земля остаются за walkStart/walkBack/walkLand —
+  // второго источника правды у прогулки быть не должно.
+  if(typeof startExpedition==="function")
+    startExpedition(PET.walkLand??0,(PET.nextPlan&&PET.nextPlan.route)||"тихая");
+  // План использован — снимаем, чтобы он не висел на все следующие дни.
+  // Маршрут при этом помним: он и есть настройка «как ходим по умолчанию».
+  if(PET.nextPlan) PET.nextPlan={route:PET.nextPlan.route};
   // Куда пошла. Выбрал сам — идёт туда, но примерно в четверти случаев
   // всё равно сворачивает своей дорогой: она живая, а не курьер.
   const открытые=(PET.lands||[0]).slice().sort((a,b)=>a-b);
@@ -1967,6 +2000,9 @@ function renderWalk(){
       `<div class="dim" style="margin-top:6px">${
         осталось<45*60*1000 ? "Уже возвращается — скоро будет дома."
         : "Вернётся сама, ждать у экрана не надо. Отмечай сделанное — она придёт раньше."}</div>`+
+      ((typeof walkPath==="function"&&walkPath())
+        ? `<div class="dim" style="margin-top:8px;font-size:12.5px;line-height:1.7">${walkPath()}</div>`
+        : "")+
       (тянет>0?`<div class="dim" style="margin-top:6px">Сегодняшние отметки приблизили её на ${
         тянет>=60?`${Math.floor(тянет/60)} ч${тянет%60?` ${тянет%60} мин`:""}`:`${тянет} мин`}.</div>`:"")+
       // Приложение не может позвать бота в фоне: единственный канал —
@@ -1987,10 +2023,27 @@ function renderWalk(){
       `<div style="height:100%;width:${(доля*100).toFixed(1)}%;border-radius:6px;background:linear-gradient(90deg,#f0b429,#f6d365);transition:width .6s ease"></div>`+
     `</div>`+
     (доля>=1
-      ? (walkAllowedNow()
+      ? (нДень()
           ? `<button class="btn" style="margin-top:12px" onclick="openAim()">Отпустить бродить</button>`
-          : `<div class="dim" style="margin-top:10px">Она ещё спит. Отпустить можно с восьми утра.</div>`)
-      : `<div class="dim" style="margin-top:8px">Зажигай сферы — энергия копится сама. Спящая сфера даёт втрое больше.</div>`);
+          : `<div class="dim" style="margin-top:10px">${new Date().getHours()>=НОЧЬ_С
+              ? "День закончен. Она никуда не пойдёт до утра."
+              : "Она ещё спит. Отпустить можно с восьми утра."}</div>`)
+      : `<div class="dim" style="margin-top:8px">Зажигай сферы — энергия копится сама. Спящая сфера даёт втрое больше.</div>`)+
+    // Путь на завтра: выбрать можно когда угодно, в том числе ночью,
+    // и рысь при этом никуда не идёт. Утром останется одно нажатие.
+    планСтрока();
+}
+
+// Строка про завтрашний путь под полоской прогулки.
+function планСтрока(){
+  if(isWalking()) return "";
+  const п=PET.nextPlan;
+  const земля=(п&&п.land!=null&&typeof LANDS!=="undefined"&&LANDS[п.land])?LANDS[п.land].n:null;
+  const маршрут=(п&&п.route&&typeof ROUTES!=="undefined"&&ROUTES[п.route])?ROUTES[п.route].n:null;
+  return `<div class="dim" style="margin-top:10px;font-size:12.5px;cursor:pointer"
+     onclick="openPlan()">${земля
+       ? `На завтра выбрано: ${земля}${маршрут?` · ${маршрут.toLowerCase()}`:""} · <u>изменить</u>`
+       : `<u>Выбрать путь на завтра</u>`}</div>`;
 }
 
 // Сказать боту, когда ждать возвращения. Посылка закрывает мини-апп —
@@ -2039,6 +2092,8 @@ function openLegend(лут,пара){
 
 function openWalk(){
   if(!walkDone())return;
+  // Есть экспедиция — сначала разбор по узлам, открытка после него.
+  if(PET.expedition&&typeof expShow==="function"){ expShow(); return; }
   const лут=walkLoot();
   const пара=RESPONSES[(PET.walkPick||0)%RESPONSES.length];
   if(лут&&лут.f&&лут.f.r===2){ openLegend(лут,пара); return; }
@@ -2091,6 +2146,23 @@ function openWalk(){
     `<span>${PET.name||"Рысь"} · ${земля.n.toLowerCase()}</span>`+
     `<span>${датаСловами(todayKey())}</span>`;
   document.getElementById("walk-sound").innerHTML=PET.sound?soundBtn(PET.walkLand??0):"";
+  // Новая вещь сразу сравнивается с полкой: что изменится, если поставить
+  // её сейчас, и вместо чего. Без этого находка остаётся картинкой.
+  const срав=document.getElementById("walk-swap");
+  if(срав){
+    const cмп=(лут&&лут.f&&typeof compareToShelf==="function")
+      ? compareToShelf(лут.i,PET.walkLand??0) : null;
+    срав.innerHTML=cмп
+      ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--brd)">`+
+        `<div class="dim" style="font-size:12.5px">${cмп.t}</div>`+
+        (cмп.кого!=null&&FINDS[cмп.кого]
+          ? `<button class="btn ghost" style="margin-top:8px;font-size:13px"
+               onclick="swapIntoShelf(${лут.i},${cмп.кого});toast('Поставлено в логово')">Поставить вместо: ${FINDS[cмп.кого].n}</button>`
+          : `<button class="btn ghost" style="margin-top:8px;font-size:13px"
+               onclick="swapIntoShelf(${лут.i},null);toast('Поставлено в логово')">Поставить в логово</button>`)+
+        `</div>`
+      : "";
+  }
   // У следа своя кнопка: посмотреть ещё раз, максимум три касания.
   // Неправильного ответа нет — можно закрыть на первом, ничего не потеряно.
   const шаг=PET.traceStep||0;
@@ -2346,7 +2418,9 @@ function showPhoto(key){
 function currentPhotoKey(){
   const stage=stageNow();          // показанная, не насчитанная: см. ночной цикл
   if(stage<PHOTO_FRAMES) return String(stage);
-  return petState().k;
+  // Ночной кадр, если художник его уже прислал; иначе обычное состояние.
+  const ночь=(typeof nightPetKey==="function")?nightPetKey():null;
+  return ночь||petState().k;
 }
 // Пока рысь бродит — её на экране быть не должно. Иначе механика разваливается:
 // написано «ушла», а зверь лежит на месте. Показываем пейзаж той земли, куда
@@ -2413,6 +2487,14 @@ function updatePhoto(){
   // спящего кадра не снято.
   const night=document.getElementById("totem-night");
   if(night) night.style.opacity=(timeKey()==="night"&&stageNow()<PHOTO_FRAMES)?"1":"0";
+  // Звёзды — только когда она дома: над пейзажем чужой земли им не место,
+  // там своё небо. День закончился, мир затих.
+  // Приехал настоящий ночной снимок — рисованные звёзды гасим: на фото
+  // своё небо, и два слоя звёзд разной яркости спорят друг с другом.
+  const своёНебо=(typeof NIGHT_ART!=="undefined") && NIGHT_ART.pet;
+  const stars=document.getElementById("totem-stars");
+  if(stars) stars.classList.toggle("on",
+    timeKey()==="night" && !isWalking() && stageNow()>=PHOTO_FRAMES && !своёНебо);
   // Масштаб вешаем на сами снимки, а не на обёртку: обёртку уже занимают
   // дыхание и «прогулка», два transform на одном элементе затирают друг друга.
   const sc=withinStageScale();
@@ -2928,7 +3010,7 @@ function save(){
   // закрыт и энергии как раз хватило — грех не предложить, это одно
   // движение вместо двух. Отказ ничего не ломает: кнопка на «Тотеме»
   // никуда не делась.
-  if(!isWalking()&&energyNow()>=walkCost()&&walkAllowedNow()){ askRelease(); return; }
+  if(!isWalking()&&energyNow()>=walkCost()&&нДень()){ askRelease(); return; }
   sendDay();
 }
 
@@ -2987,107 +3069,7 @@ function startRating(){
 let period="week";
 const PERIODS={week:{n:"Неделя",days:7},month:{n:"Месяц",days:30},year:{n:"Год",days:365}};
 let picked=null;
-function renderWheel(){
-  applyTheme();
-  // Колесо живёт от оценок, а не от прожитых дней: оно должно работать
-  // с первой минуты, иначе знакомству негде происходить.
-  const need=PERIODS[period].days;
-  const slice=DAYS.slice(-need);
-  document.getElementById("period").innerHTML=hasData()?Object.keys(PERIODS)
-    .map(k=>`<div class="${k===period?"on":""}" data-p="${k}">${PERIODS[k].n}</div>`).join(""):"";
-  document.querySelectorAll("#period div").forEach(el=>el.onclick=()=>{
-    period=el.dataset.p;renderWheel();});
-  const оценено=rated().length;
-  document.getElementById("wheel-sub").textContent=
-    оценено<SPHERES.length
-      ? `Оценено ${оценено} из ${SPHERES.length}. Ткни в пустой сектор и поставь оценку`
-      : !hasData()
-        ? "Все сферы оценены. Осталось записать первый день"
-        : `Данных за ${slice.length} ${plural(slice.length,"день","дня","дней")}`
-          +(slice.length<need?` из ${need} — копим дальше`:"");
 
-  const cx=165,cy=163,R=112,n=SPHERES.length,st=2*Math.PI/n;
-  const arc=(i,r)=>{const a0=-Math.PI/2+i*st,a1=a0+st;
-    return `M${cx},${cy} L${cx+r*Math.cos(a0)},${cy+r*Math.sin(a0)} A${r},${r} 0 0 1 ${cx+r*Math.cos(a1)},${cy+r*Math.sin(a1)} Z`;};
-  const gl=getComputedStyle(document.documentElement).getPropertyValue("--brd");
-  let s="";
-  [.25,.5,.75,1].forEach(k=>s+=`<circle cx="${cx}" cy="${cy}" r="${R*k}" fill="none" stroke="${gl}"/>`);
-  SPHERES.forEach((d,i)=>s+=`<path d="${arc(i,R)}" fill="none" stroke="${gl}"/>`);
-  SPHERES.forEach((d,i)=>{const v=DATA.wheel[d.code]||0;
-    // Неоценённая сфера — тонкий контур целого сектора: видно, что её ждут
-    if(!v){ s+=`<path d="${arc(i,R)}" fill="${d.color}" fill-opacity="${picked===d.code?".18":".06"}"
-      stroke="${d.color}" stroke-width="${picked===d.code?2:.8}" stroke-dasharray="3 3"
-      data-c="${d.code}" style="cursor:pointer"/>`; return; }
-    s+=`<path d="${arc(i,R*v/10)}" fill="${d.color}" fill-opacity="${picked===d.code?".95":".6"}"
-      stroke="${d.color}" stroke-width="${picked===d.code?2:.8}" data-c="${d.code}" style="cursor:pointer"/>`;});
-  SPHERES.forEach((d,i)=>{const a=-Math.PI/2+i*st+st/2,v=DATA.wheel[d.code]||0;
-    s+=`<text x="${cx+(R+20)*Math.cos(a)}" y="${cy+(R+20)*Math.sin(a)}" font-size="9.5"
-      text-anchor="middle" dominant-baseline="middle" fill="currentColor" opacity=".65">${d.name}</text>`;
-    if(v>=3)s+=`<text x="${cx+(R*v/10-12)*Math.cos(a)}" y="${cy+(R*v/10-12)*Math.sin(a)}" font-size="10.5"
-      font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="middle">${v}</text>`;});
-  const el=document.getElementById("wheel");el.innerHTML=s;
-  el.querySelectorAll("path[data-c]").forEach(p=>p.onclick=()=>{picked=p.dataset.c;renderWheel();
-    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
-
-  const d=byCode(picked)||weakest(),v=DATA.wheel[d.code]||0,dm=dormant(d.code);
-  document.getElementById("wheel-detail").innerHTML=
-    `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div class="fname" style="margin:0">${d.ic} ${d.name}</div>
-      <div style="font:600 28px var(--fd);color:${d.color}">${v||"—"}</div></div>
-     <div class="dim" style="margin-top:7px">Что сюда входит</div>
-     <div class="parts">${d.parts.map(p=>`<span class="part">${p}</span>`).join("")}</div>
-     <div class="lead" style="margin-top:16px">Чем разжечь</div>
-     ${d.spark.map(a=>`<div class="spark"><span class="d"></span><span>${a}</span></div>`).join("")}
-     <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--brd)">
-       <div class="dim" style="flex:1">${!hasData()?"дней ещё не записано":dm===0?"сегодня уже задета":dm===1?"не трогал вчера":"не трогал "+dm+" "+plural(dm,"день","дня","дней")}</div>
-       <div class="pts">+${ptsFor(d.code)}</div></div>
-     ${v?`<div class="dim" style="margin-top:16px;padding-top:13px;border-top:1px solid var(--brd)">
-            ${(()=>{const л=litDays(d.code,WHEEL_WINDOW);
-              const сдвиг=(PET.wheelMoved||[]).find(x=>x.c===d.code);
-              return (сдвиг?`Было ${сдвиг.было}, стало ${сдвиг.стало}. `:"")+
-                `Горело ${л.горело} ${plural(л.горело,"день","дня","дней")} из ${л.из}.`;})()}<br>
-            Оценка двигается сама: от того, сколько дней эта сфера горела.
-            Колесо показывает, где ты сейчас, а не спрашивает заново.</div>`
-        :`<div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
-          <div class="dim" style="margin-top:4px">Из этой оценки растёт ${BODY[d.code]} зверя</div>
-          <div class="scale" id="wheel-scale"></div>`}
-`;
-  // Оценки ставятся здесь: без этого телу зверя нечем меняться.
-  // Шкалы нет у уже оценённой сферы — колесо спрашивает один раз,
-  // дальше двигается само от чек-инов.
-  const sc=document.getElementById("wheel-scale");
-  if(!sc)return;
-  sc.innerHTML=[1,2,3,4,5,6,7,8,9,10].map(n=>
-    `<div class="sn ${n===v?"on":""}" data-n="${n}">${n}</div>`).join("");
-  sc.querySelectorAll(".sn").forEach(el=>el.onclick=()=>{
-    const знакомство=rated().length<SPHERES.length;      // ещё не все сферы оценены
-    DATA.wheel[d.code]=+el.dataset.n;
-    lsSet("wheel",JSON.stringify(DATA.wheel));
-    cloudSave();
-    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
-
-    if(!знакомство){ renderWheel(); return; }            // правим оценку задним числом — не прыгаем
-
-    const следующая=SPHERES.find(s=>!(DATA.wheel[s.code]||0));
-    if(следующая){
-      picked=следующая.code;
-      renderWheel();
-      document.getElementById("wheel-detail").scrollIntoView({behavior:"smooth",block:"center"});
-      return;
-    }
-    // Оценены все двенадцать — зверь собран, дальше первый чек-ин
-    picked=null;
-    renderWheel();
-    document.getElementById("wheel-detail").innerHTML=
-      `<div class="lead">Знакомство пройдено</div>
-       <div class="fname">Зверь собран</div>
-       <div class="why">Все двенадцать сфер оценены. Теперь он выглядит ровно так,
-         как сейчас устроена твоя жизнь. Осталось записать сегодняшний день.</div>`;
-    document.getElementById("wheel-detail").scrollIntoView({behavior:"smooth",block:"center"});
-    if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
-    setTimeout(()=>go("checkin"),1600);
-  });
-}
 
 // ── Динамика ─────────────────────────────────────────────────────────
 function spark2(vals,color,goal,h=56){

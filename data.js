@@ -793,22 +793,10 @@ function petState(){
 
 
 // ── Логово на «Тотеме» ───
-function renderDen(){
-  const box=document.getElementById("den-box");
-  if(!box)return;
-  const вещи=(PET.den||[]).filter(i=>FINDS[i]);
-  if(!вещи.length){box.style.display="none";return;}   // пустую полку не показываем
-  box.style.display="";
-  const цвет=["rgba(255,255,255,.10)","rgba(120,190,255,.18)","rgba(246,211,101,.22)"];
-  box.innerHTML=`<div class="lead">Логово</div>`+
-    `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">`+
-    вещи.map(i=>{const f=FINDS[i];
-      return `<div onclick="openFind(${i})" style="cursor:pointer;border-radius:12px;padding:9px;
-        min-height:62px;background:${цвет[f.r]};border:1px solid rgba(255,255,255,.14)">`+
-        `<div style="font-size:12.5px;line-height:1.25">${f.n}</div>`+
-        `<div class="dim" style="font-size:10.5px;margin-top:3px">${LANDS[findPlace(i)].n}</div></div>`;
-    }).join("")+`</div>`;
-}
+// Логово переехало в expedition.js и стало активной сборкой (renderShelf).
+// Здесь остаётся только переходник, чтобы старые вызовы не сломались.
+function renderDen(){ if(typeof renderShelf==="function") renderShelf(); }
+
 
 
 // ── Дуга дня ──────────────────────────────────────────────────────────
@@ -994,10 +982,27 @@ function aimWalk(i){
   const b=document.getElementById("aim-go");
   // Без предлога: «отпустить в река» — падежей в русском шесть, а склонять
   // девять названий ради одной строки не стоит.
-  if(b) b.textContent=i===null?"Пусть решит сама":`Отпустить · ${(LANDS[i]||LANDS[0]).n}`;
+  if(b) b.textContent=aimPlanMode
+    ? (i===null?"Пусть решит сама":`Запомнить · ${(LANDS[i]||LANDS[0]).n}`)
+    : (i===null?"Пусть решит сама":`Отпустить · ${(LANDS[i]||LANDS[0]).n}`);
 }
-function openAim(){
-  if(isWalking()||energyNow()<walkCost())return;
+// Режим планирования: то же окно, но рысь никуда не уходит — выбор
+// запоминается на завтра. Вечером человек готовит путь, а не гонит зверя
+// в ночь; утром достаточно нажать «отпустить».
+let aimPlanMode=false;
+function openPlan(){
+  aimPlanMode=true;
+  openAim(true);
+}
+function openAim(планируем){
+  aimPlanMode=!!планируем;
+  if(!планируем&&(isWalking()||energyNow()<walkCost()))return;
+  // Ночью отправить нельзя, а спланировать можно: это и есть способ
+  // закончить день, а не получить ещё одну задачу.
+  if(!планируем&&typeof нДень==="function"&&!нДень()){
+    toast(new Date().getHours()>=22?"День закончен. Можно выбрать путь на завтра":"Она ещё спит. С восьми утра");
+    return;
+  }
   if(!walkAllowedNow()){toast("Она ещё спит. С восьми утра");return;}
   const открытые=(PET.lands||[0]).slice().sort((a,b)=>a-b);
   document.getElementById("aim-list").innerHTML=открытые.map(i=>{
@@ -1014,12 +1019,82 @@ function openAim(){
   const f=forkToday();
   const fb=document.getElementById("aim-fork");
   if(fb) fb.textContent=`Сегодня от развилки ${f[0]} и ${f[1]}. Она может свернуть своей дорогой — так бывает.`;
-  PET.walkAim=null; aimWalk(null);
+  // Утром подставляем то, что выбрали вечером: смысл планирования в том,
+  // чтобы утром осталось одно нажатие. Планировали — увидишь свой выбор.
+  const план=PET.nextPlan;
+  const заранее=(!планируем&&план&&план.land!=null)?план.land:null;
+  PET.walkAim=заранее; aimWalk(заранее);
+  // Выбор маршрута. Тихая тропа короче и вся видна, дальний след длиннее
+  // и последняя встреча скрыта. Без этого выбора человек не мог попасть
+  // на дальний путь вообще, а это половина игры.
+  // Узлы маршрута прямо в подготовке: видно, что встретится и чего это
+  // потребует. Один «?» — то, что останется неизвестным без утренней записи.
+  const пр=document.getElementById("aim-nodes");
+  if(пр&&typeof buildRoute==="function") aimNodes();
+  const мр=document.getElementById("aim-route");
+  if(мр&&typeof ROUTES!=="undefined"){
+    const текущий=(PET.nextPlan&&PET.nextPlan.route)||"тихая";
+    // «Хозяин места» появляется в списке, только когда собраны три следа
+    // этой земли — до тех пор его в природе нет.
+    const доступные=(typeof routesFor==="function")?routesFor(PET.walkAim??PET.walkLand??0)
+                                                   :Object.keys(ROUTES);
+    мр.innerHTML=доступные.map(k=>
+      `<div class="aim-r${k===текущий?" sel":""}" data-r="${k}" onclick="pickRoute('${k}')"
+         style="padding:9px 11px;border-radius:12px;cursor:pointer;border:2px solid transparent">
+        <div style="font:600 13.5px var(--fu)">${ROUTES[k].n}</div>
+        <div class="dim" style="font-size:11.5px;margin-top:2px">${ROUTES[k].о}</div>
+      </div>`).join("");
+  }
   document.getElementById("aim-modal").style.display="flex";
 }
 function goAim(){
   document.getElementById("aim-modal").style.display="none";
+  if(aimPlanMode){
+    planTomorrow(PET.walkAim,(PET.nextPlan&&PET.nextPlan.route)||"тихая");
+    aimPlanMode=false;
+    if(typeof renderWalk==="function") renderWalk();
+    toast("Путь на завтра запомнен");
+    return;
+  }
   startWalk(PET.walkAim);
+}
+// Маршрут запоминается в nextPlan: его читают и подготовка, и старт.
+function pickRoute(k){
+  PET.nextPlan={...(PET.nextPlan||{}),route:k};
+  savePet();
+  document.querySelectorAll("#aim-route .aim-r").forEach(el=>
+    el.classList.toggle("sel",el.dataset.r===k));
+  aimNodes();
+  if(typeof renderShelf==="function") renderShelf();
+}
+
+// Что ждёт на пути: встречи в одну строку, под каждой — чего потребует.
+// Закрытые сборкой отмечены, незакрытые названы честно.
+function aimNodes(){
+  const box=document.getElementById("aim-nodes");
+  if(!box) return;
+  const земля=PET.walkAim??PET.walkLand??0;
+  const тип=(PET.nextPlan&&PET.nextPlan.route)||"тихая";
+  const маршрут=buildRoute(земля,тип,expSeedFor(земля,тип),знаетУтро());
+  const сборка=shelfStats(PET.den||[]);
+  box.innerHTML=
+    `<div class="dim" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase">что впереди</div>`+
+    `<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">`+
+    маршрут.узлы.map(у=>{
+      if(у.скрыт) return `<div style="flex:1;min-width:78px;padding:8px;border-radius:10px;
+        background:rgba(255,255,255,.06);text-align:center">
+        <div style="font:600 15px var(--fu)">?</div>
+        <div class="dim" style="font-size:10.5px;margin-top:2px">пока не видно</div></div>`;
+      const n=NODE_BY_ID[у.id]||{};
+      const хватает=сборка.s[n.s]>=у.нужно;
+      return `<div style="flex:1;min-width:78px;padding:8px;border-radius:10px;
+        background:rgba(255,255,255,.06);text-align:center;
+        border:1px solid ${хватает?"rgba(140,210,160,.45)":"transparent"}">
+        <div style="font-size:11.5px;line-height:1.25">${n.t||""}</div>
+        <div class="dim" style="font-size:10.5px;margin-top:3px">${
+          STATS[n.s].n} ${у.нужно}${хватает?" ✓":""}</div></div>`;
+    }).join("")+`</div>`+
+    (знаетУтро()?"":`<div class="dim" style="margin-top:8px;font-size:11.5px">Отметишь утренние цифры — один узел станет видно.</div>`);
 }
 
 
@@ -1038,6 +1113,25 @@ function openFind(i){
   document.getElementById("find-where").textContent=
     (LANDS[где]||LANDS[0]).n+(когда?" · "+датаСловами(когда):"");
   document.getElementById("find-text").textContent=f.x;
+  // Зачем эта вещь. Одно действие крупно, без таблиц процентов:
+  // человек должен за пару секунд понять, что она делает и где полезна.
+  const снаряга=document.getElementById("find-gear");
+  if(снаряга){
+    const пр=(typeof gearProfile==="function")?gearProfile(i):null;
+    const мастерство=(typeof masteryOf==="function")?masteryOf(i):0;
+    снаряга.innerHTML=пр
+      ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--brd)">`+
+        `<div style="font:600 15px var(--fu)">${STATS[пр.stat].n} +${пр.сила}</div>`+
+        (пр.эффект?`<div class="dim" style="margin-top:5px">${пр.эффект}</div>`:"")+
+        (пр.правило?`<div class="dim" style="margin-top:5px"><b>${пр.правило}</b></div>`:"")+
+        `<div class="dim" style="margin-top:5px;font-size:12px">Лучше всего: ${
+          (LANDS[пр.земля]||LANDS[0]).n.toLowerCase()}</div>`+
+        (мастерство?`<div class="dim" style="margin-top:5px;font-size:12px">${
+          мастерство>=3?"Проверенная вещь — работает надёжнее":
+          `Сработала ${мастерство} ${plural(мастерство,"раз","раза","раз")} из трёх до проверенной`}</div>`:"")+
+        `</div>`
+      : "";
+  }
   document.getElementById("find-sound").innerHTML=PET.sound?soundBtn(где):"";
   denButton();
   document.getElementById("find-modal").style.display="flex";
@@ -1161,4 +1255,149 @@ function renderTrend(){
         plural(все.length,"дню","дням","дням")} с данными</div></div>`;}).join("")
     ||`<div class="dim">Графики появятся, когда наберётся два дня.</div>`;
 
+}
+
+
+// ── Что впереди ───
+function renderAhead(){
+  const box=document.getElementById("ahead");
+  if(!box)return;
+  const сейчас=new Date(), день=864e5;
+  const через=d=>Math.ceil((d-сейчас)/день);
+  const строки=[];
+
+  // Солнцестояния и равноденствия — из тех же дат, что уже отмечены в сезонах
+  const вехи=[[2,20,"день сравняется с ночью"],[5,21,"самый длинный день в году"],
+              [8,22,"день сравняется с ночью, дальше темнее"],[11,21,"самая длинная ночь в году"]];
+  вехи.forEach(([м,д,что])=>{
+    let дата=new Date(сейчас.getFullYear(),м,д);
+    if(дата<сейчас) дата=new Date(сейчас.getFullYear()+1,м,д);
+    строки.push({к:через(дата),т:`${что} — ${дата.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`});
+  });
+
+  // Запечатанные письма
+  (PET.capsules||[]).filter(k=>!k.read).forEach(k=>{
+    const д=new Date(k.open);
+    if(д>сейчас) строки.push({к:через(д),
+      т:`письмо вернётся ${д.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`});
+  });
+
+  // Следующий подрост зверя, пока он не вырос полностью
+  if(growthStepsPassed()<GROWTH_STEPS){
+    const перШаг=GROWTH_STEPS/PHOTO_FRAMES;
+    const доСтадии=(Math.ceil((growthStepsPassed()+1)/перШаг)*перШаг-growthStepsPassed())*GROWTH_STEP_H;
+    строки.push({к:Math.ceil(доСтадии/24),т:"она станет заметно больше"});
+  }
+
+  строки.sort((a,b)=>a.к-b.к);
+  const ближайшие=строки.slice(0,4);
+  box.innerHTML=`<div class="lead">Что впереди</div>`+
+    (ближайшие.length
+      ? ближайшие.map(x=>`<div class="dim" style="margin-top:7px">Через ${x.к} ${
+          plural(x.к,"день","дня","дней")} — ${x.т}</div>`).join("")
+      : `<div class="dim" style="margin-top:7px">Пока ничего не назначено. Это тоже нормально.</div>`);
+}
+
+
+// ── Экран «Колесо» ───
+function renderWheel(){
+  applyTheme();
+  // Колесо живёт от оценок, а не от прожитых дней: оно должно работать
+  // с первой минуты, иначе знакомству негде происходить.
+  const need=PERIODS[period].days;
+  const slice=DAYS.slice(-need);
+  document.getElementById("period").innerHTML=hasData()?Object.keys(PERIODS)
+    .map(k=>`<div class="${k===period?"on":""}" data-p="${k}">${PERIODS[k].n}</div>`).join(""):"";
+  document.querySelectorAll("#period div").forEach(el=>el.onclick=()=>{
+    period=el.dataset.p;renderWheel();});
+  const оценено=rated().length;
+  document.getElementById("wheel-sub").textContent=
+    оценено<SPHERES.length
+      ? `Оценено ${оценено} из ${SPHERES.length}. Ткни в пустой сектор и поставь оценку`
+      : !hasData()
+        ? "Все сферы оценены. Осталось записать первый день"
+        : `Данных за ${slice.length} ${plural(slice.length,"день","дня","дней")}`
+          +(slice.length<need?` из ${need} — копим дальше`:"");
+
+  const cx=165,cy=163,R=112,n=SPHERES.length,st=2*Math.PI/n;
+  const arc=(i,r)=>{const a0=-Math.PI/2+i*st,a1=a0+st;
+    return `M${cx},${cy} L${cx+r*Math.cos(a0)},${cy+r*Math.sin(a0)} A${r},${r} 0 0 1 ${cx+r*Math.cos(a1)},${cy+r*Math.sin(a1)} Z`;};
+  const gl=getComputedStyle(document.documentElement).getPropertyValue("--brd");
+  let s="";
+  [.25,.5,.75,1].forEach(k=>s+=`<circle cx="${cx}" cy="${cy}" r="${R*k}" fill="none" stroke="${gl}"/>`);
+  SPHERES.forEach((d,i)=>s+=`<path d="${arc(i,R)}" fill="none" stroke="${gl}"/>`);
+  SPHERES.forEach((d,i)=>{const v=DATA.wheel[d.code]||0;
+    // Неоценённая сфера — тонкий контур целого сектора: видно, что её ждут
+    if(!v){ s+=`<path d="${arc(i,R)}" fill="${d.color}" fill-opacity="${picked===d.code?".18":".06"}"
+      stroke="${d.color}" stroke-width="${picked===d.code?2:.8}" stroke-dasharray="3 3"
+      data-c="${d.code}" style="cursor:pointer"/>`; return; }
+    s+=`<path d="${arc(i,R*v/10)}" fill="${d.color}" fill-opacity="${picked===d.code?".95":".6"}"
+      stroke="${d.color}" stroke-width="${picked===d.code?2:.8}" data-c="${d.code}" style="cursor:pointer"/>`;});
+  SPHERES.forEach((d,i)=>{const a=-Math.PI/2+i*st+st/2,v=DATA.wheel[d.code]||0;
+    s+=`<text x="${cx+(R+20)*Math.cos(a)}" y="${cy+(R+20)*Math.sin(a)}" font-size="9.5"
+      text-anchor="middle" dominant-baseline="middle" fill="currentColor" opacity=".65">${d.name}</text>`;
+    if(v>=3)s+=`<text x="${cx+(R*v/10-12)*Math.cos(a)}" y="${cy+(R*v/10-12)*Math.sin(a)}" font-size="10.5"
+      font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="middle">${v}</text>`;});
+  const el=document.getElementById("wheel");el.innerHTML=s;
+  el.querySelectorAll("path[data-c]").forEach(p=>p.onclick=()=>{picked=p.dataset.c;renderWheel();
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
+
+  const d=byCode(picked)||weakest(),v=DATA.wheel[d.code]||0,dm=dormant(d.code);
+  document.getElementById("wheel-detail").innerHTML=
+    `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="fname" style="margin:0">${d.ic} ${d.name}</div>
+      <div style="font:600 28px var(--fd);color:${d.color}">${v||"—"}</div></div>
+     <div class="dim" style="margin-top:7px">Что сюда входит</div>
+     <div class="parts">${d.parts.map(p=>`<span class="part">${p}</span>`).join("")}</div>
+     <div class="lead" style="margin-top:16px">Чем разжечь</div>
+     ${d.spark.map(a=>`<div class="spark"><span class="d"></span><span>${a}</span></div>`).join("")}
+     <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--brd)">
+       <div class="dim" style="flex:1">${!hasData()?"дней ещё не записано":dm===0?"сегодня уже задета":dm===1?"не трогал вчера":"не трогал "+dm+" "+plural(dm,"день","дня","дней")}</div>
+       <div class="pts">+${ptsFor(d.code)}</div></div>
+     ${v?`<div class="dim" style="margin-top:16px;padding-top:13px;border-top:1px solid var(--brd)">
+            ${(()=>{const л=litDays(d.code,WHEEL_WINDOW);
+              const сдвиг=(PET.wheelMoved||[]).find(x=>x.c===d.code);
+              return (сдвиг?`Было ${сдвиг.было}, стало ${сдвиг.стало}. `:"")+
+                `Горело ${л.горело} ${plural(л.горело,"день","дня","дней")} из ${л.из}.`;})()}<br>
+            Оценка двигается сама: от того, сколько дней эта сфера горела.
+            Колесо показывает, где ты сейчас, а не спрашивает заново.</div>`
+        :`<div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
+          <div class="dim" style="margin-top:4px">Из этой оценки растёт ${BODY[d.code]} зверя</div>
+          <div class="scale" id="wheel-scale"></div>`}
+`;
+  // Оценки ставятся здесь: без этого телу зверя нечем меняться.
+  // Шкалы нет у уже оценённой сферы — колесо спрашивает один раз,
+  // дальше двигается само от чек-инов.
+  const sc=document.getElementById("wheel-scale");
+  if(!sc)return;
+  sc.innerHTML=[1,2,3,4,5,6,7,8,9,10].map(n=>
+    `<div class="sn ${n===v?"on":""}" data-n="${n}">${n}</div>`).join("");
+  sc.querySelectorAll(".sn").forEach(el=>el.onclick=()=>{
+    const знакомство=rated().length<SPHERES.length;      // ещё не все сферы оценены
+    DATA.wheel[d.code]=+el.dataset.n;
+    lsSet("wheel",JSON.stringify(DATA.wheel));
+    cloudSave();
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+
+    if(!знакомство){ renderWheel(); return; }            // правим оценку задним числом — не прыгаем
+
+    const следующая=SPHERES.find(s=>!(DATA.wheel[s.code]||0));
+    if(следующая){
+      picked=следующая.code;
+      renderWheel();
+      document.getElementById("wheel-detail").scrollIntoView({behavior:"smooth",block:"center"});
+      return;
+    }
+    // Оценены все двенадцать — зверь собран, дальше первый чек-ин
+    picked=null;
+    renderWheel();
+    document.getElementById("wheel-detail").innerHTML=
+      `<div class="lead">Знакомство пройдено</div>
+       <div class="fname">Зверь собран</div>
+       <div class="why">Все двенадцать сфер оценены. Теперь он выглядит ровно так,
+         как сейчас устроена твоя жизнь. Осталось записать сегодняшний день.</div>`;
+    document.getElementById("wheel-detail").scrollIntoView({behavior:"smooth",block:"center"});
+    if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+    setTimeout(()=>go("checkin"),1600);
+  });
 }
