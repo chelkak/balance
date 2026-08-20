@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=60"></script>
-<script src="data.js?v=60"></script>
-<script src="deck.js?v=60"></script>
+<script src="photos/list.js?v=61"></script>
+<script src="data.js?v=61"></script>
+<script src="deck.js?v=61"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -44,6 +44,8 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
 .btn.saved{background:#7fc0a4;color:#0f1714}
 /* Карточки подряд без отступа читались как один слипшийся блок */
 #ready,#quest,#card,#den-box,#season-box,#walk-box{margin-bottom:12px}
+.aim{border:2px solid transparent;transition:border-color .2s}
+.aim.sel{border-color:var(--accent)}
 /* Кнопка звука лежит поверх снимка земли, в правом верхнем углу. Маленькая
    и полупрозрачная: звук здесь не главное, а предложение. */
 .sound-btn{position:absolute;top:10px;right:10px;z-index:3;width:34px;height:34px;
@@ -308,6 +310,18 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     </div>
   </div>
 </div>
+<div id="aim-modal" style="display:none;position:fixed;inset:0;z-index:62;background:rgba(6,8,14,.82);
+     align-items:center;justify-content:center;padding:18px;overflow:auto"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div class="g" style="width:100%;max-width:360px;padding:20px">
+    <div class="fname">Куда её отпустить?</div>
+    <div class="dim" style="margin-top:6px">Она может свернуть своей дорогой — так бывает.</div>
+    <div id="aim-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px"></div>
+    <button class="btn" id="aim-go" style="margin-top:14px" onclick="goAim()"></button>
+    <button class="btn ghost" style="margin-top:8px"
+      onclick="document.getElementById('aim-modal').style.display='none'">Не сейчас</button>
+  </div>
+</div>
 <div id="release-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(6,8,14,.72);
      align-items:center;justify-content:center;padding:18px">
   <div class="g" style="max-width:360px;padding:22px">
@@ -390,6 +404,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <h2>Оформление</h2>
   <div class="themes" id="themes"></div>
   <div class="g" id="me-info"></div>
+  <h2>Что впереди</h2>
+  <div class="g" id="ahead"></div>
   <h2>Звук мест</h2>
   <div class="g">
     <div class="dim">У каждой земли свой звук — ветер, вода, глухая тишина. Он не включается сам никогда: только когда нажмёшь ▶ на снимке. Здесь можно убрать и саму кнопку.</div>
@@ -498,7 +514,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="60 · 20.08.2026 00:55";
+const APP_VERSION="61 · 20.08.2026 07:59";
 
 let toastTimer=null;
 function toast(text){
@@ -557,23 +573,6 @@ const lsDel=k=>localStorage.removeItem(NS+k);
 })();
 if(tg&&inTelegram){tg.ready();tg.expand();}
 
-const THEMES={
- air:{n:"Воздух",light:1,ink:"#17231d",ink2:"rgba(23,35,29,.58)",card:"rgba(255,255,255,.6)",
-   brd:"rgba(23,35,29,.11)",accent:"#4e8a6b",aink:"#fff",nav:"rgba(238,245,240,.8)",
-   page:"linear-gradient(168deg,#eef5f0 0%,#dfece4 52%,#cde1d5 100%)"},
- sand:{n:"Песок",light:1,ink:"#2b2118",ink2:"rgba(43,33,24,.56)",card:"rgba(255,252,247,.62)",
-   brd:"rgba(43,33,24,.12)",accent:"#a8703e",aink:"#fff",nav:"rgba(247,240,231,.82)",
-   page:"linear-gradient(168deg,#f8f2e9 0%,#efe1cf 54%,#e3cfb5 100%)"},
- bw:{n:"ЧБ",light:0,ink:"#f4f5f6",ink2:"rgba(244,245,246,.6)",card:"rgba(255,255,255,.09)",
-   brd:"rgba(255,255,255,.16)",accent:"#e8eaec",aink:"#14161a",nav:"rgba(12,14,17,.7)",
-   photo:1,gray:1,
-   page:"radial-gradient(120% 90% at 50% 0%,#26292e 0%,#191b1f 50%,#0f1113 100%)"},
- night:{n:"Ночь",light:0,ink:"#e9eef0",ink2:"rgba(233,238,240,.55)",card:"rgba(255,255,255,.07)",
-   brd:"rgba(255,255,255,.13)",accent:"#7fc0a4",aink:"#0f1714",nav:"rgba(14,18,22,.76)",
-   page:"radial-gradient(120% 90% at 50% 0%,#1d262b 0%,#141a1f 48%,#0d1114 100%)"},
- photo:{n:"Фото",light:0,ink:"#f2f5f7",ink2:"rgba(242,245,247,.62)",card:"rgba(255,255,255,.1)",
-   brd:"rgba(255,255,255,.16)",accent:"#8fd3b6",aink:"#0f1714",nav:"rgba(10,14,18,.66)",page:null}
-};
 const PH=window.PHOTOS||{};
 const hasPhotos=Object.values(PH).some(a=>a&&a.length);
 const usesPhoto=k=>!!THEMES[k]&&(k==="photo"||THEMES[k].photo);
@@ -935,6 +934,9 @@ let PET={fed:LS.fed??100, fedOn:LS.fedOn||"", puzzleOn:LS.puzzleOn||"", bonus:LS
          walkStart:LS.walkStart||0, walkRoll:LS.walkRoll??null, walkPick:LS.walkPick??null,
          walkSpent:LS.walkSpent||0, walks:LS.walks||0, walkLand:LS.walkLand||0,
          walkTold:LS.walkTold||0, walkBack:LS.walkBack||0, walkNight:LS.walkNight||0,
+         walkLuck:LS.walkLuck??null, walkAim:LS.walkAim??null,
+         // сны: что снилось и когда показали, чтобы не повторять
+         dreamOn:LS.dreamOn||"", dreamSeen:LS.dreamSeen||[], dreamText:LS.dreamText||"",
          // ночной цикл: какую стадию человек уже видел и когда её показали
          stageSeen:LS.stageSeen||0, stageSeenOn:LS.stageSeenOn||"",
          // находки и характер
@@ -998,9 +1000,6 @@ const weakest=()=>{
 // шансы, «везёт» — надбавка. Иначе получилось бы наказание за случайность.
 // И она не влияет ни на прогулку, ни на камни, ни на возможность что-то
 // сделать: решает только, что рысь принесёт, если уже вернулась.
-const LUCK=[{k:0,t:"день обычный",  x:"Что найдётся, то найдётся."},
-            {k:1,t:"рыси везёт",    x:"Она сегодня внимательнее обычного."},
-            {k:2,t:"рыси очень везёт",x:"Такие дни бывают редко."}];
 // Считается от личного ключа и даты: выкрутить нельзя, но и не случайно
 // заново при каждой перерисовке. У каждого своя погода удачи.
 // Вынесено параметром, чтобы распределение можно было проверить по году,
@@ -1021,6 +1020,34 @@ function luckFor(ключ){
   return LUCK[r<0.12?2:r<0.38?1:0];
 }
 const luckToday=()=>luckFor(todayKey());
+
+// ── Сны ──────────────────────────────────────────────────────────────
+// Утренний заход до сих пор не приносил ничего: внёс пульс и вес — и всё.
+// Теперь одна строка под рысью про то, что ей снилось. Привязано к тому,
+// где она вчера была и что принесла, поэтому сон каждый раз про вашу
+// собственную вчерашнюю жизнь, а не случайная красивость.
+//
+// Показывается один раз за день и только до полудня: сон — утреннее дело.
+// Тексты живут в data.js (DREAMS), сюда не тащим.
+const DREAM_UNTIL=12;
+function dreamToday(){
+  if(new Date().getHours()>=DREAM_UNTIL) return null;
+  if(PET.dreamOn===todayKey()) return PET.dreamText||null;
+  if(!(PET.walks||0)) return null;              // ещё не ходила — снов нет
+  const земля=(LANDS[PET.walkLand??0]||LANDS[0]).n.toLowerCase();
+  const последняя=(PET.finds||[]).slice(-1)[0];
+  const вещь=последняя!=null&&FINDS[последняя]?FINDS[последняя].n.toLowerCase():null;
+  const пул=(window.DREAMS||[]).filter((_,i)=>!(PET.dreamSeen||[]).includes(i));
+  const все=window.DREAMS||[];
+  if(!все.length) return null;
+  const из=пул.length?пул:все;
+  const idx=все.indexOf(из[Math.floor(Math.random()*из.length)]);
+  const текст=все[idx].replace("{земля}",земля).replace("{вещь}",вещь||"что-то тёплое");
+  PET.dreamOn=todayKey(); PET.dreamText=текст;
+  PET.dreamSeen=[...new Set([...(PET.dreamSeen||[]),idx])].slice(-20);
+  savePet();
+  return текст;
+}
 
 // ── Серый день ───────────────────────────────────────────────────────
 // Взято у Way of Life: у дня три состояния, а не два. Да, нет и «этот день
@@ -1331,8 +1358,13 @@ function resetAll(){
     return;
   }
   ["log","pet","wheel","goals","theme","demo"].forEach(k=>lsDel(k));
-  if(CLOUD){["log_n","wheel","goals","pet"].forEach(k=>CLOUD.removeItem(k,()=>{}));
-    for(let i=0;i<40;i++)CLOUD.removeItem("log_"+i,()=>{});}
+  // Зверь с 59-й версии лежит в облаке кусками — их тоже надо стереть.
+  // Без этого «Начать заново» стирало дни, а зверь возвращался при первом
+  // же перезаходе: cloudLoad собирал его из pet_0..N, а возраст брался
+  // через Math.min и откатывался к старому. Кнопка, сделанная специально
+  // на случай перепутанных данных, молча не работала.
+  if(CLOUD){["log_n","wheel","goals","pet","pet_n"].forEach(k=>CLOUD.removeItem(k,()=>{}));
+    for(let i=0;i<40;i++){CLOUD.removeItem("log_"+i,()=>{});CLOUD.removeItem("pet_"+i,()=>{});}}
   нота.textContent="Готово. Перезапускаю…";
   setTimeout(()=>location.reload(),900);
 }
@@ -1685,8 +1717,53 @@ function renderMe(){
     `<div class="dim">Земель открыто: ${земель} из ${LANDS.length} · камней: ${PET.stones||0}</div>`+
     `<div class="dim">Запечатано писем: ${(PET.capsules||[]).length}</div>`+
     `<div class="dim" style="margin-top:10px">Версия ${APP_VERSION}</div>`;
+  renderAhead();
   const sw=document.getElementById("sound-switch");
   if(sw) sw.textContent=PET.sound?"Звук мест включён — выключить":"Звук мест выключен — включить";
+}
+
+// Что впереди. Только то, что придёт само: даты солнцестояний, начало
+// сезона, возвращение запечатанных писем, следующий подрост зверя.
+// Ни одной задачи и ни одного напоминания — это горизонт, а не список дел.
+// Человеку, у которого впереди пока ничего не назначено, важно видеть,
+// что время всё-таки к чему-то идёт.
+function renderAhead(){
+  const box=document.getElementById("ahead");
+  if(!box)return;
+  const сейчас=new Date(), день=864e5;
+  const через=d=>Math.ceil((d-сейчас)/день);
+  const строки=[];
+
+  // Солнцестояния и равноденствия — из тех же дат, что уже отмечены в сезонах
+  const вехи=[[2,20,"день сравняется с ночью"],[5,21,"самый длинный день в году"],
+              [8,22,"день сравняется с ночью, дальше темнее"],[11,21,"самая длинная ночь в году"]];
+  вехи.forEach(([м,д,что])=>{
+    let дата=new Date(сейчас.getFullYear(),м,д);
+    if(дата<сейчас) дата=new Date(сейчас.getFullYear()+1,м,д);
+    строки.push({к:через(дата),т:`${что} — ${дата.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`});
+  });
+
+  // Запечатанные письма
+  (PET.capsules||[]).filter(k=>!k.read).forEach(k=>{
+    const д=new Date(k.open);
+    if(д>сейчас) строки.push({к:через(д),
+      т:`письмо вернётся ${д.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`});
+  });
+
+  // Следующий подрост зверя, пока он не вырос полностью
+  if(growthStepsPassed()<GROWTH_STEPS){
+    const перШаг=GROWTH_STEPS/PHOTO_FRAMES;
+    const доСтадии=(Math.ceil((growthStepsPassed()+1)/перШаг)*перШаг-growthStepsPassed())*GROWTH_STEP_H;
+    строки.push({к:Math.ceil(доСтадии/24),т:"она станет заметно больше"});
+  }
+
+  строки.sort((a,b)=>a.к-b.к);
+  const ближайшие=строки.slice(0,4);
+  box.innerHTML=`<div class="lead">Что впереди</div>`+
+    (ближайшие.length
+      ? ближайшие.map(x=>`<div class="dim" style="margin-top:7px">Через ${x.к} ${
+          plural(x.к,"день","дня","дней")} — ${x.т}</div>`).join("")
+      : `<div class="dim" style="margin-top:7px">Пока ничего не назначено. Это тоже нормально.</div>`);
 }
 
 // Выключатель насовсем: вместе со звуком исчезают и кнопки со снимков.
@@ -1797,27 +1874,6 @@ const energyNow=()=>Math.max(0,earned()+(PET.cardEnergy||0)-(PET.walkSpent||0));
 const isWalking=()=>!!PET.walkStart;
 const walkDone=()=>isWalking()&&Date.now()>=walkBackTime();
 
-const TRAITS={смелость:"смелая",нежность:"ласковая",любопытство:"любопытная",спокойствие:"спокойная"};
-const RESPONSES=[
-  [{t:"Обнять её",k:"нежность"},{t:"Расспросить, как всё было",k:"любопытство"}],
-  [{t:"Сказать, что гордишься",k:"нежность"},{t:"Спросить, не было ли страшно",k:"спокойствие"}],
-  [{t:"Позвать дальше в следующий раз",k:"смелость"},{t:"Сказать, что можно и отдохнуть",k:"спокойствие"}],
-  [{t:"Рассмотреть всё вместе",k:"любопытство"},{t:"Просто посидеть рядом",k:"спокойствие"}],
-  [{t:"Похвалить за смелость",k:"смелость"},{t:"Погладить и ничего не говорить",k:"нежность"}]
-];
-
-// ── Звук места ───────────────────────────────────────────────────────
-// Ни одного файла: звук считается на месте из шума и фильтров. Скачивать
-// чужие записи леса и реки — это и лишний вес, и чужие права; а разница
-// между землями всё равно не в записи, а в характере — как быстро ходит
-// ветер и насколько глухо. Девять профилей, по одному на землю.
-//
-// Два правила, и они важнее звучания: играет только по нажатию (само
-// никогда), и выключить можно навсегда — в кабинете. Звук в приложении,
-// которое открывают в транспорте, без выключателя — это грубость.
-// Звук места (SOUNDS, soundPlay, soundToggle, soundBtn) живёт в data.js
-document.addEventListener("visibilitychange",()=>{ if(document.hidden) soundStop(); });
-
 // ── Земли ────────────────────────────────────────────────────────────
 // Раньше все находки лежали в одном мешке: рысь ходила «куда-то», и через
 // месяц собирать было нечего. Теперь у каждой земли свой набор и своя
@@ -1826,17 +1882,6 @@ document.addEventListener("visibilitychange",()=>{ if(document.hidden) soundStop
 // f — номер снимка в webapp/land. Порядок земель повествовательный (от
 // ближнего леса к перевалу), номера файлов идут своим чередом — поэтому
 // связь задана явно, а не индексом массива.
-const LANDS=[
-  {n:"Ближний лес",  f:1, c:0,   o:"Мох, шишки, следы у самой опушки."},
-  {n:"Река",         f:2, c:60,  o:"Галька, обкатанное стекло, чужие потери на дне."},
-  {n:"Старая просека",f:3,c:140, o:"Здесь когда-то жили люди. Осталось немногое."},
-  {n:"Болото",       f:4, c:240, o:"Туман до полудня. Она возвращается мокрая."},
-  {n:"Каменистая гряда",f:5,c:360,o:"Ветер и кварц. Наверху видно далеко."},
-  {n:"Ночной лес",   f:7, c:500, o:"Она уходит туда только затемно."},
-  {n:"Поле на рассвете",f:9,c:660,o:"Пусто и светло. Находок мало, но они странные."},
-  {n:"Первый снег",  f:8, c:840, o:"След виден целиком, от начала до конца."},
-  {n:"Перевал",      f:6, c:1040,o:"Дальше она пока не ходила."}
-];
 const landPhoto=i=>`land/${(LANDS[i]||LANDS[0]).f}.webp`;
 // Земля находки вычисляется из её места внутри своей редкости — так каждой
 // земле достаётся и обычное, и редкое, и своя легендарная. Файл колоды
@@ -1890,7 +1935,46 @@ function renderLands(){
   }).join("");
 }
 
-function startWalk(){
+// ── Куда пойдём ──────────────────────────────────────────────────────
+// Единственное решение за день, которое ничего не стоит и ни за что
+// не наказывает. Девять снимков земель до сих пор были ценником в списке;
+// теперь это выбор, куда её отпустить.
+//
+// «Пусть решит сама» — не отговорка, а полноправный вариант. И примерно
+// в четверти случаев она уходит своей дорогой даже когда ты выбрал:
+// иначе выбор превратился бы в оптимизацию, где есть выгодные земли.
+const SVOYA_DOROGA=0.25;
+function aimWalk(i){
+  PET.walkAim=i;
+  document.querySelectorAll("#aim-list .aim").forEach(el=>
+    el.classList.toggle("sel",+el.dataset.i===i));
+  const b=document.getElementById("aim-go");
+  // Без предлога: «отпустить в река» — падежей в русском шесть, а склонять
+  // девять названий ради одной строки не стоит.
+  if(b) b.textContent=i===null?"Пусть решит сама":`Отпустить · ${(LANDS[i]||LANDS[0]).n}`;
+}
+function openAim(){
+  if(isWalking()||energyNow()<walkCost())return;
+  if(!walkAllowedNow()){toast("Она ещё спит. С восьми утра");return;}
+  const открытые=(PET.lands||[0]).slice().sort((a,b)=>a-b);
+  document.getElementById("aim-list").innerHTML=открытые.map(i=>{
+    const l=LANDS[i]||LANDS[0];
+    return `<div class="aim" data-i="${i}" onclick="aimWalk(${i})"
+       style="position:relative;height:78px;border-radius:12px;overflow:hidden;cursor:pointer">
+      <img src="${landPhoto(i)}" loading="lazy" style="position:absolute;inset:0;width:100%;
+        height:100%;object-fit:cover">
+      <div style="position:absolute;inset:0;background:linear-gradient(transparent 35%,rgba(6,8,14,.85))"></div>
+      <div style="position:absolute;left:11px;bottom:8px;font:600 13.5px var(--fu);color:#fff">${l.n}</div>
+    </div>`;}).join("");
+  PET.walkAim=null; aimWalk(null);
+  document.getElementById("aim-modal").style.display="flex";
+}
+function goAim(){
+  document.getElementById("aim-modal").style.display="none";
+  startWalk(PET.walkAim);
+}
+
+function startWalk(куда){
   if(isWalking()||energyNow()<walkCost())return;
   if(!walkAllowedNow()){toast("Она ещё спит. С восьми утра");return;}
   // Забираем всё накопленное, а не только цену: у Александра за прошлые дни
@@ -1903,12 +1987,22 @@ function startWalk(){
   PET.walkTold=0;
   PET.walkRoll=Math.random();          // что она принесёт — решается на выходе
   PET.walkPick=Math.floor(Math.random()*1e9);
-  // Куда пошла — из открытых земель. Чем дальше земля, тем реже она туда ходит.
+  // Удачу тоже запоминаем здесь. Прогулка длится до восьми часов и легко
+  // переваливает за полночь — а считалась удача в момент встречи, то есть
+  // уже другого дня. Обещание «сегодня рыси везёт» не выполнялось чаще,
+  // чем выполнялось.
+  PET.walkLuck=luckToday().k;
+  // Куда пошла. Выбрал сам — идёт туда, но примерно в четверти случаев
+  // всё равно сворачивает своей дорогой: она живая, а не курьер.
   const открытые=(PET.lands||[0]).slice().sort((a,b)=>a-b);
-  PET.walkLand=открытые[Math.floor(Math.random()*открытые.length)];
+  const сама=открытые[Math.floor(Math.random()*открытые.length)];
+  const послушалась=куда!=null&&куда!==undefined&&Math.random()>SVOYA_DOROGA;
+  PET.walkLand=послушалась?куда:сама;
+  PET.walkAim=куда??null;
   savePet();renderWalk();renderTotem();
   if(!PET.walks)летопись("Она впервые ушла бродить одна.");
-  toast("Ушла бродить");
+  toast(PET.walkAim!=null&&PET.walkLand!==PET.walkAim
+    ? "Ушла своей дорогой" : "Ушла бродить");
 }
 
 // Что нашлось. Находка выпадает НЕ всегда — иногда рысь просто гуляла.
@@ -1932,7 +2026,7 @@ function walkLoot(){
   // Удача дня сдвигает пороги вверх и только вверх: в обычный день шансы
   // ровно те же, что были всегда, в удачный — выше. Хуже не становится
   // никогда, иначе это было бы наказание за случайность.
-  const бонус=luckToday().k*0.06;
+  const бонус=(PET.walkLuck??luckToday().k)*0.06;
   const rare=(p%100)/100;
   const редкость=rare<0.05+бонус?2:rare<0.30+бонус*2?1:0;
   const земля=PET.walkLand??0;
@@ -1986,7 +2080,7 @@ function renderWalk(){
     `</div>`+
     (доля>=1
       ? (walkAllowedNow()
-          ? `<button class="btn" style="margin-top:12px" onclick="startWalk()">Отпустить бродить</button>`
+          ? `<button class="btn" style="margin-top:12px" onclick="openAim()">Отпустить бродить</button>`
           : `<div class="dim" style="margin-top:10px">Она ещё спит. Отпустить можно с восьми утра.</div>`)
       : `<div class="dim" style="margin-top:8px">Зажигай сферы — энергия копится сама. Спящая сфера даёт втрое больше.</div>`);
 }
@@ -2471,6 +2565,12 @@ function renderTotem(){
          : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`}`;
 
   {
+    const сон=dreamToday();
+    if(сон) document.getElementById("totem-state").innerHTML+=
+      `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
+      `<b>Ей снилось.</b> ${сон}</div>`;
+  }
+  {
     // Удача дня — рядом с прогулкой, а не в отдельном блоке: она про то,
     // что рысь принесёт, и читаться должна вместе с ней.
     const л=luckToday();
@@ -2539,54 +2639,6 @@ function pokeTotem(){
 // превращается в жвачку, а завершённость видно. Сложность подрастает вместе
 // со зверем: на десятой стадии ряды с двумя правилами и умножение в столбик.
 const PUZZLES_PER_DAY=3;
-const KINDS=["ряд","удвоение","фибоначчи","лишнее","сумма","зеркало",
-             "умножение","двойное","доли","разность","процент"];
-let ПОСЛЕДНИЙ_ВИД=null;
-function makePuzzle(избегать){
-  const R=n=>Math.floor(Math.random()*n);
-  const ур=stageNow();                       // 1..10 — растёт вместе с рысью
-  const К=1+Math.floor(ур/3);                // множитель сложности: 1..4
-  const mix=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=R(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;};
-  const uniq=(ans,alt)=>{const s=new Set([ans]);alt.forEach(v=>{if(v!==ans&&v>0)s.add(v);});
-    const out=[...s].slice(0,4);
-    while(out.length<4){const v=ans+1+R(9);if(!out.includes(v))out.push(v);}
-    return mix(out);};
-  // Виды все и сразу: сложность растёт числами, а не запретами. Раньше
-  // новичку доставались шесть простейших, из которых три выглядели одинаково.
-  // Внутри одного дня вид не повторяется — три задачки, три разных.
-  const свободные=KINDS.filter(k=>!(избегать||[]).includes(k));
-  const вид=(свободные.length?свободные:KINDS)[R(свободные.length||KINDS.length)];
-  ПОСЛЕДНИЙ_ВИД=вид;
-  switch(вид){
-    case "ряд":{const a=2+R(9*К),d=2+R(8*К),ans=a+4*d;
-      return {q:`Продолжи ряд: ${a}, ${a+d}, ${a+2*d}, ${a+3*d}, ?`,ans,opts:uniq(ans,[ans+d,ans-d,ans+1])};}
-    case "удвоение":{const b=2+R(5*К),ans=b*16;
-      return {q:`Какое число следующее: ${b}, ${b*2}, ${b*4}, ${b*8}, ?`,ans,opts:uniq(ans,[ans+b,ans-b,ans*2])};}
-    case "фибоначчи":{const a=1+R(5),b=a+1+R(4*К),s=[a,b,a+b,a+2*b,2*a+3*b],ans=3*a+5*b;
-      return {q:`Угадай правило и продолжи: ${s.join(", ")}, ?`,ans,opts:uniq(ans,[ans+1,ans-2,ans+b])};}
-    case "лишнее":{const base=2+R(6*К),arr=[base*2,base*4,base*6,base*8],odd=base*5+1;
-      arr[R(4)]=odd;
-      return {q:`Что здесь лишнее: ${arr.join(", ")}?`,ans:odd,opts:mix(arr)};}
-    case "сумма":{const a=11+R(60*К),b=11+R(60*К),ans=a+b;
-      return {q:`Сколько будет ${a} + ${b}?`,ans,opts:uniq(ans,[ans+9,ans-10,ans+1])};}
-    case "умножение":{const a=3+R(9+3*К),b=3+R(9+2*К),ans=a*b;
-      return {q:`Сколько будет ${a} × ${b}?`,ans,opts:uniq(ans,[ans+a,ans-b,ans+10])};}
-    case "двойное":{const a=1+R(6),d=2+R(5),m=2,s=[a,a*m+d,(a*m+d)*m+d,((a*m+d)*m+d)*m+d];
-      const ans=s[3]*m+d;
-      return {q:`Ряд по правилу «умножь на ${m}, прибавь ${d}»: ${s.join(", ")}, ?`,ans,
-              opts:uniq(ans,[ans+d,ans-m,ans+m*d])};}
-    case "доли":{const ч=2+R(3),всего=ч*(4+R(8*К)),ans=всего/ч;
-      return {q:`${всего} разделить на ${ч} — сколько?`,ans,opts:uniq(ans,[ans+ч,ans-1,ans*2])};}
-    case "разность":{const a=40+R(90*К),b=11+R(38),ans=a-b;
-      return {q:`Сколько будет ${a} − ${b}?`,ans,opts:uniq(ans,[ans+9,ans-11,ans+1])};}
-    case "процент":{const б=[10,20,25,50][R(4)],ц=б*(2+R(9*К)),ans=Math.round(ц*б/100);
-      return {q:`Сколько будет ${б}% от ${ц}?`,ans,opts:uniq(ans,[ans+б,Math.round(ans/2),ans+1])};}
-    default:{const n=100+R(800),ans=+String(n).split("").reverse().join("");
-      return {q:`Прочитай число задом наперёд: ${n}`,ans,opts:uniq(ans,[ans+11,ans-9,n])};}
-  }
-}
-let PZ=null;
-function nextPuzzle(){PZ=makePuzzle(PET.puzzleKinds||[]);renderPuzzle();}
 function renderPuzzle(){
   const box=document.getElementById("puzzle"),title=document.getElementById("puzzle-title");
   if(mode()==="red"){                      // в тяжёлые дни ничего не просим
@@ -2692,6 +2744,7 @@ function renderToday(){
       +(d>=10?"":`<div class="dim" style="margin-top:12px">${HELP}</div>`);
     document.getElementById("puzzle-title").style.display="none";
     document.getElementById("puzzle").innerHTML="";
+    greyRow();     // в красном режиме дверь нужнее всего, а тут был выход
     return;
   }
 
@@ -2736,10 +2789,17 @@ function renderToday(){
   document.getElementById("puzzle-title").style.display="";
   renderPuzzle();
 
-  // Серый день — тихой строкой в самом низу, без вида кнопки. Это не
-  // предложение и не совет: приложение никогда не заговаривает об этом
-  // первым, «может, отметишь день серым?» читается как «ты всё равно
-  // не сделаешь». Просто дверь, которая есть, если понадобится.
+  greyRow();
+}
+
+// Серый день — тихой строкой в самом низу, без вида кнопки. Это не
+// предложение и не совет: приложение никогда не заговаривает об этом
+// первым, «может, отметишь день серым?» читается как «ты всё равно
+// не сделаешь». Просто дверь, которая есть, если понадобится.
+//
+// Вынесено отдельной функцией: в красном режиме renderToday выходит
+// раньше, и дверь пропадала ровно в те дни, ради которых её сделали.
+function greyRow(){
   {
     const серый=isGrey(todayKey());
     let box=document.getElementById("grey-day");
@@ -2856,7 +2916,8 @@ function save(){
   LOG[key]={d:key,s:доп(edit.sleep,было.s),m:доп(edit.mood,было.m),e:доп(edit.energy,было.e),
     t:[...edit.touched],p:доп(edit.pulse,было.p),w:доп(edit.weight,было.w),
     st:доп(edit.steps,было.st),di:доп(edit.dist,было.di),
-    tr:edit.train,n:доп((edit.note||"").slice(0,120),было.n),pt:got};
+    tr:edit.train,n:доп((edit.note||"").slice(0,120),было.n),pt:got,
+    grey:было.grey||0};        // отметка «день не в счёт» не должна слетать
   creditDay(key,edit.touched);   // сколько показали, столько и начислили
   saveLog();
   mergeLog();
@@ -2910,7 +2971,7 @@ function askRelease(){
 
 function releaseWalk(yes){
   document.getElementById("release-modal").style.display="none";
-  if(yes) startWalk();
+  if(yes){ startWalk(null); }   // из чек-ина отпускаем без выбора: он закрывает мини-апп
   sendDay();
 }
 
