@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=76"></script>
-<script src="data.js?v=76"></script>
-<script src="deck.js?v=76"></script>
-<script src="expedition.js?v=76"></script>
+<script src="photos/list.js?v=77"></script>
+<script src="data.js?v=77"></script>
+<script src="deck.js?v=77"></script>
+<script src="expedition.js?v=77"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -589,7 +589,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="76 · 21.08.2026 04:00";
+const APP_VERSION="77 · 21.08.2026 04:09";
 
 let toastTimer=null;
 function toast(text){
@@ -647,6 +647,24 @@ const lsDel=k=>localStorage.removeItem(NS+k);
   }
 })();
 if(tg&&inTelegram){tg.ready();tg.expand();}
+
+// ── Один комплект файлов, а не смесь версий ──────────────────────────
+// Телеграм кэширует index.html, data.js и expedition.js по отдельности,
+// с запасом до десяти минут. Пока метки версий не совпали, приложение
+// собрано из разных выпусков: часть функций уже вызывается, а лежат они
+// ещё в старом файле. Перезагружаемся один раз, с обходом кэша.
+(function сверкаВерсий(){
+  if(APP_VERSION==="рабочая") return;                  // локальный запуск
+  const свои=[window.DATA_JS_VERSION, window.EXP_JS_VERSION];
+  if(свои.every(в=>в===APP_VERSION)) return;
+  const было=sessionStorage.getItem("перезагрузка");
+  if(было){                                            // второй раз не крутим
+    console.warn("Версии файлов расходятся:", APP_VERSION, свои);
+    return;
+  }
+  sessionStorage.setItem("перезагрузка","1");
+  location.replace(location.pathname+"?v="+encodeURIComponent(APP_VERSION));
+})();
 
 const PH=window.PHOTOS||{};
 const hasPhotos=Object.values(PH).some(a=>a&&a.length);
