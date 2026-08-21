@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=75"></script>
-<script src="data.js?v=75"></script>
-<script src="deck.js?v=75"></script>
-<script src="expedition.js?v=75"></script>
+<script src="photos/list.js?v=76"></script>
+<script src="data.js?v=76"></script>
+<script src="deck.js?v=76"></script>
+<script src="expedition.js?v=76"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -589,7 +589,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="75 · 21.08.2026 03:47";
+const APP_VERSION="76 · 21.08.2026 04:00";
 
 let toastTimer=null;
 function toast(text){
@@ -2368,10 +2368,14 @@ function showPhoto(key){
 // осуждать за плохой день, это противоречит духу проекта.
 function currentPhotoKey(){
   const stage=stageNow();          // показанная, не насчитанная: см. ночной цикл
-  if(stage<PHOTO_FRAMES) return String(stage);
-  // Ночной кадр, если художник его уже прислал; иначе обычное состояние.
+  // Ночь спрашиваем первой и для любого возраста. Раньше здесь стоял выход
+  // по стадии, и до ночной проверки доходила только взрослая рысь: у зверя
+  // помладше ночью показывался дневной кадр, хотя ночной уже лежал рядом.
+  // Ночь — режим суток, а не награда за возраст.
   const ночь=(typeof nightPetKey==="function")?nightPetKey():null;
-  return ночь||petState().k;
+  if(ночь) return ночь;
+  if(stage<PHOTO_FRAMES) return String(stage);
+  return petState().k;
 }
 // Пока рысь бродит — её на экране быть не должно. Иначе механика разваливается:
 // написано «ушла», а зверь лежит на месте. Показываем пейзаж той земли, куда
