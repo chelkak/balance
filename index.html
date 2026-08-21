@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=82"></script>
-<script src="data.js?v=82"></script>
-<script src="deck.js?v=82"></script>
-<script src="expedition.js?v=82"></script>
+<script src="photos/list.js?v=83"></script>
+<script src="data.js?v=83"></script>
+<script src="deck.js?v=83"></script>
+<script src="expedition.js?v=83"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -44,7 +44,10 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
 .quote{margin-bottom:12px}
 .btn.saved{background:#7fc0a4;color:#0f1714}
 /* Карточки подряд без отступа читались как один слипшийся блок */
-#ready,#quest,#card,#den-box,#season-box,#walk-box{margin-bottom:12px}
+/* Отступ снизу у карточек, за которыми идёт следующая. #tasks попал сюда
+   после уборки: раньше зазор держали карта дня и «Одно дело», а когда их
+   убрали, цитата села вплотную к списку дел. */
+#ready,#card,#den-box,#walk-box,#tasks{margin-bottom:12px}
 .aim{border:2px solid transparent;transition:border-color .2s}
 .aim.sel{border-color:var(--accent)}
 /* Ночная сцена: звёзды нарисованы градиентами, ни одной новой картинки.
@@ -582,7 +585,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="82 · 21.08.2026 05:40";
+const APP_VERSION="83 · 21.08.2026 05:43";
 
 let toastTimer=null;
 function toast(text){
