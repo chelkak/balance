@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=89"></script>
-<script src="data.js?v=89"></script>
-<script src="deck.js?v=89"></script>
-<script src="expedition.js?v=89"></script>
+<script src="photos/list.js?v=90"></script>
+<script src="data.js?v=90"></script>
+<script src="deck.js?v=90"></script>
+<script src="expedition.js?v=90"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -468,11 +468,12 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <div id="totem-state"></div>
     <div id="walk-box"></div>
   </div>
-  <div class="g" id="den-box" style="margin-top:12px"></div>
 </section>
 
 <section id="v-me" class="hidden">
   <div class="head"><h1>Кабинет</h1><div class="sub" id="me-sub"></div></div>
+  <h2>Мои цели</h2>
+  <div class="g" id="goals"></div>
   <h2>Оформление</h2>
   <div class="themes" id="themes"></div>
   <div class="g" id="me-info"></div>
@@ -501,7 +502,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
 <section id="v-finds" class="hidden">
   <div class="head"><h1>Находки</h1><div class="sub" id="finds-sub"></div></div>
-  <div class="g" id="nature"></div>
+  <div class="g" id="den-box"></div>
+  <div class="g" id="nature" style="margin-top:12px"></div>
   <div class="g" id="finds-intro"></div>
   <h2 id="h-lands">Земли</h2>
   <div class="sub" id="h-lands-sub" style="margin-bottom:10px">Куда она может уходить. Новые открываются за камни</div>
@@ -556,14 +558,9 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="sub" style="margin-bottom:10px">Отметь, где сделал хотя бы минимум — сфера считается зажжённой</div>
   <div class="spheres" id="sp-edit"></div>
 
-  <h2 id="note-title">Строка про день</h2>
-  <div class="sub" id="note-sub" style="margin-bottom:8px"></div>
-  <textarea id="note" rows="2" placeholder="Необязательно"></textarea>
-
+  <!-- Сохранил — сразу к задачам. Отдельной кнопки перехода нет: она
+       дублировала бы то, что и так происходит по «Сохранить день». -->
   <button class="btn" id="save-btn" onclick="save()">Сохранить день</button>
-  <button class="btn ghost" onclick="go('totem')">Отмена</button>
-  <!-- Дальше по кругу: внёс показатели — иди смотреть, что сегодня делать. -->
-  <button class="btn ghost" style="margin-top:14px" onclick="go('today')">Задачи на день</button>
 </section>
 
 <section id="v-wheel" class="hidden">
@@ -576,9 +573,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
 <section id="v-trend" class="hidden">
   <div class="head"><h1>Динамика</h1><div class="sub" id="trend-sub"></div></div>
-  <h2>Мои цели</h2>
-  <div class="g" id="goals"></div>
-  <div id="charts" style="margin-top:16px"></div>
+  <div id="charts"></div>
 </section>
 
 </div>
@@ -595,7 +590,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="89 · 21.08.2026 08:45";
+const APP_VERSION="90 · 21.08.2026 09:22";
 
 let toastTimer=null;
 function toast(text){
@@ -2928,21 +2923,12 @@ function openCheckin(){
     ["выжат","мало","средне","полный бак"],["1–2","3–5","6–8","9–10"]);
   pills(document.getElementById("p-train"),["нет","зал","кардио","игра","другое"],edit.train,"train");
   spheresGrid(document.getElementById("sp-edit"),edit.touched,true,true);
-  // Вопрос дня вместо пустого поля: так понятно, что писать.
-  const в=noteQuestion(), зг=document.getElementById("note-title"),
-        под=document.getElementById("note-sub"), поле=document.getElementById("note");
-  if(в&&зг){
-    зг.textContent="Строка про день";
-    под.textContent=в.x;
-    поле.placeholder="Одной строкой, как есть. Можно пропустить";
-  }
   ПОЛЯ_ТЕЛА.forEach(([k,id])=>{
     const el=document.getElementById(id);
     el.value=edit[k]??"";
     const prev=hasData()&&!IS_DEMO?lastKnown(k):null;
     el.placeholder=prev?`вчера ${prev}`:"—";   // подсказка, а не готовый ответ
   });
-  document.getElementById("note").value=edit.note||"";
   renderBest();
 }
 // Одним списком: раньше пары «ключ — поле» были выписаны в двух местах,
@@ -2992,11 +2978,10 @@ function save(){
   // Теперь сохраняется то, что внесено. Пустое поле не затирает записанное
   // раньше: и в приложении, и в базе бота стоит COALESCE.
   readBody();
-  edit.note=document.getElementById("note").value.trim();
   const внесено=edit.sleep!=null||edit.mood!=null||edit.energy!=null||
                 edit.pulse!=null||edit.weight!=null||edit.steps!=null||edit.dist!=null||
                 edit.push!=null||edit.squat!=null||edit.kettle!=null||
-                (edit.touched||[]).length>0||!!edit.note;
+                (edit.touched||[]).length>0;
   if(!внесено){ toast("Впиши хоть что-нибудь"); return; }
   const got=dayPoints(edit.touched,{s:edit.sleep,m:edit.mood,e:edit.energy,
     p:edit.pulse,w:edit.weight,st:edit.steps,di:edit.dist,
@@ -3011,7 +2996,7 @@ function save(){
     t:[...edit.touched],p:доп(edit.pulse,было.p),w:доп(edit.weight,было.w),
     st:доп(edit.steps,было.st),di:доп(edit.dist,было.di),
     pu:доп(edit.push,было.pu),sq:доп(edit.squat,было.sq),kb:доп(edit.kettle,было.kb),
-    tr:edit.train,n:доп((edit.note||"").slice(0,120),было.n),pt:got,
+    tr:edit.train,n:было.n,pt:got,
     // Отметка «день не в счёт» не должна слетать при сохранении чек-ина,
     // и она обязана уезжать боту явным нулём тоже: иначе снять её нечем —
     // на стороне бота COALESCE оставит прежнюю единицу.
@@ -3026,6 +3011,7 @@ function save(){
   if(key!==todayKey()){
     editDay=null;openCheckin();renderDays();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+    go("today");
     return;
   }
   if(Math.random()<0.15){
@@ -3055,7 +3041,10 @@ function save(){
 function sendDay(){
   const out=logPacket();
   if(inTelegram){ setTimeout(()=>tg.sendData(out.packet),700); return; }
+  // Записал — иди смотреть, что сегодня делать. Отдельной кнопки перехода
+  // больше нет: она дублировала то, что и так происходит по сохранению.
   renderTotem();
+  go("today");
 }
 
 function askRelease(){
@@ -3138,11 +3127,11 @@ function go(v){
     const n=document.getElementById("n-"+x);
     if(n) n.classList.toggle("act2",x===v);});
   window.scrollTo(0,0);
-  if(v==="totem"){renderTotem();renderWalk();renderDen();renderMarks();}
+  if(v==="totem"){renderTotem();renderWalk();renderMarks();}
   if(v==="today"){renderToday();renderCard();}
   if(v==="checkin")openCheckin();
-  if(v==="finds")renderFinds();
-  if(v==="me")renderMe();
+  if(v==="finds"){renderFinds();renderDen();}
+  if(v==="me"){renderMe();renderGoals();}
   if(v==="wheel")renderWheel();
   if(v==="trend")renderTrend();
   VIEW=v;

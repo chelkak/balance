@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="89 · 21.08.2026 08:45";
+window.DATA_JS_VERSION="90 · 21.08.2026 09:22";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -1225,14 +1225,15 @@ function ближайшаяЗемля(){
     : `<div class="dim" style="margin-top:4px">Следующая земля — ${ц.l.n}. `+
       `Нужно ещё ${не_хватает} 💎 из ${ц.l.c}.</div>`;
 }
-function renderTrend(){
-  applyTheme();
+// ── Мои цели ───
+// Цель по весу и сну задают один раз, а не смотрят каждый день, поэтому
+// блок уехал из «Динамики» в кабинет. Здесь же считается прогресс к ней.
+function renderGoals(){
+  const box=document.getElementById("goals");
+  if(!box) return;
   if(!hasData()){
-    document.getElementById("trend-sub").textContent="Пока пусто";
-    document.getElementById("goals").innerHTML=
-      `<div class="why">Графики появятся, когда наберётся неделя записей.
-        Цели тоже — сначала нужно, с чем сравнивать.</div>`;
-    document.getElementById("charts").innerHTML="";
+    box.innerHTML=`<div class="why">Цели появятся, когда наберётся неделя записей —
+      сначала нужно, с чем сравнивать.</div>`;
     return;
   }
   const g=DATA.goals,wl=DAYS.map(d=>d.weight).filter(v=>v),cur=wl.length?wl[wl.length-1]:0;
@@ -1240,9 +1241,7 @@ function renderTrend(){
   const left=cur-g.weight,weeks=perWeek>.05?Math.ceil(left/perWeek):null;
   const сИсторией=DAYS.filter(d=>d.sleep!=null);
   const nights=сИсторией.filter(d=>d.sleep>=g.sleep).length;
-  document.getElementById("trend-sub").textContent=
-    `${DAYS.length} ${plural(DAYS.length,"день","дня","дней")} истории. Неделя врёт, месяц — нет`;
-  document.getElementById("goals").innerHTML=`
+  box.innerHTML=`
     <div class="fields">
       <div class="field"><label>цель по весу, кг</label>
         <input id="g-weight" type="number" inputmode="decimal" step="0.1" value="${g.weight}"></div>
@@ -1260,6 +1259,24 @@ function renderTrend(){
       сИсторией.length<DAYS.length?" дней со сном":""}.</div>`;
   document.getElementById("g-weight").onchange=e=>setGoal("weight",e.target);
   document.getElementById("g-sleep").onchange=e=>setGoal("sleep",e.target);
+}
+
+function renderTrend(){
+  applyTheme();
+  if(!hasData()){
+    document.getElementById("trend-sub").textContent="Пока пусто";
+    document.getElementById("charts").innerHTML=
+      `<div class="g"><div class="why">Графики появятся, когда наберётся
+        неделя записей — сначала нужно, с чем сравнивать.</div></div>`;
+    return;
+  }
+  const g=DATA.goals,wl=DAYS.map(d=>d.weight).filter(v=>v),cur=wl.length?wl[wl.length-1]:0;
+  const first=wl.length>=7?avg(wl.slice(0,7)):cur,perWeek=wl.length>=14?(first-avg(wl.slice(-7)))/2:0;
+  const left=cur-g.weight,weeks=perWeek>.05?Math.ceil(left/perWeek):null;
+  const сИсторией=DAYS.filter(d=>d.sleep!=null);
+  const nights=сИсторией.filter(d=>d.sleep>=g.sleep).length;
+  document.getElementById("trend-sub").textContent=
+    `${DAYS.length} ${plural(DAYS.length,"день","дня","дней")} истории. Неделя врёт, месяц — нет`;
 
   const ac=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
   // Силовые идут последними и появляются, только когда их начали вносить:
