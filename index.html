@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=92"></script>
-<script src="data.js?v=92"></script>
-<script src="deck.js?v=92"></script>
-<script src="expedition.js?v=92"></script>
+<script src="photos/list.js?v=93"></script>
+<script src="data.js?v=93"></script>
+<script src="deck.js?v=93"></script>
+<script src="expedition.js?v=93"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -551,11 +551,10 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <div class="field"><label>приседания</label><input id="f-squat" type="number" inputmode="numeric" oninput="readBody()"></div>
     <div class="field"><label>гиря</label><input id="f-kettle" type="number" inputmode="numeric" oninput="readBody()"></div>
   </div>
-  <div class="sub" id="best-line" style="margin-top:8px"></div>
+
 
 
   <h2>Что сегодня горело</h2>
-  <div class="sub" style="margin-bottom:10px">Отметь, где сделал хотя бы минимум — сфера считается зажжённой</div>
   <div class="spheres" id="sp-edit"></div>
 
   <!-- Сохранил — сразу к задачам. Отдельной кнопки перехода нет: она
@@ -590,7 +589,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="92 · 21.08.2026 09:48";
+const APP_VERSION="93 · 21.08.2026 09:51";
 
 let toastTimer=null;
 function toast(text){
@@ -2912,7 +2911,6 @@ function openCheckin(){
     const prev=hasData()&&!IS_DEMO?lastKnown(k):null;
     el.placeholder=prev?`вчера ${prev}`:"—";   // подсказка, а не готовый ответ
   });
-  renderBest();
 }
 // Одним списком: раньше пары «ключ — поле» были выписаны в двух местах,
 // и добавление поля требовало помнить про оба.
@@ -2931,28 +2929,11 @@ function рекорд(ключ,кроме){
   });
   return лучш==null?null:{v:лучш,d:когда};
 }
-// Строка под силовыми: что было лучшим и побито ли это сегодня.
-function renderBest(){
-  const строка=document.getElementById("best-line");
-  if(!строка) return;
-  const имена={push:"отжимания",squat:"приседания",kettle:"гиря"};
-  const части=[];
-  СИЛОВЫЕ.forEach(k=>{
-    const р=рекорд(k,dayKey()), сегодня=edit[k];
-    if(сегодня!=null&&(р==null||сегодня>р.v)){
-      части.push(`<b>${имена[k]} — новый рекорд</b>`);
-    } else if(р!=null){
-      части.push(`${имена[k]}: лучшее ${р.v}`);
-    }
-  });
-  строка.innerHTML=части.length?части.join(" · "):"Первый раз — он и станет рекордом";
-}
 function readBody(){
   ПОЛЯ_ТЕЛА.forEach(([k,id])=>{
     const v=document.getElementById(id).value.trim();
     edit[k]=v===""?null:parseFloat(v);
   });
-  renderBest();          // рекорд виден сразу, а не после сохранения
 }
 function save(){
   // Раньше требовались сон, настроение и энергия разом, иначе день не
