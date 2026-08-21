@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=80"></script>
-<script src="data.js?v=80"></script>
-<script src="deck.js?v=80"></script>
-<script src="expedition.js?v=80"></script>
+<script src="photos/list.js?v=81"></script>
+<script src="data.js?v=81"></script>
+<script src="deck.js?v=81"></script>
+<script src="expedition.js?v=81"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -582,7 +582,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="80 · 21.08.2026 05:27";
+const APP_VERSION="81 · 21.08.2026 05:35";
 
 let toastTimer=null;
 function toast(text){
@@ -1446,10 +1446,15 @@ function cardToday(){
 }
 
 function renderCard(){
-  const box=document.getElementById("card"),head=null;
+  // Отдельного заголовка над картой больше нет: она подписывает себя сама.
+  // Убирая его, я оставил обращение к нему во второй ветке — и функция
+  // падала на любой карте, кроме «мысли». Экран после этого не дорисовывался.
+  const box=document.getElementById("card");
+  if(!box) return;
   const c=cardToday();
-  if(!c||c.t==="м"){box.classList.add("hidden");if(head)head.classList.add("hidden");return;}
-  box.classList.remove("hidden");head.classList.remove("hidden");
+  // Мысль из колоды и цитата под ней — один жанр, стояли вплотную.
+  if(!c||c.t==="м"){box.classList.add("hidden");return;}
+  box.classList.remove("hidden");
   const взял=PET.cardSeen===todayKey();
   const шапка=`<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">${CARD_LABEL[c.t]||"Карта"}</div>`+
     `<div class="why" style="margin-top:8px;font-size:16px;line-height:1.5">${c.x}</div>`;
