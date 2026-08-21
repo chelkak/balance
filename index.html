@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=96"></script>
-<script src="data.js?v=96"></script>
-<script src="deck.js?v=96"></script>
-<script src="expedition.js?v=96"></script>
+<script src="photos/list.js?v=97"></script>
+<script src="data.js?v=97"></script>
+<script src="deck.js?v=97"></script>
+<script src="expedition.js?v=97"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -447,7 +447,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
           <img id="photo-a" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s ease">
           <img id="photo-b" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s ease">
         </div></div>
-        <div id="totem-marks" style="position:absolute;inset:0;pointer-events:none"></div>
         <div id="totem-stars"></div>
         <div id="totem-night" style="position:absolute;inset:0;background:rgba(8,10,18,.4);opacity:0;
           transition:opacity 2s ease;pointer-events:none"></div>
@@ -588,7 +587,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="96 · 21.08.2026 11:08";
+const APP_VERSION="97 · 21.08.2026 11:21";
 
 let toastTimer=null;
 function toast(text){
@@ -1457,52 +1456,6 @@ function ownOrder(list,соль){
 // не подсказывает ничего: непонятно, что писать и кому. Конкретный вопрос —
 // подсказывает. Меняется каждый день и берётся из той же запечатанной колоды.
 // ── Метки: зверь, которого больше ни у кого нет ──────────────────────
-// Рысь у всех одинаковая — это то место, где терялась уникальность.
-// Новые фотографии на каждый случай не нужны: поверх снимка ложатся
-// тонкие прозрачные слои, и шесть слоёв дают сотни сочетаний.
-// Каждый слой обязан значить что-то прожитое, иначе это просто украшение.
-// Файлов ещё нет — код молча ничего не рисует и ждёт художника.
-const MARKS_DIR="pet/marks/";
-function marksNow(){
-  const m=[];
-  const вед=strongest(), сл=weakest();
-  if((DATA.wheel[вед.code]||0)>=7) m.push({f:"lead-"+вед.code, w:`метка сильной стороны — ${вед.name.toLowerCase()}`});
-  const мес=Math.floor(daysWithMe()/30);
-  if(мес>=3) m.push({f:"grey-"+Math.min(3,Math.floor(мес/3)), w:`седина: ${мес} ${plural(мес,"месяц","месяца","месяцев")} вместе`});
-  if(hardDays()>=7) m.push({f:"scar", w:"след тяжёлого периода"});
-  const хар=natureWords()[0];
-  if(хар) m.push({f:"nature-"+хар, w:`характер: ${хар}`});
-  const ред=(PET.finds||[]).filter(i=>FINDS[i]&&FINDS[i].r===2).length;
-  if(ред>=1) m.push({f:"legend", w:`легендарных находок: ${ред}`});
-  if((PET.lands||[0]).length>=5) m.push({f:"far", w:"ходит далеко"});
-  return m;
-}
-// Пока художник не прислал слои, шесть картинок дают шесть ошибок 404
-// на каждое открытие. Поэтому сначала один пробный запрос: нет папки —
-// слои не рисуем вообще. Появятся файлы — включится само, без правки кода.
-let MARKS_READY=false;
-(function probeMarks(){
-  const im=new Image();
-  im.onload=()=>{MARKS_READY=true;renderMarks();};
-  im.onerror=()=>{MARKS_READY=false;};
-  im.src=MARKS_DIR+"probe.png";
-})();
-function renderMarks(){
-  const box=document.getElementById("totem-marks");
-  if(!box)return;
-  if(!MARKS_READY){box.innerHTML="";return;}
-  box.innerHTML=marksNow().map(x=>
-    `<img src="${MARKS_DIR}${x.f}.png" alt="" onerror="this.remove()"
-      style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
-      opacity:.9"> `).join("");
-}
-// Словами — чтобы механика работала уже сейчас, до появления картинок,
-// и чтобы было видно, из чего именно сложился твой зверь.
-function marksText(){
-  const m=marksNow();
-  return m.length?m.map(x=>x.w).join(" · "):null;
-}
-
 // ── Выгрузка ─────────────────────────────────────────────────────────
 // Мы пообещали человеку, что письмо вернётся через год. Данные лежат
 // в облаке Телеграма — аккаунт, переустановка, сбой, и обещания нет.
@@ -3022,7 +2975,7 @@ function go(v){
     const n=document.getElementById("n-"+x);
     if(n) n.classList.toggle("act2",x===v);});
   window.scrollTo(0,0);
-  if(v==="totem"){renderTotem();renderWalk();renderMarks();}
+  if(v==="totem"){renderTotem();renderWalk();}
   if(v==="today"){renderToday();renderCard();}
   if(v==="checkin")openCheckin();
   if(v==="finds"){renderFinds();renderDen();renderPlan();}
