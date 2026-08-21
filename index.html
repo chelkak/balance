@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=78"></script>
-<script src="data.js?v=78"></script>
-<script src="deck.js?v=78"></script>
-<script src="expedition.js?v=78"></script>
+<script src="photos/list.js?v=79"></script>
+<script src="data.js?v=79"></script>
+<script src="deck.js?v=79"></script>
+<script src="expedition.js?v=79"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -585,7 +585,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="78 · 21.08.2026 04:50";
+const APP_VERSION="79 · 21.08.2026 05:13";
 
 let toastTimer=null;
 function toast(text){
@@ -1856,10 +1856,17 @@ const WALK_MIN_MS=60*60*1000;                 // раньше часа не ве
 // за окном: проснулась на рассвете, укладывается на закате.
 const walkHoursFor=st=>8-Math.round((st-1)*4/9);   // стадия 1 → 8 ч, стадия 10 → 4 ч
 const MIN_PER_ENERGY=6;                       // одна энергия тянет домой на шесть минут
+// Её утро начинается в сумерках, за час до солнца, и кончается через час
+// после заката. Так и живут рыси — сумеречный зверь, а не дневной.
+//
+// Это не украшение. Строгий рассвет ломал главное: зимой солнце встаёт
+// в 8:57, и человек, заполнивший чек-ин в семь утра, полтора часа не мог
+// её отпустить. Час сумерек возвращает утро тому, кто рано встаёт.
+const СУМЕРКИ=1;
 function walkAllowedNow(){
   const с=солнце(), ч=new Date().getHours()+new Date().getMinutes()/60;
   if(с.восход==null) return ч>=8;             // полярная ночь: запасной вариант
-  return ч>=с.восход;
+  return ч>=с.восход-СУМЕРКИ;
 }
 // После десяти вечера приложение умеет закончить день, а не требовать
 // ещё одну задачу: новая долгая экспедиция не предлагается. Чек-ин
@@ -1872,13 +1879,14 @@ function walkAllowedNow(){
 function рассветВремя(){
   const с=солнце();
   if(с.восход==null) return "Она ещё спит";
-  const ч=Math.floor(с.восход), м=Math.round((с.восход%1)*60);
-  return `Она ещё спит. Проснётся на рассвете, в ${ч}:${String(м).padStart(2,"0")}`;
+  const т=с.восход-СУМЕРКИ;
+  const ч=Math.floor(т), м=Math.round((т%1)*60);
+  return `Она ещё спит. Проснётся в сумерках, к ${ч}:${String(м).padStart(2,"0")}`;
 }
 function нДень(){
   const с=солнце(), ч=new Date().getHours()+new Date().getMinutes()/60;
   if(!walkAllowedNow()) return false;
-  return с.закат==null ? ч<22 : ч<с.закат;
+  return с.закат==null ? ч<22 : ч<с.закат+СУМЕРКИ;
 }
 
 // Сколько уже натикало ей навстречу. Энергию на выходе забирают всю
@@ -3000,6 +3008,7 @@ function save(){
   edit.note=document.getElementById("note").value.trim();
   const внесено=edit.sleep!=null||edit.mood!=null||edit.energy!=null||
                 edit.pulse!=null||edit.weight!=null||edit.steps!=null||edit.dist!=null||
+                edit.push!=null||edit.squat!=null||edit.kettle!=null||
                 (edit.touched||[]).length>0||!!edit.note;
   if(!внесено){ toast("Впиши хоть что-нибудь"); return; }
   const got=dayPoints(edit.touched,{s:edit.sleep,m:edit.mood,e:edit.energy,
