@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=79"></script>
-<script src="data.js?v=79"></script>
-<script src="deck.js?v=79"></script>
-<script src="expedition.js?v=79"></script>
+<script src="photos/list.js?v=80"></script>
+<script src="data.js?v=80"></script>
+<script src="deck.js?v=80"></script>
+<script src="expedition.js?v=80"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -453,7 +453,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     </div>
   </div>
   <div class="g" id="totem-state" style="margin-top:12px"></div>
-  <div class="g" id="season-box" style="margin-top:12px"></div>
+
   <div class="g" id="den-box" style="margin-top:12px"></div>
   <div class="g" id="walk-box" style="margin-top:12px"></div>
   <button class="btn" onclick="go('today')">Что сегодня</button>
@@ -507,9 +507,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="g" id="ready"></div>
   <div class="g" id="arc" style="display:none;margin-bottom:12px"></div>
   <div id="today-body"></div>
-  <h2 id="quest-title">Одно дело</h2>
-  <div class="g" id="quest"></div>
-  <h2 id="card-title">Мысль дня</h2>
   <div class="g" id="card"></div>
   <div class="g quote" id="quote"></div>
   <h2 id="puzzle-title">Разминка</h2>
@@ -585,7 +582,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="79 · 21.08.2026 05:13";
+const APP_VERSION="80 · 21.08.2026 05:27";
 
 let toastTimer=null;
 function toast(text){
@@ -1045,6 +1042,9 @@ function mergeLog(){
     sleep:e.s??null,mood:e.m??null,energy:e.e??null,
     touched:e.t||[],pulse:e.p??null,weight:e.w??null,
     steps:e.st??null,dist:e.di??null,
+    // Силовые доезжали до базы и там оставались: в «Динамике» их не было,
+    // и человек справедливо спрашивал, куда они вообще записываются.
+    push:e.pu??null,squat:e.sq??null,kettle:e.kb??null,
     grey:e.grey===undefined?undefined:(e.grey?1:0)});
   if(!DEMO_ON){
     DAYS=keys.slice(-LOG_DAYS).map(k=>make(LOG[k]));
@@ -1446,9 +1446,9 @@ function cardToday(){
 }
 
 function renderCard(){
-  const box=document.getElementById("card"),head=document.getElementById("card-title");
+  const box=document.getElementById("card"),head=null;
   const c=cardToday();
-  if(!c){box.classList.add("hidden");head.classList.add("hidden");return;}
+  if(!c||c.t==="м"){box.classList.add("hidden");if(head)head.classList.add("hidden");return;}
   box.classList.remove("hidden");head.classList.remove("hidden");
   const взял=PET.cardSeen===todayKey();
   const шапка=`<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">${CARD_LABEL[c.t]||"Карта"}</div>`+
@@ -1705,6 +1705,16 @@ const QUESTS=window.QUESTS||[];
 function questToday(){
   const o=ownOrder(QUESTS,4242);
   return QUESTS[o[dayIndex()%o.length]];
+}
+// Камни за записанный день. Раньше их давало «Одно дело» — блок, который
+// дублировал дела по сферам и потому убран. Источник переехал сюда: земли
+// открываются за то, что человек ведёт дневник, а не за побочное задание.
+function stonesForDay(){
+  if(PET.dayStonesOn===todayKey()) return;
+  PET.dayStonesOn=todayKey();
+  PET.stones=(PET.stones||0)+8;
+  savePet();
+  toast("+8 💎 за записанный день");
 }
 function renderQuest(){
   const box=document.getElementById("quest"),head=document.getElementById("quest-title");
@@ -1981,6 +1991,10 @@ function startWalk(куда){
   // уже другого дня. Обещание «сегодня рыси везёт» не выполнялось чаще,
   // чем выполнялось.
   PET.walkLuck=luckToday().k;
+  // Снимок земли весит под двести килобайт: по мобильному он приезжает
+  // секунды, и всё это время на экране пустой градиент. Греем заранее.
+  const заранее=new Image();
+  заранее.src=landPhoto(PET.walkLand??куда??0);
   // Игровой слой поверх прогулки: снимок полки и маршрут фиксируются
   // на выходе. Время и земля остаются за walkStart/walkBack/walkLand —
   // второго источника правды у прогулки быть не должно.
@@ -3030,6 +3044,7 @@ function save(){
     // на стороне бота COALESCE оставит прежнюю единицу.
     grey:было.grey?1:0};
   creditDay(key,edit.touched);   // сколько показали, столько и начислили
+  stonesForDay();                // и камни: день записан — земля ближе
   countTries(key,edit.touched);  // отметка сферы — это и есть попытка по ней
   saveLog();
   mergeLog();
@@ -3150,8 +3165,8 @@ function go(v){
     const n=document.getElementById("n-"+x);
     if(n) n.classList.toggle("act2",x===v);});
   window.scrollTo(0,0);
-  if(v==="totem"){renderTotem();renderWalk();renderDen();renderSeason();renderMarks();}
-  if(v==="today"){renderToday();renderReady();renderQuest();renderCard();}
+  if(v==="totem"){renderTotem();renderWalk();renderDen();renderMarks();}
+  if(v==="today"){renderToday();renderReady();renderCard();}
   if(v==="checkin")openCheckin();
   if(v==="finds")renderFinds();
   if(v==="me")renderMe();
