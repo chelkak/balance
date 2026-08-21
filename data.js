@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="85 · 21.08.2026 05:52";
+window.DATA_JS_VERSION="86 · 21.08.2026 05:54";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -1219,12 +1219,10 @@ function ближайшаяЗемля(){
   if(!закрытые.length)
     return `<div class="dim" style="margin-top:4px">Все земли открыты. Камни теперь просто копятся.</div>`;
   const ц=закрытые[0], не_хватает=ц.l.c-есть;
-  // Без склонений: «до старая просека» читается как ошибка, а склонять
-  // названия земель по падежам — отдельная возня ради одной строки.
   return не_хватает<=0
-    ? `<div style="margin-top:4px;color:var(--accent)">Хватает на новую землю: ${ц.l.n} — открывай ниже.</div>`
-    : `<div class="dim" style="margin-top:4px">Следующая земля — ${ц.l.n}. `+
-      `Нужно ещё ${не_хватает} 💎 из ${ц.l.c}.</div>`;
+    ? `<div style="margin-top:4px;color:var(--accent)">Хватает на «${ц.l.n}» — открывай ниже.</div>`
+    : `<div class="dim" style="margin-top:4px">До «${ц.l.n.toLowerCase()}» осталось ${не_хватает} 💎`+
+      ` из ${ц.l.c}.</div>`;
 }
 function renderTrend(){
   applyTheme();
@@ -1348,29 +1346,27 @@ function renderWheel(){
         : `Данных за ${slice.length} ${plural(slice.length,"день","дня","дней")}`
           +(slice.length<need?` из ${need} — копим дальше`:"");
 
-  // Двенадцать строк вместо круга. Круг был нелеп не идеей, а формой:
-  // подписи кеглем 9,5 по окружности на телефоне не читаются, секторы
-  // разной длины глазом не сравнить, и всё это занимало пол-экрана.
-  // Список отсортирован — сравнение происходит само, без усилий.
-  const ряды=SPHERES.map(sp=>({sp, v:DATA.wheel[sp.code]||0}))
-    .sort((a,b)=>b.v-a.v||SPHERES.indexOf(a.sp)-SPHERES.indexOf(b.sp));
-  const держат=ряды.filter(r=>r.v>=7).slice(0,3).map(r=>r.sp.name.toLowerCase());
-  const просели=ряды.filter(r=>r.v>0&&r.v<=4).slice(-3).map(r=>r.sp.name.toLowerCase());
-  const итог=(держат.length||просели.length)
-    ? `<div class="dim" style="margin-bottom:12px">`+
-      (держат.length?`Держат: <b>${держат.join(", ")}</b>. `:"")+
-      (просели.length?`Просели: <b>${просели.join(", ")}</b>.`:"")+`</div>`
-    : "";
-  const el=document.getElementById("wheel");
-  el.innerHTML=итог+ряды.map(({sp,v})=>{
-    const выбрана=picked===sp.code;
-    return `<div class="wrow${выбрана?" on":""}" data-c="${sp.code}">
-      <div class="wname">${sp.ic} ${sp.name}</div>
-      <div class="wtrack"><div class="wfill" style="width:${v*10}%;background:${sp.color};
-        opacity:${выбрана?1:.75}"></div></div>
-      <div class="wval" style="color:${v?sp.color:"var(--ink2)"}">${v||"—"}</div>
-    </div>`;}).join("");
-  el.querySelectorAll(".wrow").forEach(p=>p.onclick=()=>{picked=p.dataset.c;renderWheel();
+  const cx=165,cy=163,R=112,n=SPHERES.length,st=2*Math.PI/n;
+  const arc=(i,r)=>{const a0=-Math.PI/2+i*st,a1=a0+st;
+    return `M${cx},${cy} L${cx+r*Math.cos(a0)},${cy+r*Math.sin(a0)} A${r},${r} 0 0 1 ${cx+r*Math.cos(a1)},${cy+r*Math.sin(a1)} Z`;};
+  const gl=getComputedStyle(document.documentElement).getPropertyValue("--brd");
+  let s="";
+  [.25,.5,.75,1].forEach(k=>s+=`<circle cx="${cx}" cy="${cy}" r="${R*k}" fill="none" stroke="${gl}"/>`);
+  SPHERES.forEach((d,i)=>s+=`<path d="${arc(i,R)}" fill="none" stroke="${gl}"/>`);
+  SPHERES.forEach((d,i)=>{const v=DATA.wheel[d.code]||0;
+    // Неоценённая сфера — тонкий контур целого сектора: видно, что её ждут
+    if(!v){ s+=`<path d="${arc(i,R)}" fill="${d.color}" fill-opacity="${picked===d.code?".18":".06"}"
+      stroke="${d.color}" stroke-width="${picked===d.code?2:.8}" stroke-dasharray="3 3"
+      data-c="${d.code}" style="cursor:pointer"/>`; return; }
+    s+=`<path d="${arc(i,R*v/10)}" fill="${d.color}" fill-opacity="${picked===d.code?".95":".6"}"
+      stroke="${d.color}" stroke-width="${picked===d.code?2:.8}" data-c="${d.code}" style="cursor:pointer"/>`;});
+  SPHERES.forEach((d,i)=>{const a=-Math.PI/2+i*st+st/2,v=DATA.wheel[d.code]||0;
+    s+=`<text x="${cx+(R+20)*Math.cos(a)}" y="${cy+(R+20)*Math.sin(a)}" font-size="9.5"
+      text-anchor="middle" dominant-baseline="middle" fill="currentColor" opacity=".65">${d.name}</text>`;
+    if(v>=3)s+=`<text x="${cx+(R*v/10-12)*Math.cos(a)}" y="${cy+(R*v/10-12)*Math.sin(a)}" font-size="10.5"
+      font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="middle">${v}</text>`;});
+  const el=document.getElementById("wheel");el.innerHTML=s;
+  el.querySelectorAll("path[data-c]").forEach(p=>p.onclick=()=>{picked=p.dataset.c;renderWheel();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
 
   const d=byCode(picked)||weakest(),v=DATA.wheel[d.code]||0,dm=dormant(d.code);

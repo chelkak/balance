@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=85"></script>
-<script src="data.js?v=85"></script>
-<script src="deck.js?v=85"></script>
-<script src="expedition.js?v=85"></script>
+<script src="photos/list.js?v=86"></script>
+<script src="data.js?v=86"></script>
+<script src="deck.js?v=86"></script>
+<script src="expedition.js?v=86"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -48,17 +48,6 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
    после уборки: раньше зазор держали карта дня и «Одно дело», а когда их
    убрали, цитата села вплотную к списку дел. */
 #ready,#card,#den-box,#walk-box,#tasks{margin-bottom:12px}
-/* Колесо списком: строка на сферу, отсортированы по оценке. Круг с
-   подписями кеглем 9,5 по окружности на телефоне не читался. */
-.wrow{display:flex;align-items:center;gap:10px;padding:5px 0;cursor:pointer;
-  border-bottom:1px solid var(--brd)}
-.wrow:last-child{border-bottom:none}
-.wrow.on .wname{color:var(--ink)}
-.wname{flex:0 0 38%;font-size:13px;color:var(--ink2);white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
-.wtrack{flex:1;height:7px;background:var(--brd);border-radius:5px;overflow:hidden}
-.wfill{height:100%;border-radius:5px;transition:width .5s ease}
-.wval{flex:0 0 20px;text-align:right;font:600 14px var(--fd)}
 .aim{border:2px solid transparent;transition:border-color .2s}
 .aim.sel{border-color:var(--accent)}
 /* Ночная сцена: звёзды нарисованы градиентами, ни одной новой картинки.
@@ -570,7 +559,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <section id="v-wheel" class="hidden">
   <div class="head"><h1>Колесо</h1><div class="sub" id="wheel-sub"></div></div>
   <div class="seg" id="period"></div>
-  <div class="g" id="wheel" style="margin:10px 0 12px;padding:12px 15px"></div>
+  <div style="text-align:center;margin:6px 0 2px">
+    <svg id="wheel" viewBox="0 0 330 330" width="100%" style="max-width:350px"></svg></div>
   <div class="g" id="wheel-detail"></div>
 </section>
 
@@ -595,7 +585,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="85 · 21.08.2026 05:52";
+const APP_VERSION="86 · 21.08.2026 05:54";
 
 let toastTimer=null;
 function toast(text){
