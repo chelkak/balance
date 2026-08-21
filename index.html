@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=100"></script>
-<script src="data.js?v=100"></script>
-<script src="deck.js?v=100"></script>
-<script src="expedition.js?v=100"></script>
+<script src="photos/list.js?v=101"></script>
+<script src="data.js?v=101"></script>
+<script src="deck.js?v=101"></script>
+<script src="expedition.js?v=101"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -540,15 +540,15 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
   <h2>Тело</h2>
   <div class="fields">
-    <div class="field"><label>пульс покоя</label><input id="f-pulse" type="number" inputmode="numeric"></div>
-    <div class="field"><label>вес, кг</label><input id="f-weight" type="number" inputmode="decimal" step="0.1"></div>
-    <div class="field"><label>шаги</label><input id="f-steps" type="number" inputmode="numeric"></div>
-    <div class="field"><label>дистанция, км</label><input id="f-dist" type="number" inputmode="decimal" step="0.1"></div>
+    <div class="field"><label>пульс покоя</label><input id="f-pulse" type="number" inputmode="numeric" min="20" max="250" oninput="readBody()"></div>
+    <div class="field"><label>вес, кг</label><input id="f-weight" type="number" inputmode="decimal" step="0.1" min="20" max="400" oninput="readBody()"></div>
+    <div class="field"><label>шаги</label><input id="f-steps" type="number" inputmode="numeric" min="0" max="200000" oninput="readBody()"></div>
+    <div class="field"><label>дистанция, км</label><input id="f-dist" type="number" inputmode="decimal" step="0.1" min="0" max="500" oninput="readBody()"></div>
   </div>
   <div class="fields fields3" style="margin-top:9px">
-    <div class="field"><label>отжимания</label><input id="f-push" type="number" inputmode="numeric" oninput="readBody()"></div>
-    <div class="field"><label>приседания</label><input id="f-squat" type="number" inputmode="numeric" oninput="readBody()"></div>
-    <div class="field"><label>гиря</label><input id="f-kettle" type="number" inputmode="numeric" oninput="readBody()"></div>
+    <div class="field"><label>отжимания</label><input id="f-push" type="number" inputmode="numeric" min="0" max="5000" oninput="readBody()"></div>
+    <div class="field"><label>приседания</label><input id="f-squat" type="number" inputmode="numeric" min="0" max="5000" oninput="readBody()"></div>
+    <div class="field"><label>гиря</label><input id="f-kettle" type="number" inputmode="numeric" min="0" max="5000" oninput="readBody()"></div>
   </div>
 
 
@@ -587,7 +587,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="100 · 21.08.2026 12:38";
+const APP_VERSION="101 · 21.08.2026 12:54";
 
 let toastTimer=null;
 function toast(text){
@@ -2806,10 +2806,22 @@ const СИЛОВЫЕ=["push","squat","kettle"];
 // Личный рекорд — единственное сравнение, где соперник ты сам. Ни среднего
 // по неделе, ни чужой нормы: только «сегодня больше, чем когда-либо было».
 const КЛЮЧ_В_ЛОГ={push:"pu",squat:"sq",kettle:"kb",steps:"st",dist:"di"};
+// Пределы по каждому полю. Разметка их тоже несёт, но телефонные
+// клавиатуры позволяют вставить что угодно мимо ограничений браузера.
+const ПРЕДЕЛЫ={pulse:[20,250], weight:[20,400], steps:[0,200000],
+  dist:[0,500], push:[0,5000], squat:[0,5000], kettle:[0,5000]};
 function readBody(){
   ПОЛЯ_ТЕЛА.forEach(([k,id])=>{
     const v=document.getElementById(id).value.trim();
-    edit[k]=v===""?null:parseFloat(v);
+    let ч=v===""?null:parseFloat(v);
+    // Мусор и промах пальцем не должны уезжать в базу: там они станут
+    // средним, целью и точкой на графике, а вытащить их оттуда нечем.
+    const мимо=ч!=null&&(!isFinite(ч)||ПРЕДЕЛЫ[k]&&(ч<ПРЕДЕЛЫ[k][0]||ч>ПРЕДЕЛЫ[k][1]));
+    // Но молча обнулять нельзя: человек набрал 833 вместо 83.3, поле
+    // очистилось, и он не понял, почему вес не записался. Подсвечиваем.
+    const поле=document.getElementById(id);
+    if(поле) поле.style.borderColor=мимо?"#c85a54":"";
+    edit[k]=мимо?null:ч;
   });
 }
 function save(){
