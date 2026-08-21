@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=94"></script>
-<script src="data.js?v=94"></script>
-<script src="deck.js?v=94"></script>
-<script src="expedition.js?v=94"></script>
+<script src="photos/list.js?v=95"></script>
+<script src="data.js?v=95"></script>
+<script src="deck.js?v=95"></script>
+<script src="expedition.js?v=95"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -562,8 +562,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
 <section id="v-wheel" class="hidden">
   <div class="head"><h1>Колесо</h1><div class="sub" id="wheel-sub"></div></div>
-  <h2>Что сегодня горело</h2>
-  <div class="spheres" id="sp-edit" style="margin-bottom:14px"></div>
+  <div class="g" id="wheel-calib" style="margin-bottom:14px;display:none"></div>
   <div class="seg" id="period"></div>
   <div style="text-align:center;margin:6px 0 2px">
     <svg id="wheel" viewBox="0 0 330 330" width="100%" style="max-width:350px"></svg></div>
@@ -589,7 +588,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="94 · 21.08.2026 09:57";
+const APP_VERSION="95 · 21.08.2026 10:51";
 
 let toastTimer=null;
 function toast(text){
@@ -1137,7 +1136,8 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          // звук места: 1 — можно, 0 — выключен насовсем
          sound:LS.sound??1,
          // когда колесо последний раз пересчитывалось само + что оно сдвинуло
-         wheelAt:LS.wheelAt||"", wheelMoved:LS.wheelMoved||[],
+         calibratedAt:LS.calibratedAt||"", wheelPrev:LS.wheelPrev||null,
+         wheelSnapAt:LS.wheelSnapAt||"",
          // какие истории про людей уже слышал — чтобы не повторялись
          storiesSeen:LS.storiesSeen||[], pendingStoryIndex:LS.pendingStoryIndex??null,
          // земли, камни, капсулы, летопись, задачки
@@ -1192,197 +1192,6 @@ const weakest=()=>{
 //
 
 
-// ── Серый день ───────────────────────────────────────────────────────
-// Взято у Way of Life: у дня три состояния, а не два. Да, нет и «этот день
-// не про это». Разница между «я не смог» и «сегодня не в счёт» огромная:
-// первое человек носит на себе, второе кладёт на полку.
-//
-// Философия «не наказывать за пропуск» до сих пор держалась на молчании —
-// приложение просто ничего не говорило. Но молчание не то же самое, что
-// прощение: человек достраивает упрёк сам. Это активный жест вместо тишины.
-//
-// Ни счётчика серых дней, ни лимита, ни предложения от приложения:
-// «может, отметишь день серым?» читается как «ты ведь всё равно не сделаешь».
-const isGrey=k=>!!(LOG[k]&&LOG[k].grey);
-function toggleGrey(){
-  const k=dayKey();
-  const было=isGrey(k);
-  LOG[k]={...(LOG[k]||{d:k}),grey:было?0:1};
-  if(!было&&!LOG[k].t) LOG[k].t=[];
-  saveLog(); mergeLog();
-  renderToday(); renderDays();
-  toast(было?"День снова обычный":"Хорошо. Этот день не в счёт");
-}
-
-// Истории про живых людей — самое сильное, что здесь написано, и их 22.
-// Но на сферу приходится одна-две, а берутся они под самую слабую сферу.
-// Пока колесо стояло, человек видел одну и ту же по кругу. Теперь помним
-// услышанное: сначала отдаём неслыханное из своей сферы, потом неслыханное
-// вообще, и только когда кончилось всё — начинаем по второму разу.
-function pickStory(sphere,seed){
-  const слышал=new Set(PET.storiesSeen||[]);
-  const все=STORIES.map((s,i)=>({s,i}));
-  const свои=все.filter(o=>o.s.sphere===sphere);
-  let выбор=свои.filter(o=>!слышал.has(o.i));            // своя сфера, неслыханное
-  if(!выбор.length) выбор=все.filter(o=>!слышал.has(o.i)); // любое неслыханное
-  if(!выбор.length) выбор=свои.length?свои:все;            // всё услышано — по кругу
-  return выбор[(seed>>>0)%выбор.length];
-}
-function rememberStory(i){
-  if(i==null)return;
-  PET.storiesSeen=[...new Set([...(PET.storiesSeen||[]),i])];
-  PET.heard=(PET.heard||0)+1;
-  savePet();
-}
-
-// ── Колесо двигается само ────────────────────────────────────────────
-// 19 августа убрали шкалу («колесо спрашивает оценку один раз, дальше она
-// двигается сама от чек-инов») — и вторую половину правки не написали.
-// Экран обещал движение, а двигать было нечем: оценка стояла намертво.
-// Из-за этого «Фокус недели» показывал одну и ту же сферу вечно, а истории
-// про людей выбираются под самую слабую сферу — значит двадцать из двадцати
-// двух были недостижимы. Правда вскрылась на разборе 20 августа.
-//
-// Правило простое и мягкое: смотрим две недели. Горела почти всегда — плюс
-// один. Не горела совсем — минус один. Между — стоит. Двигаем не чаще раза
-// в неделю, чтобы оценка не дёргалась от одного удачного дня.
-const WHEEL_WINDOW=14, WHEEL_UP=10, WHEEL_DOWN=1;
-// Сколько дней из последних N сфера горела. Серые дни не в счёт — они
-// не про эту сферу и не должны тянуть оценку вниз.
-function litDays(code,окно){
-  const дни=DAYS.slice(-окно).filter(d=>!d.grey);
-  return {горело:дни.filter(d=>(d.touched||[]).includes(code)).length,из:дни.length};
-}
-function moveWheel(){
-  // Раз в неделю и только когда есть на чём считать: на трёх днях
-  // движение — это гадание, а не наблюдение.
-  const неделя=Math.floor(Date.now()/(7*864e5));
-  if(PET.wheelAt===String(неделя)) return;
-  if(DAYS.filter(d=>!d.grey).length<7){ PET.wheelAt=String(неделя); savePet(); return; }
-  const сдвиги=[];
-  SPHERES.forEach(sp=>{
-    const было=DATA.wheel[sp.code]||0;
-    if(!было) return;                       // неоценённую не трогаем, её спросят
-    const {горело,из}=litDays(sp.code,WHEEL_WINDOW);
-    let стало=было;
-    if(горело>=WHEEL_UP) стало=Math.min(10,было+1);
-    else if(горело<=WHEEL_DOWN) стало=Math.max(1,было-1);
-    if(стало!==было){
-      DATA.wheel[sp.code]=стало;
-      сдвиги.push({c:sp.code,было,стало,горело,из});
-    }
-  });
-  PET.wheelAt=String(неделя);
-  PET.wheelMoved=сдвиги;
-  if(сдвиги.length){
-    lsSet("wheel",JSON.stringify(DATA.wheel));
-    сдвиги.forEach(x=>{
-      const имя=byCode(x.c).name.toLowerCase();
-      летопись(`${имя}: ${x.было} → ${x.стало}, горело ${x.горело} ${plural(x.горело,"день","дня","дней")} из ${x.из}.`);
-    });
-  }
-  savePet();
-}
-
-// ── Счётчик попыток ──────────────────────────────────────────────────
-// Весь мир меряет результат: есть работа или нет. Девять месяцев поиска
-// при этом выглядят как пустота — хотя это сотни отправленных откликов,
-// переписанных резюме и собеседований, после которых не перезвонили.
-// Каждое из них требовало усилия ровно тогда, когда его взять неоткуда.
-// Счётчик считает сделанное. Только вверх, без обнуления, никогда не падает.
-const TRY_MARKS=[10,25,50,100,200,350,500,1000];
-const triesOf=c=>(PET.tries||{})[c]||0;
-// Считается сам, при отметке сферы в чек-ине. Отдельной кнопки нет
-// намеренно: нажимать «+ попытка» после отправленного отклика — значит
-// хлопать себе в ладоши в пустой комнате, и на девятом месяце поиска
-// это стыдно, а не приятно. Галочка и так уже поставлена по другому
-// поводу, попытка — просто её след.
-//
-// Тихо: ни всплывашки, ни вибрации. Вехи в летопись всё равно пишутся —
-// они и есть то единственное, ради чего счётчик существует.
-function addTry(code,тихо){
-  PET.tries={...(PET.tries||{})};
-  PET.tries[code]=triesOf(code)+1;
-  const n=PET.tries[code], s=byCode(code);
-  if(TRY_MARKS.includes(n))
-    летопись(`${n} ${plural(n,"попытка","попытки","попыток")} — ${s.name.toLowerCase()}. Ни одна не пропала.`);
-  savePet();
-  if(тихо) return;
-  renderWheel();
-  if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
-  toast(`${n} ${plural(n,"попытка","попытки","попыток")}`);
-}
-// Отметил сферу — засчитали попытку по ней. Один раз за день на сферу:
-// чек-ин можно сохранять сколько угодно раз, и от этого счёт расти не должен.
-function countTries(key,сферы){
-  PET.triedOn=PET.triedOn||{};
-  const было=new Set(PET.triedOn[key]||[]);
-  (сферы||[]).forEach(c=>{ if(!было.has(c)){ addTry(c,true); было.add(c); } });
-  PET.triedOn={[key]:[...было]};        // помним только последний день
-  savePet();
-}
-
-
-const strongest=()=>SPHERES.reduce((m,s)=>DATA.wheel[s.code]>DATA.wheel[m.code]?s:m,SPHERES[0]);
-function dormant(c){let n=0;for(let i=DAYS.length-1;i>=0;i--){if(DAYS[i].touched.includes(c))break;n++;}return n;}
-const BASE=10,BONUS=30;
-const ptsFor=c=>dormant(c)>=3?BONUS:BASE;
-// Замер тела — тоже работа по себе, и энергию он даёт наравне со сферой.
-// Раньше не давал вовсе: человек утром вставал, мерил пульс и вес, а рысь
-// стояла на нуле и никуда не шла. Получалось, что приложение не заметило
-// ровно то, ради чего трекер и заводят.
-const ЗАМЕР=4;
-const ЗАМЕРЫ_ДНЯ=["s","m","e","p","w","st","di","pu","sq","kb"];
-const measurePoints=день=>ЗАМЕРЫ_ДНЯ
-  .filter(k=>день&&день[k]!=null&&день[k]!=="").length*ЗАМЕР;
-const dayPoints=(l,день)=>l.reduce((s,c)=>s+ptsFor(c),0)+measurePoints(день);
-// Баллы копятся за всё время и хранятся у себя. Раньше считались по окну
-// в 30 дней — на тридцатый день старые дни выпадали, и рост вставал навсегда.
-const earned=()=>Object.values(PET.days||{}).reduce((s,v)=>s+v,0)+(PET.bonus||0);
-// Единственное место, где начисляются баллы за день: и из чек-ина, и из галочек
-function creditDay(key,touched){
-  PET.days=PET.days||{};
-  PET.days[key]=dayPoints(touched,LOG[key]);
-  savePet();
-}
-
-// ══ Карта дня, прогулка, находки, характер ═══════════════════════════
-// Содержимое лежит в запечатанном deck.js. Порядок карт перемешивается
-// личным ключом deckSeed, который рождается один раз и случайно, — поэтому
-// даже тот, кто писал колоду, не знает, что выпадет завтра. В этом и смысл.
-const DECK=window.DECK||[], FINDS=window.FINDS||[];
-
-if(!PET.deckSeed){PET.deckSeed=Math.floor(Math.random()*1e9)+1;savePet();}
-
-// Генератор случайных чисел с зерном: одинаковое зерно — одинаковая
-// последовательность. Без этого карта дня менялась бы при каждом перезаходе.
-function rngFrom(seed){let s=(seed>>>0)||1;
-  return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};}
-
-// Перестановка всей колоды под личный ключ: год без повторов, свой порядок.
-function deckOrder(){
-  const r=rngFrom(PET.deckSeed),a=DECK.map((_,i)=>i);
-  for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
-  return a;
-}
-const dayIndex=()=>Math.max(0,Math.floor((Date.now()-(PET.bornAt||Date.now()))/86400000));
-
-// Свой перемешанный порядок для любого набора карт: у вопросов дня он должен
-// отличаться от порядка колоды, иначе вопрос и карта дня будут ходить парой.
-function ownOrder(list,соль){
-  const r=rngFrom((PET.deckSeed||1)+соль),a=list.map((_,i)=>i);
-  for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
-  return a;
-}
-// Вопрос дня для «строки про день». Пустое поле с подписью «Необязательно»
-// не подсказывает ничего: непонятно, что писать и кому. Конкретный вопрос —
-// подсказывает. Меняется каждый день и берётся из той же запечатанной колоды.
-function noteQuestion(){
-  const вопросы=DECK.filter(c=>c.t==="в");
-  if(!вопросы.length)return null;
-  const o=ownOrder(вопросы,7777);
-  return вопросы[o[dayIndex()%o.length]];
-}
 function cardToday(){
   if(!DECK.length)return null;
   const order=deckOrder();
@@ -1447,6 +1256,205 @@ function openCapsule(){
 }
 function laterCapsule(){document.getElementById("capsule-modal").style.display="none";}
 
+// ── Серый день ───────────────────────────────────────────────────────
+// Взято у Way of Life: у дня три состояния, а не два. Да, нет и «этот день
+// не про это». Разница между «я не смог» и «сегодня не в счёт» огромная:
+// первое человек носит на себе, второе кладёт на полку.
+//
+// Философия «не наказывать за пропуск» до сих пор держалась на молчании —
+// приложение просто ничего не говорило. Но молчание не то же самое, что
+// прощение: человек достраивает упрёк сам. Это активный жест вместо тишины.
+//
+// Ни счётчика серых дней, ни лимита, ни предложения от приложения:
+// «может, отметишь день серым?» читается как «ты ведь всё равно не сделаешь».
+const isGrey=k=>!!(LOG[k]&&LOG[k].grey);
+function toggleGrey(){
+  const k=dayKey();
+  const было=isGrey(k);
+  LOG[k]={...(LOG[k]||{d:k}),grey:было?0:1};
+  if(!было&&!LOG[k].t) LOG[k].t=[];
+  saveLog(); mergeLog();
+  renderToday(); renderDays();
+  toast(было?"День снова обычный":"Хорошо. Этот день не в счёт");
+}
+
+// Истории про живых людей — самое сильное, что здесь написано, и их 22.
+// Но на сферу приходится одна-две, а берутся они под самую слабую сферу.
+// Пока колесо стояло, человек видел одну и ту же по кругу. Теперь помним
+// услышанное: сначала отдаём неслыханное из своей сферы, потом неслыханное
+// вообще, и только когда кончилось всё — начинаем по второму разу.
+function pickStory(sphere,seed){
+  const слышал=new Set(PET.storiesSeen||[]);
+  const все=STORIES.map((s,i)=>({s,i}));
+  const свои=все.filter(o=>o.s.sphere===sphere);
+  let выбор=свои.filter(o=>!слышал.has(o.i));            // своя сфера, неслыханное
+  if(!выбор.length) выбор=все.filter(o=>!слышал.has(o.i)); // любое неслыханное
+  if(!выбор.length) выбор=свои.length?свои:все;            // всё услышано — по кругу
+  return выбор[(seed>>>0)%выбор.length];
+}
+function rememberStory(i){
+  if(i==null)return;
+  PET.storiesSeen=[...new Set([...(PET.storiesSeen||[]),i])];
+  PET.heard=(PET.heard||0)+1;
+  savePet();
+}
+
+// ── Колесо двигается само ────────────────────────────────────────────
+// 19 августа убрали шкалу («колесо спрашивает оценку один раз, дальше она
+// двигается сама от чек-инов») — и вторую половину правки не написали.
+// Экран обещал движение, а двигать было нечем: оценка стояла намертво.
+// Из-за этого «Фокус недели» показывал одну и ту же сферу вечно, а истории
+// про людей выбираются под самую слабую сферу — значит двадцать из двадцати
+// двух были недостижимы. Правда вскрылась на разборе 20 августа.
+//
+// Правило простое и мягкое: смотрим две недели. Горела почти всегда — плюс
+// один. Не горела совсем — минус один. Между — стоит. Двигаем не чаще раза
+// в неделю, чтобы оценка не дёргалась от одного удачного дня.
+const WHEEL_WINDOW=14;      // окно, за которое считаем «сколько горело»
+const СВЕРКА_ЧЕРЕЗ=7;                    // дней между сверками
+// Сколько дней прошло с прошлой сверки. Ни разу не сверялся — считаем,
+// что пора: колесо у него стоит с самого знакомства.
+function днейСоСверки(){
+  if(!PET.calibratedAt) return СВЕРКА_ЧЕРЕЗ;
+  // По календарным дням, а не по часам: сверялся неделю назад в полдень,
+  // зашёл утром — по часам выходило шесть дней, и сверка не предлагалась.
+  const было=new Date(PET.calibratedAt+"T00:00:00");
+  const сейчас=new Date(); сейчас.setHours(0,0,0,0);
+  return Math.round((сейчас-было)/864e5);
+}
+function пораСверять(){
+  const пора=rated().length>0 && днейСоСверки()>=СВЕРКА_ЧЕРЕЗ;
+  // Снимок «как было» делаем в тот момент, когда сверка открылась, а не
+  // когда закрылась: иначе сравнивать нечего — человек уже всё поменял.
+  if(пора && !PET.wheelSnapAt){
+    PET.wheelPrev={...DATA.wheel}; PET.wheelSnapAt=todayKey(); savePet();
+  }
+  if(!пора && PET.wheelSnapAt && PET.wheelSnapAt!==PET.calibratedAt){
+    PET.wheelSnapAt=PET.calibratedAt; savePet();   // сверка закрыта, снимок отработал
+  }
+  return пора;
+}
+// Что изменилось с прошлого раза — то, ради чего сверку и делают.
+function итогиСверки(новые){
+  const было=PET.wheelPrev||{};
+  const строки=[];
+  SPHERES.forEach(sp=>{
+    const б=было[sp.code], н=новые[sp.code];
+    if(!б||!н||б===н) return;
+    строки.push({c:sp.code, n:sp.name, было:б, стало:н});
+  });
+  return строки.sort((a,b)=>(b.стало-b.было)-(a.стало-a.было));
+}
+function завершитьСверку(){
+  // wheelPrev не трогаем: он снят при открытии сверки и нужен, чтобы
+  // показать «было → стало». Обнулится, когда придёт срок следующей.
+  PET.calibratedAt=todayKey();
+  savePet();
+}
+// Сколько дней из последних N сфера горела. Серые дни не в счёт — они
+// не про эту сферу и не должны тянуть оценку вниз.
+function litDays(code,окно){
+  const дни=DAYS.slice(-окно).filter(d=>!d.grey);
+  return {горело:дни.filter(d=>(d.touched||[]).includes(code)).length,из:дни.length};
+}
+// ── Счётчик попыток ──────────────────────────────────────────────────
+// Весь мир меряет результат: есть работа или нет. Девять месяцев поиска
+// при этом выглядят как пустота — хотя это сотни отправленных откликов,
+// переписанных резюме и собеседований, после которых не перезвонили.
+// Каждое из них требовало усилия ровно тогда, когда его взять неоткуда.
+// Счётчик считает сделанное. Только вверх, без обнуления, никогда не падает.
+const TRY_MARKS=[10,25,50,100,200,350,500,1000];
+const triesOf=c=>(PET.tries||{})[c]||0;
+// Считается сам, при отметке сферы в чек-ине. Отдельной кнопки нет
+// намеренно: нажимать «+ попытка» после отправленного отклика — значит
+// хлопать себе в ладоши в пустой комнате, и на девятом месяце поиска
+// это стыдно, а не приятно. Галочка и так уже поставлена по другому
+// поводу, попытка — просто её след.
+//
+// Тихо: ни всплывашки, ни вибрации. Вехи в летопись всё равно пишутся —
+// они и есть то единственное, ради чего счётчик существует.
+function addTry(code,тихо){
+  PET.tries={...(PET.tries||{})};
+  PET.tries[code]=triesOf(code)+1;
+  const n=PET.tries[code], s=byCode(code);
+  if(TRY_MARKS.includes(n))
+    летопись(`${n} ${plural(n,"попытка","попытки","попыток")} — ${s.name.toLowerCase()}. Ни одна не пропала.`);
+  savePet();
+  if(тихо) return;
+  renderWheel();
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+  toast(`${n} ${plural(n,"попытка","попытки","попыток")}`);
+}
+// Отметил сферу — засчитали попытку по ней. Один раз за день на сферу:
+// чек-ин можно сохранять сколько угодно раз, и от этого счёт расти не должен.
+function countTries(key,сферы){
+  PET.triedOn=PET.triedOn||{};
+  const было=new Set(PET.triedOn[key]||[]);
+  (сферы||[]).forEach(c=>{ if(!было.has(c)){ addTry(c,true); было.add(c); } });
+  PET.triedOn={[key]:[...было]};        // помним только последний день
+  savePet();
+}
+
+
+const strongest=()=>SPHERES.reduce((m,s)=>DATA.wheel[s.code]>DATA.wheel[m.code]?s:m,SPHERES[0]);
+function dormant(c){let n=0;for(let i=DAYS.length-1;i>=0;i--){if(DAYS[i].touched.includes(c))break;n++;}return n;}
+const BASE=10,BONUS=30;
+const ptsFor=c=>dormant(c)>=3?BONUS:BASE;
+// Замер тела — тоже работа по себе, и энергию он даёт наравне со сферой.
+// Раньше не давал вовсе: человек утром вставал, мерил пульс и вес, а рысь
+// стояла на нуле и никуда не шла. Получалось, что приложение не заметило
+// ровно то, ради чего трекер и заводят.
+const ЗАМЕР=4;                    // одно записанное число
+const ЗАДАЧА=8;                   // одно сделанное дело
+const ЗАМЕРЫ_ДНЯ=["s","m","e","p","w","st","di","pu","sq","kb"];
+const measurePoints=день=>ЗАМЕРЫ_ДНЯ
+  .filter(k=>день&&день[k]!=null&&день[k]!=="").length*ЗАМЕР;
+// Сделанные дела считаются поштучно: пять дел из одной сферы — это пять
+// дел, а не одна галочка.
+const taskPoints=день=>((день&&день.dn)||0)*ЗАДАЧА;
+const dayPoints=(l,день)=>l.reduce((s,c)=>s+ptsFor(c),0)
+  +measurePoints(день)+taskPoints(день);
+// Баллы копятся за всё время и хранятся у себя. Раньше считались по окну
+// в 30 дней — на тридцатый день старые дни выпадали, и рост вставал навсегда.
+const earned=()=>Object.values(PET.days||{}).reduce((s,v)=>s+v,0)+(PET.bonus||0);
+// Единственное место, где начисляются баллы за день: и из чек-ина, и из галочек
+function creditDay(key,touched){
+  PET.days=PET.days||{};
+  PET.days[key]=dayPoints(touched,LOG[key]);
+  savePet();
+}
+
+// ══ Карта дня, прогулка, находки, характер ═══════════════════════════
+// Содержимое лежит в запечатанном deck.js. Порядок карт перемешивается
+// личным ключом deckSeed, который рождается один раз и случайно, — поэтому
+// даже тот, кто писал колоду, не знает, что выпадет завтра. В этом и смысл.
+const DECK=window.DECK||[], FINDS=window.FINDS||[];
+
+if(!PET.deckSeed){PET.deckSeed=Math.floor(Math.random()*1e9)+1;savePet();}
+
+// Генератор случайных чисел с зерном: одинаковое зерно — одинаковая
+// последовательность. Без этого карта дня менялась бы при каждом перезаходе.
+function rngFrom(seed){let s=(seed>>>0)||1;
+  return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};}
+
+// Перестановка всей колоды под личный ключ: год без повторов, свой порядок.
+function deckOrder(){
+  const r=rngFrom(PET.deckSeed),a=DECK.map((_,i)=>i);
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+const dayIndex=()=>Math.max(0,Math.floor((Date.now()-(PET.bornAt||Date.now()))/86400000));
+
+// Свой перемешанный порядок для любого набора карт: у вопросов дня он должен
+// отличаться от порядка колоды, иначе вопрос и карта дня будут ходить парой.
+function ownOrder(list,соль){
+  const r=rngFrom((PET.deckSeed||1)+соль),a=list.map((_,i)=>i);
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+// Вопрос дня для «строки про день». Пустое поле с подписью «Необязательно»
+// не подсказывает ничего: непонятно, что писать и кому. Конкретный вопрос —
+// подсказывает. Меняется каждый день и берётся из той же запечатанной колоды.
 // ── Метки: зверь, которого больше ни у кого нет ──────────────────────
 // Рысь у всех одинаковая — это то место, где терялась уникальность.
 // Новые фотографии на каждый случай не нужны: поверх снимка ложатся
@@ -2308,10 +2316,10 @@ function hardDays(){
 
 // Мир вокруг зверя — совет №3: баллы тратятся не на самого зверя (его нельзя
 // купить — он и есть колесо), а на поляну вокруг. Купленное остаётся навсегда,
-// ухода не требует. Цены и темп трат (≈510 баллов в неделю при горении 37 из 84)
+// ухода не требует. Цены и темп трат (баллы копятся от записанных дней и сделанных дел)
 // уже проверены советом, специально не меняю.
 // Уровней и очков опыта больше нет: зверь — это и есть твоё колесо.
-// Зрелость — среднее по двенадцати сферам, слабейшая показывает, куда расти.
+// Слабейшая сфера показывает, куда смотреть на этой неделе.
 const scores=()=>SPHERES.map(s=>DATA.wheel[s.code]||0);
 const rated=()=>scores().filter(v=>v>0);                 // сколько сфер оценено
 
@@ -2551,46 +2559,29 @@ function renderTotem(){
     new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"})
     +(IS_DEMO?" · демо-данные":"");   // версия живёт в кабинете, не здесь
 
-  drawVectorTotem(m);   // резервный зверь из сфер, живёт в data.js
 
-  // Порядок для нового человека: сначала знакомство — оценить двенадцать сфер
-  // и увидеть, как проявляется зверь, — и только потом первый чек-ин.
-  // Наоборот не годится: чек-ин без зверя выглядит как анкета непонятно зачем.
+  // Порядок для нового человека: сначала сверка восьми сторон, потом
+  // первый записанный день. Наоборот не годится: запись без зверя
+  // выглядит как анкета непонятно зачем.
   const сколько=rated().length;
   if(!сколько){
-    document.getElementById("totem-state").innerHTML=PHOTO_MODE
-      ? `<div class="lead">Знакомство</div>
-         <div class="fname">Твоя рысь уже здесь</div>
-         <div class="why">Она растёт сама — раз в 6 часов, весь месяц. Двенадцать сфер жизни
-           её не меняют, они отдельно: от них зависит, какой фокус недели
-           показывать и что предлагать на вкладке «Сегодня».</div>
-         <div class="dim" style="margin-top:10px">Оцени каждую сферу от 1 до 10, чтобы
-           система знала, куда сейчас важнее смотреть.</div>
-         <button class="btn" onclick="startRating()">Оценить сферы</button>
-         ${nameBlock()}`
-      : `<div class="lead">Знакомство</div>
-         <div class="fname">Здесь будет твой зверь</div>
-         <div class="why">Он складывается из двенадцати сторон твоей жизни: корпус — здоровье,
-           уши — друзья, хвост — деньги, рога — карьера. Чем ровнее живёшь, тем он целее.
-           Пока ни одна сторона не оценена, поэтому силуэт едва виден.</div>
-         <div class="dim" style="margin-top:10px">Оцени каждую сферу от 1 до 10: насколько
-           эта часть жизни тебя сейчас держит. Займёт минуту, и зверь проявится на глазах.</div>
-         <button class="btn" onclick="startRating()">Собрать зверя</button>
-         ${hasData()?"":`<button class="btn ghost" onclick="showDemo(true)">Посмотреть на примере</button>`}`;
+    document.getElementById("totem-state").innerHTML=
+      `<div class="lead">Знакомство</div>
+       <div class="fname">Твоя рысь уже здесь</div>
+       <div class="why">Она растёт сама — раз в 6 часов, весь месяц. Восемь сторон
+         жизни её не меняют, они отдельно: раз в неделю ты сверяешь, где
+         находишься, и из этого собирается фокус на следующие семь дней.</div>
+       <div class="dim" style="margin-top:10px">Пройди по восьми сторонам и поставь
+         оценку — как чувствуешь сегодня.</div>
+       <button class="btn" onclick="startRating()">Сверить восемь сторон</button>
+       ${nameBlock()}`;
     updatePhoto();
     return;
   }
-  const low=Math.min(...rated()),w=weakest(),str=strongest();
-  const слабые=SPHERES.filter(x=>(DATA.wheel[x.code]||0)<=3).map(x=>BODY[x.code]);
-  // На фото — рысь, женский род. В векторном запасном режиме это по-прежнему
-  // «зверь», мужской. Тексты разошлись бы, если бы не эта развилка.
-  const state=PHOTO_MODE
-    ? (m==="red"?"Свернулась рядом с тобой"
-      :m==="yellow"?"Притихла, но всё хорошо"
-      :"Бодра и спокойна")
-    : (m==="red"?"Свернулся рядом с тобой"
-      :m==="yellow"?"Притих, но с ним всё хорошо"
-      :"Бодр и спокоен");
+  const w=weakest(),str=strongest();
+  const state=m==="red"?"Свернулась рядом с тобой"
+    :m==="yellow"?"Притихла, но всё хорошо"
+    :"Бодра и спокойна";
 
   // Копилку баллов не показываем: тратить их негде с тех пор, как убрали
   // лавку. Число, которое только растёт и ничего не делает, — пустой шум.
@@ -2633,17 +2624,13 @@ function renderTotem(){
         ${PET.name?"":`<div class="fname" style="margin:5px 0 0">${state}</div>`}</div>
      ${nameBlock()}
      ${сколько<SPHERES.length
-       ? `<div class="dim" style="margin-top:12px">Оценено ${сколько} из ${SPHERES.length}.${PHOTO_MODE?"":
-            " Неоценённые части ещё не проросли — зверь проявится целиком, когда пройдёшь все."}</div>
-          <button class="btn ghost" onclick="startRating()">Дооценить сферы</button>`
+       ? `<div class="dim" style="margin-top:12px">Оценено ${сколько} из ${SPHERES.length}.</div>
+          <button class="btn ghost" onclick="startRating()">Досверить</button>`
        : ""}
      ${DEMO_ON?`<button class="btn ghost" onclick="showDemo(false)">Это пример. Убрать и начать своё</button>`:""}
      ${m==="red"
-       ? `<div class="dim" style="margin-top:12px">Сейчас он ничего от тебя не хочет. Просто побудьте рядом.</div>`
-       : PHOTO_MODE ? ""
-       : `<div class="dim" style="margin-top:12px">${слабые.length
-         ? `Зверь собран из твоих двенадцати сфер. Пока не проросли: ${слабые.join(", ")}. Поднимешь сферу — вырастет её часть.`
-         : `Зверь собран из твоих двенадцати сфер. Все части проросли — держи так.`}</div>`}`;
+       ? `<div class="dim" style="margin-top:12px">Сейчас она ничего от тебя не хочет. Просто побудьте рядом.</div>`
+       : ""}`;
 
   {
     // Почему она сегодня такая. Строка есть всегда, когда показан взрослый
@@ -2811,6 +2798,7 @@ function renderToday(){
     // иначе экран обещает баллы, которых нет, и чек-ин про неё не знает.
     const rec=LOG[todayKey()]||{d:todayKey()};
     rec.t=[...DATA.today.touched];
+    rec.dn=PET.doneTasks.length;          // сколько дел сделано сегодня
     rec.pt=dayPoints(rec.t,rec); rec.ok=false;
     LOG[todayKey()]=rec; saveLog();
     creditDay(todayKey(),rec.t);
@@ -2959,6 +2947,7 @@ function save(){
     t:[...edit.touched],p:доп(edit.pulse,было.p),w:доп(edit.weight,было.w),
     st:доп(edit.steps,было.st),di:доп(edit.dist,было.di),
     pu:доп(edit.push,было.pu),sq:доп(edit.squat,было.sq),kb:доп(edit.kettle,было.kb),
+    dn:Math.max(было.dn||0,(PET.doneTasks||[]).length),
     tr:было.tr,n:было.n,pt:got,
     // Отметка «день не в счёт» не должна слетать при сохранении чек-ина,
     // и она обязана уезжать боту явным нулём тоже: иначе снять её нечем —
@@ -3044,6 +3033,12 @@ function savedTick(){
 
 // ── Колесо: неделя / месяц / год ─────────────────────────────────────
 // Знакомство начинается с первой неоценённой сферы, а не с общего вида колеса
+function закрытьСверку(){
+  завершитьСверку();
+  renderWheel();
+  toast("Сверено. Фокус недели обновлён");
+  go("today");
+}
 function startRating(){
   const первая=SPHERES.find(s=>!(DATA.wheel[s.code]||0));
   picked=первая?первая.code:null;
@@ -3095,7 +3090,7 @@ function go(v){
   if(v==="checkin")openCheckin();
   if(v==="finds"){renderFinds();renderDen();renderPlan();}
   if(v==="me"){renderMe();renderGoals();}
-  if(v==="wheel"){renderWheel();renderSpheresEdit();}
+  if(v==="wheel")renderWheel();
   if(v==="trend")renderTrend();
   VIEW=v;
 }
@@ -3134,7 +3129,6 @@ let VIEW="totem";
 if(CONFIRM) confirmFromBot(CONFIRM);   // что дошло до бота — помечаем и чистим
 prune();
 mergeLog();
-moveWheel();                 // колесо подтягивается само, раз в неделю
 DATA.today=todayState();     // новый день начинается с чистого листа
 go("totem");
 setInterval(applyTheme,60000);
