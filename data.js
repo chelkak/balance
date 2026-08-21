@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="77 · 21.08.2026 04:09";
+window.DATA_JS_VERSION="78 · 21.08.2026 04:50";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -1006,10 +1006,10 @@ function openAim(планируем){
   // Ночью отправить нельзя, а спланировать можно: это и есть способ
   // закончить день, а не получить ещё одну задачу.
   if(!планируем&&typeof нДень==="function"&&!нДень()){
-    toast(new Date().getHours()>=22?"День закончен. Можно выбрать путь на завтра":"Она ещё спит. С восьми утра");
+    toast(walkAllowedNow()?"День закончен. Можно выбрать путь на завтра":рассветВремя());
     return;
   }
-  if(!walkAllowedNow()){toast("Она ещё спит. С восьми утра");return;}
+  if(!walkAllowedNow()){toast(рассветВремя());return;}
   const открытые=(PET.lands||[0]).slice().sort((a,b)=>a-b);
   document.getElementById("aim-list").innerHTML=открытые.map(i=>{
     const l=LANDS[i]||LANDS[0];
@@ -1564,65 +1564,3 @@ function renderMe(){
 // Полумеры вроде «тише» тут не нужны — либо человеку это интересно,
 // либо он не хочет видеть даже предложения.
 
-// ── Временные показатели ─────────────────────────────────────────────
-// Кашель, давление, температура живут неделю-другую и уходят. Держать под
-// них постоянные поля — значит носить простуду в интерфейсе круглый год.
-// Поэтому: нажал, поле появилось, через две недели исчезло само. Данные
-// при этом остаются, пропадает только место на экране.
-//
-// Названия готовые, а не набираемые руками: диалог ввода в телеграме
-// неудобен, а четыре кнопки закрывают почти всё, что бывает.
-const ВРЕМЕННЫЕ={
-  press:{n:"давление", ед:"верхнее"},
-  temp: {n:"температура", ед:"°C", шаг:"0.1"},
-  pain: {n:"боль", ед:"0–10"},
-  cough:{n:"кашель", ед:"0–10"},
-};
-const ЖИВЁТ=14;                         // дней, потом поле уходит с экрана
-
-function активныеВременные(){
-  const с=DATA.temp||{}, сегодня=todayKey();
-  return Object.keys(с).filter(k=>ВРЕМЕННЫЕ[k]&&с[k]>=сегодня);
-}
-function добавитьВременный(k){
-  if(!ВРЕМЕННЫЕ[k]) return;
-  const до=new Date(); до.setDate(до.getDate()+ЖИВЁТ);
-  // Дата по местному времени: toISOString даёт Гринвич, и ночью по Москве
-  // это уже вчера. Тот же баг когда-то съезжал сутки по всему приложению.
-  DATA.temp={...(DATA.temp||{}), [k]:keyOf(до)};
-  lsSet("temp",JSON.stringify(DATA.temp));
-  renderTemp();
-}
-function убратьВременный(k){
-  const с={...(DATA.temp||{})}; delete с[k];
-  DATA.temp=с; lsSet("temp",JSON.stringify(с));
-  renderTemp();
-}
-function readTemp(){
-  const из={};
-  активныеВременные().forEach(k=>{
-    const el=document.getElementById("t-"+k);
-    if(!el) return;
-    const v=el.value.trim();
-    if(v!=="") из[k]=parseFloat(v);
-  });
-  edit.tmp=Object.keys(из).length?из:null;
-}
-function renderTemp(){
-  const поля=document.getElementById("tmp-fields");
-  const кнопки=document.getElementById("tmp-add");
-  const шапка=document.getElementById("tmp-title");
-  if(!поля||!кнопки) return;
-  const есть=активныеВременные();
-  const было=(edit.tmp)||{};
-  поля.innerHTML=есть.map(k=>{
-    const в=ВРЕМЕННЫЕ[k];
-    return `<div class="field"><label>${в.n}, ${в.ед}
-        <span onclick="убратьВременный('${k}')" style="float:right;cursor:pointer;opacity:.5">убрать</span></label>
-      <input id="t-${k}" type="number" inputmode="decimal"${в.шаг?` step="${в.шаг}"`:""}
-        value="${было[k]??""}" oninput="readTemp()"></div>`;}).join("");
-  кнопки.innerHTML=Object.keys(ВРЕМЕННЫЕ).filter(k=>!есть.includes(k))
-    .map(k=>`<div class="pill" onclick="добавитьВременный('${k}')">+ ${ВРЕМЕННЫЕ[k].n}</div>`).join("");
-  // Заголовок не висит над пустотой, когда ничего не болит.
-  if(шапка) шапка.style.opacity=есть.length?"1":".55";
-}

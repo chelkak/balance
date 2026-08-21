@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=77"></script>
-<script src="data.js?v=77"></script>
-<script src="deck.js?v=77"></script>
-<script src="expedition.js?v=77"></script>
+<script src="photos/list.js?v=78"></script>
+<script src="data.js?v=78"></script>
+<script src="deck.js?v=78"></script>
+<script src="expedition.js?v=78"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -541,10 +541,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   </div>
   <div class="sub" id="best-line" style="margin-top:8px"></div>
 
-  <h2 id="tmp-title">Ненадолго</h2>
-  <div class="sub" style="margin-bottom:8px">Заболело — отмечай, пока это есть. Через две недели уйдёт само</div>
-  <div id="tmp-fields" class="fields"></div>
-  <div class="pills" id="tmp-add" style="margin-top:8px"></div>
 
   <h2>Тренировка</h2><div class="pills" id="p-train"></div>
 
@@ -589,7 +585,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="77 · 21.08.2026 04:09";
+const APP_VERSION="78 · 21.08.2026 04:50";
 
 let toastTimer=null;
 function toast(text){
@@ -663,7 +659,12 @@ if(tg&&inTelegram){tg.ready();tg.expand();}
     return;
   }
   sessionStorage.setItem("перезагрузка","1");
-  location.replace(location.pathname+"?v="+encodeURIComponent(APP_VERSION));
+  // Решётку сохраняем обязательно: в ней едут колесо, цели и последние дни
+  // от бота (payload.url), и по ней же решается перенос старых ключей.
+  // Без неё перезагрузка молча выбрасывала данные владельца — и делала это
+  // ровно тогда, когда вероятнее всего, сразу после публикации.
+  location.replace(location.pathname
+    + "?v=" + encodeURIComponent(APP_VERSION) + location.hash);
 })();
 
 const PH=window.PHOTOS||{};
@@ -784,7 +785,7 @@ let DATA={today:{sleep:null,mood:null,energy:null,touched:[],note:"",
  wheel:DEMO_ON?{health:6,look:5,love:7,family:8,friends:4,career:6,money:5,self:3,spirit:2,rest:6,env:5,comm:4}:{...NEUTRAL},
  goals:{weight:78,sleep:7.5},spent:0,
  // Что человек отметил как временное и до какого числа это показывать.
- temp:(()=>{try{return JSON.parse(lsGet("temp")||"{}");}catch(e){return {};}})()};
+ temp:{}};
 
 let IS_DEMO=DEMO_ON, CONFIRM=null;
 function showDemo(on){
@@ -1382,14 +1383,22 @@ const strongest=()=>SPHERES.reduce((m,s)=>DATA.wheel[s.code]>DATA.wheel[m.code]?
 function dormant(c){let n=0;for(let i=DAYS.length-1;i>=0;i--){if(DAYS[i].touched.includes(c))break;n++;}return n;}
 const BASE=10,BONUS=30;
 const ptsFor=c=>dormant(c)>=3?BONUS:BASE;
-const dayPoints=l=>l.reduce((s,c)=>s+ptsFor(c),0);
+// Замер тела — тоже работа по себе, и энергию он даёт наравне со сферой.
+// Раньше не давал вовсе: человек утром вставал, мерил пульс и вес, а рысь
+// стояла на нуле и никуда не шла. Получалось, что приложение не заметило
+// ровно то, ради чего трекер и заводят.
+const ЗАМЕР=4;
+const ЗАМЕРЫ_ДНЯ=["s","m","e","p","w","st","di","pu","sq","kb"];
+const measurePoints=день=>ЗАМЕРЫ_ДНЯ
+  .filter(k=>день&&день[k]!=null&&день[k]!=="").length*ЗАМЕР;
+const dayPoints=(l,день)=>l.reduce((s,c)=>s+ptsFor(c),0)+measurePoints(день);
 // Баллы копятся за всё время и хранятся у себя. Раньше считались по окну
 // в 30 дней — на тридцатый день старые дни выпадали, и рост вставал навсегда.
 const earned=()=>Object.values(PET.days||{}).reduce((s,v)=>s+v,0)+(PET.bonus||0);
 // Единственное место, где начисляются баллы за день: и из чек-ина, и из галочек
 function creditDay(key,touched){
   PET.days=PET.days||{};
-  PET.days[key]=dayPoints(touched);
+  PET.days[key]=dayPoints(touched,LOG[key]);
   savePet();
 }
 
@@ -1841,15 +1850,36 @@ function летопись(текст){
 // «сохранил и жди»: каждой галочкой человек зовёт её обратно. Утром
 // отпустил, днём занят, вечером лёг на диван, донёс день — и она пришла.
 const WALK_MIN_MS=60*60*1000;                 // раньше часа не вернётся никогда
-const WALK_FROM_H=8;                          // до восьми утра она спит
+// Раньше стояло «с восьми утра до десяти вечера» — круглые числа, взятые
+// как пример. Но в августе светает в пять, и человек, вставший на рассвете,
+// упирался в спящую рысь при светлом окне. Теперь день у неё тот же, что
+// за окном: проснулась на рассвете, укладывается на закате.
 const walkHoursFor=st=>8-Math.round((st-1)*4/9);   // стадия 1 → 8 ч, стадия 10 → 4 ч
 const MIN_PER_ENERGY=6;                       // одна энергия тянет домой на шесть минут
-const walkAllowedNow=()=>new Date().getHours()>=WALK_FROM_H;
+function walkAllowedNow(){
+  const с=солнце(), ч=new Date().getHours()+new Date().getMinutes()/60;
+  if(с.восход==null) return ч>=8;             // полярная ночь: запасной вариант
+  return ч>=с.восход;
+}
 // После десяти вечера приложение умеет закончить день, а не требовать
 // ещё одну задачу: новая долгая экспедиция не предлагается. Чек-ин
 // при этом остаётся доступным — трекер нельзя запирать из-за времени.
-const НОЧЬ_С=22;
-const нДень=()=>walkAllowedNow()&&new Date().getHours()<НОЧЬ_С;
+// Закат — конец её дня. Новую дальнюю дорогу затемно не начинают, но день
+// можно закончить и спланировать завтрашний путь. Чек-ин при этом остаётся
+// доступным всегда: трекер нельзя запирать из-за времени суток.
+// Что сказать, когда её ещё нельзя отпускать. Раньше здесь стояло глухое
+// «с восьми утра» — неправда в половине года.
+function рассветВремя(){
+  const с=солнце();
+  if(с.восход==null) return "Она ещё спит";
+  const ч=Math.floor(с.восход), м=Math.round((с.восход%1)*60);
+  return `Она ещё спит. Проснётся на рассвете, в ${ч}:${String(м).padStart(2,"0")}`;
+}
+function нДень(){
+  const с=солнце(), ч=new Date().getHours()+new Date().getMinutes()/60;
+  if(!walkAllowedNow()) return false;
+  return с.закат==null ? ч<22 : ч<с.закат;
+}
 
 // Сколько уже натикало ей навстречу. Энергию на выходе забирают всю
 // (walkSpent), поэтому energyNow() во время прогулки — это ровно то,
@@ -1926,8 +1956,8 @@ function openLand(i){
 
 function startWalk(куда){
   if(isWalking()||energyNow()<walkCost())return;
-  if(!нДень()){toast(new Date().getHours()>=НОЧЬ_С
-    ? "День закончен. Утром отпустишь" : "Она ещё спит. С восьми утра");return;}
+  if(!нДень()){toast(walkAllowedNow()
+    ? "День закончен. Утром отпустишь" : рассветВремя());return;}
   // Забираем всё накопленное, а не только цену: у Александра за прошлые дни
   // скопился банк на семь прогулок, и полоска первые дни была бы всегда полной —
   // то есть механика показала бы себя худшей стороной в первый же день.
@@ -1973,9 +2003,38 @@ function startWalk(куда){
 // прогулка приносила только вещи, а истории висели отдельным событием.
 // История берётся под самую слабую сферу, но долгие сферы туда не попадают:
 // про них тыкать не надо (см. isSlow).
+// Как прошёл путь — сегодняшний исход экспедиции, если он был.
+// До этого добыча решалась одним случайным числом: собранная полка меняла
+// только текст вечернего разбора. Человек за две прогулки понимал, что
+// возится зря, — и был прав, связи действительно не было.
+function походИсход(){
+  const п=PET.lastExpedition;
+  return (п&&п.d===todayKey())?п.исход:null;
+}
+// Одна фраза о том, чем кончился путь и почему. Берётся из того же исхода,
+// что двигает добычу, — иначе слова и расчёт разъедутся.
+function походПричина(){
+  const п=PET.lastExpedition;
+  if(!п||п.d!==todayKey()) return "";
+  const земля=(LANDS[п.land]||LANDS[0]).n.toLowerCase();
+  if(п.исход==="чисто")
+    return `Путь через ${земля} прошла целиком — собранное на полке сработало.`;
+  if(п.исход==="отступление")
+    return `До конца не дошла и повернула, зато ${земля} теперь знает лучше.`;
+  const узел=(typeof NODE_BY_ID!=="undefined"&&п.узел&&NODE_BY_ID[п.узел])
+    ? NODE_BY_ID[п.узел].t.toLowerCase() : null;
+  return узел
+    ? `Одну встречу обошла стороной — ${узел}. В следующий раз пригодится другая вещь.`
+    : "Одну встречу обошла стороной. В следующий раз пригодится другая вещь.";
+}
 function walkLoot(){
   const r=PET.walkRoll??Math.random();
   const пик=PET.walkPick??0;
+  const исход=походИсход();
+  // Дошла чисто — пороги сдвигаются в её пользу. Повернула — предмета нет,
+  // но день не пустой: остаются след, наблюдение или история, и знание
+  // земли, которое записала сама экспедиция. Наказания тут нет, есть разница.
+  if(исход==="отступление"&&r<=0.55) return {trace:TRACES[пик%TRACES.length]};
   // Возвращение всегда имеет развязку, но не обязано давать предмет.
   // «Просто гуляла» осталось, но рядом встали след и наблюдение: они
   // ничего не кладут в витрину, а день не остаётся пустым.
@@ -1990,7 +2049,9 @@ function walkLoot(){
   // Удача дня сдвигает пороги вверх и только вверх: в обычный день шансы
   // ровно те же, что были всегда, в удачный — выше. Хуже не становится
   // никогда, иначе это было бы наказание за случайность.
-  const бонус=(PET.walkLuck??luckToday().k)*0.06;
+  // Чистый путь работает как удачный день: только вверх, никогда вниз.
+  const заПуть=(исход==="чисто")?1:0;
+  const бонус=((PET.walkLuck??luckToday().k)+заПуть)*0.06;
   const rare=(p%100)/100;
   const редкость=rare<0.05+бонус?2:rare<0.30+бонус*2?1:0;
   const земля=PET.walkLand??0;
@@ -2055,9 +2116,9 @@ function renderWalk(){
     (доля>=1
       ? (нДень()
           ? `<button class="btn" style="margin-top:12px" onclick="openAim()">Отпустить бродить</button>`
-          : `<div class="dim" style="margin-top:10px">${new Date().getHours()>=НОЧЬ_С
+          : `<div class="dim" style="margin-top:10px">${walkAllowedNow()
               ? "День закончен. Она никуда не пойдёт до утра."
-              : "Она ещё спит. Отпустить можно с восьми утра."}</div>`)
+              : рассветВремя()+"."}</div>`)
       : `<div class="dim" style="margin-top:8px">Зажигай сферы — энергия копится сама. Спящая сфера даёт втрое больше.</div>`)+
     // Путь на завтра: выбрать можно когда угодно, в том числе ночью,
     // и рысь при этом никуда не идёт. Утром останется одно нажатие.
@@ -2163,6 +2224,11 @@ function openWalk(){
     текст=`Ты отпускал её в другую сторону, а она ушла сюда — `+
       `${(LANDS[PET.walkLand??0]||LANDS[0]).n.toLowerCase()}. `+текст;
   }
+  // Причина вслух. Связь «собрал полку — дошла — принесла» есть в расчёте,
+  // но человек её не видит и решает, что возился зря. Одна строка про то,
+  // что именно сработало, стоит дороже любой новой механики.
+  const почему=походПричина();
+  if(почему) текст=текст+" "+почему;
   document.getElementById("walk-rare").textContent=шапка;
   document.getElementById("walk-title").textContent=имя;
   document.getElementById("walk-text").textContent=текст;
@@ -2774,7 +2840,7 @@ function renderToday(){
     // иначе экран обещает баллы, которых нет, и чек-ин про неё не знает.
     const rec=LOG[todayKey()]||{d:todayKey()};
     rec.t=[...DATA.today.touched];
-    rec.pt=dayPoints(rec.t); rec.ok=false;
+    rec.pt=dayPoints(rec.t,rec); rec.ok=false;
     LOG[todayKey()]=rec; saveLog();
     creditDay(todayKey(),rec.t);
     renderToday();
@@ -2883,7 +2949,6 @@ function openCheckin(){
   });
   document.getElementById("note").value=edit.note||"";
   renderBest();
-  if(typeof renderTemp==="function") renderTemp();
 }
 // Одним списком: раньше пары «ключ — поле» были выписаны в двух местах,
 // и добавление поля требовало помнить про оба.
@@ -2932,13 +2997,14 @@ function save(){
   // Теперь сохраняется то, что внесено. Пустое поле не затирает записанное
   // раньше: и в приложении, и в базе бота стоит COALESCE.
   readBody();
-  if(typeof readTemp==="function") readTemp();
   edit.note=document.getElementById("note").value.trim();
   const внесено=edit.sleep!=null||edit.mood!=null||edit.energy!=null||
                 edit.pulse!=null||edit.weight!=null||edit.steps!=null||edit.dist!=null||
                 (edit.touched||[]).length>0||!!edit.note;
   if(!внесено){ toast("Впиши хоть что-нибудь"); return; }
-  const got=dayPoints(edit.touched);
+  const got=dayPoints(edit.touched,{s:edit.sleep,m:edit.mood,e:edit.energy,
+    p:edit.pulse,w:edit.weight,st:edit.steps,di:edit.dist,
+    pu:edit.push,sq:edit.squat,kb:edit.kettle});
   const key=dayKey();
   // Второй заход за день дополняет первый, а не заменяет его: утром были
   // пульс и вес, вечером добавились сон и сферы. Пустое поле оставляет
@@ -2949,7 +3015,6 @@ function save(){
     t:[...edit.touched],p:доп(edit.pulse,было.p),w:доп(edit.weight,было.w),
     st:доп(edit.steps,было.st),di:доп(edit.dist,было.di),
     pu:доп(edit.push,было.pu),sq:доп(edit.squat,было.sq),kb:доп(edit.kettle,было.kb),
-    tmp:доп(edit.tmp,было.tmp),
     tr:edit.train,n:доп((edit.note||"").slice(0,120),было.n),pt:got,
     // Отметка «день не в счёт» не должна слетать при сохранении чек-ина,
     // и она обязана уезжать боту явным нулём тоже: иначе снять её нечем —
@@ -2978,7 +3043,7 @@ function save(){
   // что кнопка не работает. Данные при этом сохранялись.
   savedTick();
   // Прогулка живёт сама по себе и от чек-ина не зависит: отпустить можно
-  // в любой момент после восьми утра, ничего не заполняя. Но если день
+  // в любой момент от рассвета до заката, ничего не заполняя. Но если день
   // закрыт и энергии как раз хватило — грех не предложить, это одно
   // движение вместо двух. Отказ ничего не ломает: кнопка на «Тотеме»
   // никуда не делась.
