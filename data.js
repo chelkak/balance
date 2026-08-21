@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="93 · 21.08.2026 09:51";
+window.DATA_JS_VERSION="94 · 21.08.2026 09:57";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -1372,6 +1372,33 @@ function renderAhead(){
 
 
 // ── Экран «Колесо» ───
+// Отметки сфер живут на «Колесе»: из них колесо и двигается. Раньше сетка
+// стояла в чек-ине и была там самым длинным блоком.
+//
+// Здесь отметка сохраняется сразу по нажатию, а не по кнопке: форма чек-ина
+// осталась на другой вкладке, и её edit.touched сюда уже не относится —
+// отметки просто терялись бы при сохранении дня.
+function renderSpheresEdit(){
+  const box=document.getElementById("sp-edit");
+  if(!box) return;
+  const k=todayKey();
+  const текущие=()=>((LOG[k]&&LOG[k].t)||[]).slice();
+  const рисуй=()=>{
+    spheresGrid(box,текущие(),false,true);
+    box.querySelectorAll(".sp").forEach(el=>el.onclick=()=>{
+      const c=el.dataset.c, было=текущие(), i=было.indexOf(c);
+      i<0?было.push(c):было.splice(i,1);
+      LOG[k]={...(LOG[k]||{d:k}), t:было};
+      saveLog(); mergeLog();
+      creditDay(k,было);            // энергия пересчитывается сразу
+      countTries(k,было);
+      рисуй();
+      if(typeof renderWheel==="function") renderWheel();
+      if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+    });
+  };
+  рисуй();
+}
 function renderWheel(){
   applyTheme();
   // Колесо живёт от оценок, а не от прожитых дней: оно должно работать

@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=93"></script>
-<script src="data.js?v=93"></script>
-<script src="deck.js?v=93"></script>
-<script src="expedition.js?v=93"></script>
+<script src="photos/list.js?v=94"></script>
+<script src="data.js?v=94"></script>
+<script src="deck.js?v=94"></script>
+<script src="expedition.js?v=94"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -554,8 +554,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
 
 
-  <h2>Что сегодня горело</h2>
-  <div class="spheres" id="sp-edit"></div>
 
   <!-- Сохранил — сразу к задачам. Отдельной кнопки перехода нет: она
        дублировала бы то, что и так происходит по «Сохранить день». -->
@@ -564,6 +562,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
 <section id="v-wheel" class="hidden">
   <div class="head"><h1>Колесо</h1><div class="sub" id="wheel-sub"></div></div>
+  <h2>Что сегодня горело</h2>
+  <div class="spheres" id="sp-edit" style="margin-bottom:14px"></div>
   <div class="seg" id="period"></div>
   <div style="text-align:center;margin:6px 0 2px">
     <svg id="wheel" viewBox="0 0 330 330" width="100%" style="max-width:350px"></svg></div>
@@ -589,7 +589,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="93 · 21.08.2026 09:51";
+const APP_VERSION="94 · 21.08.2026 09:57";
 
 let toastTimer=null;
 function toast(text){
@@ -2904,7 +2904,6 @@ function openCheckin(){
     ["дно","тяжело","ровно","отлично"],["1–2","3–5","6–8","9–10"]);
   pills(document.getElementById("p-energy"),[2,5,7,10],edit.energy,"energy",
     ["выжат","мало","средне","полный бак"],["1–2","3–5","6–8","9–10"]);
-  spheresGrid(document.getElementById("sp-edit"),edit.touched,true,true);
   ПОЛЯ_ТЕЛА.forEach(([k,id])=>{
     const el=document.getElementById(id);
     el.value=edit[k]??"";
@@ -3096,7 +3095,7 @@ function go(v){
   if(v==="checkin")openCheckin();
   if(v==="finds"){renderFinds();renderDen();renderPlan();}
   if(v==="me"){renderMe();renderGoals();}
-  if(v==="wheel")renderWheel();
+  if(v==="wheel"){renderWheel();renderSpheresEdit();}
   if(v==="trend")renderTrend();
   VIEW=v;
 }
