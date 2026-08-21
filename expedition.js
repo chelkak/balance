@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым expedition.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.EXP_JS_VERSION="87 · 21.08.2026 06:08";
+window.EXP_JS_VERSION="88 · 21.08.2026 08:41";
 
 // ═══ ЭКСПЕДИЦИИ РЫСИ ═══════════════════════════════════════════════════
 //
@@ -672,7 +672,7 @@ function closeExpedition(){
   if(!э.result) э.result = resolveExpedition(э);
   const итог = expeditionResult(э, э.result);
   rememberMastery(э.result.сработали);
-  rememberExpedition(э, э.result);      // память для завтрашнего сна
+  rememberExpedition(э, э.result);      // отсюда добыча узнает, как прошёл путь
   if(итог.знание) rememberLand(э.land, итог.знание);
   if(э.result.исход === "чисто") rememberClear(э.land);
   PET.expedition = null;
@@ -825,23 +825,10 @@ function planTomorrow(земля, маршрут){
   PET.nextPlan = {land:земля, route:маршрут || "тихая", at:todayKey()};
   savePet();
 }
-// ── Память экспедиции для снов ────────────────────────────────────────
-// Сон продолжает вчерашний путь: земля, встреча, находка или отступление.
-// Не выдуманная красивость, а то, что вчера действительно было.
-function expMemory(){
-  const п = PET.lastExpedition;
-  if(!п) return null;
-  const земля = (LANDS[п.land] || LANDS[0]).n.toLowerCase();
-  const узел = п.узел ? (NODE_BY_ID[п.узел] || {}).t : null;
-  if(п.исход === "отступление")
-    return `Ей снилось, что она всё-таки прошла ${земля} до конца.` +
-           (узел ? ` Там, где вчера повернула.` : "");
-  if(п.исход === "обход" && узел)
-    return `Ей снилось то место — ${узел.toLowerCase()}. Во сне она прошла напрямик.`;
-  return `Ей снилось, что ${земля} гораздо больше, чем оказалось наяву.`;
-}
-// Запоминаем последний путь одной строкой: длинные тексты в PET не храним,
-// облако этого не любит.
+// ── Память последнего пути ────────────────────────────────────────────
+// Одной строкой: земля, исход, встреча, на которой не хватило. Отсюда
+// добыча узнаёт, как прошёл путь, и открытка возвращения называет причину.
+// Длинных текстов в PET не держим — облако телеграма их не любит.
 function rememberExpedition(эксп, разбор){
   const провал = разбор.шаги.find(ш => ш.итог === "обошла");
   PET.lastExpedition = {land:эксп.land, исход:разбор.исход,
@@ -853,7 +840,7 @@ function rememberExpedition(эксп, разбор){
 // нет, всё работает на дневных: код проверяет наличие сам и молча
 // остаётся на старом варианте. Положить файлы — и они подхватятся,
 // править ничего не придётся.
-const NIGHT_ART = {pet:false, land:{}, stage:{}};
+const NIGHT_ART = {pet:false, land:{}, stage:{}, mood:{}};
 (function пробаНочи(){
   const img = new Image();
   img.onload  = () => { NIGHT_ART.pet = true;
@@ -902,6 +889,27 @@ function пробаСтадии(ст){
   к.onload = () => { NIGHT_ART.stage[ст] = true;
     if(typeof updatePhoto === "function") updatePhoto(); };
   к.src = `pet/${ст}-night.jpg` + (NIGHT_ART.метка || "");
+}
+// Состояния зверя (rest, happy) для стадий младше взрослой. У взрослой
+// они сняты давно, у остальных приезжают партиями — спрашиваем по одному
+// и только то, что понадобилось прямо сейчас.
+function пробаСостояния(ст, вид){
+  const ключ = `${ст}-${вид}`;
+  if(ключ in NIGHT_ART.mood) return;
+  NIGHT_ART.mood[ключ] = false;
+  const к = new Image();
+  к.onload = () => { NIGHT_ART.mood[ключ] = true;
+    if(typeof updatePhoto === "function") updatePhoto(); };
+  к.src = `pet/${ключ}.jpg` + (NIGHT_ART.метка || "");
+}
+// Есть ли кадр этого состояния для этой стадии.
+function moodFrame(вид){
+  if(typeof stageNow !== "function") return null;
+  const ст = stageNow();
+  const взрослая = (typeof PHOTO_FRAMES !== "undefined" ? PHOTO_FRAMES : 10);
+  if(ст >= взрослая) return `10-${вид}`;
+  пробаСостояния(ст, вид);
+  return NIGHT_ART.mood[`${ст}-${вид}`] ? `${ст}-${вид}` : null;
 }
 function nightPetReady(){
   if(typeof stageNow !== "function") return false;

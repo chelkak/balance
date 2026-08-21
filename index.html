@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=87"></script>
-<script src="data.js?v=87"></script>
-<script src="deck.js?v=87"></script>
-<script src="expedition.js?v=87"></script>
+<script src="photos/list.js?v=88"></script>
+<script src="data.js?v=88"></script>
+<script src="deck.js?v=88"></script>
+<script src="expedition.js?v=88"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -48,6 +48,13 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
    после уборки: раньше зазор держали карта дня и «Одно дело», а когда их
    убрали, цитата села вплотную к списку дел. */
 #ready,#card,#den-box,#walk-box,#tasks{margin-bottom:12px}
+/* Шапка Тотема: слева время, справа кто. Сетка держит базовые линии —
+   приветствие с именем на одной, дата с режимом дня на другой. */
+#totem-head{display:grid;grid-template-columns:minmax(0,1fr) 38px;
+  column-gap:12px;row-gap:3px;margin-bottom:14px}
+#totem-head h1{margin:0;grid-column:1}
+#totem-head .sub{margin:0;grid-column:1}
+#totem-head #cabinet-btn{grid-column:2;grid-row:1 / span 2;align-self:center}
 .aim{border:2px solid transparent;transition:border-color .2s}
 .aim.sel{border-color:var(--accent)}
 /* Ночная сцена: звёзды нарисованы градиентами, ни одной новой картинки.
@@ -419,8 +426,9 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <div class="wrap">
 
 <section id="v-totem">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-    <div class="head"><h1 id="hello"></h1><div class="sub" id="totem-date"></div></div>
+  <div id="totem-head">
+    <h1 id="hello"></h1>
+    <div class="sub" id="totem-date"></div>
     <div id="cabinet-btn" onclick="go('me')" title="Кабинет"
       style="flex:0 0 auto;width:38px;height:38px;border-radius:12px;cursor:pointer;
       display:flex;align-items:center;justify-content:center;font-size:17px;
@@ -454,12 +462,13 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
         </div>
       </div>
     </div>
+    <div id="totem-foot" style="padding:15px 16px 16px;text-align:left"></div>
   </div>
-  <div class="g" id="totem-state" style="margin-top:12px"></div>
-
+  <div class="g" id="walk-card" style="margin-top:12px">
+    <div id="totem-state"></div>
+    <div id="walk-box"></div>
+  </div>
   <div class="g" id="den-box" style="margin-top:12px"></div>
-  <div class="g" id="walk-box" style="margin-top:12px"></div>
-  <button class="btn" onclick="go('today')">Что сегодня</button>
 </section>
 
 <section id="v-me" class="hidden">
@@ -506,8 +515,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
 
 <section id="v-today" class="hidden">
-  <div class="head"><h1>Сегодня</h1><div class="sub" id="today-date"></div></div>
-  <div class="g" id="ready"></div>
+  <div class="head"><h1>Задачи</h1><div class="sub" id="today-date"></div></div>
   <div class="g" id="arc" style="display:none;margin-bottom:12px"></div>
   <div id="today-body"></div>
   <div class="g" id="card"></div>
@@ -517,7 +525,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 </section>
 
 <section id="v-checkin" class="hidden">
-  <div class="head"><h1>Чек-ин</h1><div class="sub" id="checkin-sub">Полминуты, и день записан</div></div>
+  <div class="head"><h1>Записать день</h1><div class="sub" id="checkin-sub"></div></div>
   <div class="days" id="daybar"></div>
 
   <h2>Сколько спал</h2><div class="pills" id="p-sleep"></div>
@@ -554,6 +562,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
   <button class="btn" id="save-btn" onclick="save()">Сохранить день</button>
   <button class="btn ghost" onclick="go('totem')">Отмена</button>
+  <!-- Дальше по кругу: внёс показатели — иди смотреть, что сегодня делать. -->
+  <button class="btn ghost" style="margin-top:14px" onclick="go('today')">Задачи на день</button>
 </section>
 
 <section id="v-wheel" class="hidden">
@@ -575,8 +585,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
 <nav>
   <div id="n-totem" onclick="go('totem')"><i>❖</i>Тотем</div>
-  <div id="n-today" onclick="go('today')"><i>☀</i>Сегодня</div>
-  <div id="n-checkin" onclick="go('checkin')"><i>✎</i>Чек-ин</div>
+  <div id="n-checkin" onclick="go('checkin')"><i>✎</i>Записать</div>
+  <div id="n-today" onclick="go('today')"><i>☀</i>Задачи</div>
   <div id="n-finds" onclick="go('finds')"><i>✦</i>Находки</div>
   <div id="n-wheel" onclick="go('wheel')"><i>◎</i>Колесо</div>
   <div id="n-trend" onclick="go('trend')"><i>◈</i>Динамика</div>
@@ -585,7 +595,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="87 · 21.08.2026 06:08";
+const APP_VERSION="88 · 21.08.2026 08:41";
 
 let toastTimer=null;
 function toast(text){
@@ -1114,9 +1124,8 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          walkStart:LS.walkStart||0, walkRoll:LS.walkRoll??null, walkPick:LS.walkPick??null,
          walkSpent:LS.walkSpent||0, walks:LS.walks||0, walkLand:LS.walkLand||0,
          walkTold:LS.walkTold||0, walkBack:LS.walkBack||0, walkNight:LS.walkNight||0,
-         walkLuck:LS.walkLuck??null, walkAim:LS.walkAim??null, traceStep:LS.traceStep||0,
+         walkAim:LS.walkAim??null, traceStep:LS.traceStep||0,
          // сны: что снилось и когда показали, чтобы не повторять
-         dreamOn:LS.dreamOn||"", dreamSeen:LS.dreamSeen||[], dreamText:LS.dreamText||"",
          // одно событие входа: в какой день его уже показали
          eventOn:LS.eventOn||"",
          // ночной цикл: какую стадию человек уже видел и когда её показали
@@ -1187,69 +1196,7 @@ const weakest=()=>{
 // исключительно себе — прямое лекарство для того, кому девять месяцев
 // меряют только результат.
 //
-// Правило железное: удача ТОЛЬКО добавляет. «Глухой день» — это обычные
-// шансы, «везёт» — надбавка. Иначе получилось бы наказание за случайность.
-// И она не влияет ни на прогулку, ни на камни, ни на возможность что-то
-// сделать: решает только, что рысь принесёт, если уже вернулась.
-// Считается от личного ключа и даты: выкрутить нельзя, но и не случайно
-// заново при каждой перерисовке. У каждого своя погода удачи.
-// Вынесено параметром, чтобы распределение можно было проверить по году,
-// а не только на сегодня.
-function luckFor(ключ){
-  const d=(ключ||"").replace(/-/g,"");
-  let h=((PET.deckSeed||1)^0x9e3779b9)>>>0;
-  for(let i=0;i<d.length;i++){
-    h=(h^d.charCodeAt(i))>>>0;
-    h=Math.imul(h,0x01000193)>>>0;          // перемешиваем как следует: соседние
-  }                                          // даты отличаются одним символом
-  // Каждый шаг приводим к беззнаковому: `^` в JS работает со знаковыми
-  // числами, и без этого h уходил в минус. Остаток тоже получался
-  // отрицательным, r<0.12 срабатывало всегда — «очень везёт» выпадало
-  // в 57% дней вместо 12%. Поймано прогоном года по трём разным ключам.
-  h=(h^(h>>>15))>>>0; h=Math.imul(h,0x2545f491)>>>0; h=(h^(h>>>13))>>>0;
-  const r=(h%1000)/1000;
-  return LUCK[r<0.12?2:r<0.38?1:0];
-}
-const luckToday=()=>luckFor(todayKey());
 
-// ── Сны ──────────────────────────────────────────────────────────────
-// Утренний заход до сих пор не приносил ничего: внёс пульс и вес — и всё.
-// Теперь одна строка под рысью про то, что ей снилось. Привязано к тому,
-// где она вчера была и что принесла, поэтому сон каждый раз про вашу
-// собственную вчерашнюю жизнь, а не случайная красивость.
-//
-// Один раз за день, в любое время. Сначала стояло ограничение до полудня
-// («сон — утреннее дело»), но Александр заходит в приложение около 21:30,
-// и при таком правиле не увидел бы ни одного сна вообще. Сон — событие
-// первого захода за день, а не время суток.
-function dreamToday(){
-  // Отметку дня ставим только вместе с текстом. Если по какой-то причине
-  // осталась отметка без текста — считаем заново, а не показываем пустоту.
-  if(PET.dreamOn===todayKey()&&PET.dreamText) return PET.dreamText;
-  if(!(PET.walks||0)) return null;              // ещё не ходила — снов нет
-  // Сон продолжает вчерашний путь, если он был: земля, встреча, отступление.
-  // Это не выдуманная красивость, а то, что вчера действительно случилось.
-  if(typeof expMemory==="function"){
-    const память=expMemory();
-    if(память&&PET.lastExpedition&&PET.lastExpedition.d!==todayKey()){
-      PET.dreamOn=todayKey(); PET.dreamText=память; savePet();
-      return память;
-    }
-  }
-  const земля=(LANDS[PET.walkLand??0]||LANDS[0]).n.toLowerCase();
-  const последняя=(PET.finds||[]).slice(-1)[0];
-  const вещь=последняя!=null&&FINDS[последняя]?FINDS[последняя].n.toLowerCase():null;
-  const пул=(window.DREAMS||[]).filter((_,i)=>!(PET.dreamSeen||[]).includes(i));
-  const все=window.DREAMS||[];
-  if(!все.length) return null;
-  const из=пул.length?пул:все;
-  const idx=все.indexOf(из[Math.floor(Math.random()*из.length)]);
-  const текст=все[idx].replace("{земля}",земля).replace("{вещь}",вещь||"что-то тёплое");
-  PET.dreamOn=todayKey(); PET.dreamText=текст;
-  PET.dreamSeen=[...new Set([...(PET.dreamSeen||[]),idx])].slice(-20);
-  savePet();
-  return текст;
-}
 
 // ── Серый день ───────────────────────────────────────────────────────
 // Взято у Way of Life: у дня три состояния, а не два. Да, нет и «этот день
@@ -1479,7 +1426,7 @@ function takeCard(){
   if(PET.cardSeen===todayKey())return;
   PET.cardSeen=todayKey();
   PET.cardEnergy=(PET.cardEnergy||0)+5;   // карта — тоже топливо для прогулки
-  savePet();renderCard();renderWalk();toast("+5 к прогулке");
+  savePet();renderCard();renderTotem();toast("+5 к прогулке");
 }
 
 function sealCapsule(срок){
@@ -1673,34 +1620,7 @@ function readiness(){
 // вроде «сон −28% к твоей норме» — язык аналитика, а не человека, и он
 // перегружал экран. Разбор прячется за нажатие: кому надо — развернёт.
 let READY_OPEN=false;
-function toggleReady(){READY_OPEN=!READY_OPEN;renderReady();}
-function renderReady(){
-  const box=document.getElementById("ready");
-  if(!box)return;
-  const r=readiness();
-  if(!r){
-    // Пока нормы нет — молчим совсем, а не занимаем место обещанием
-    box.style.display="none";
-    return;
-  }
-  box.style.display="";
-  const w=READY_WORDS[r.состояние];
-  const цвет=r.состояние==="рабочий"?"#7fc0a4":r.состояние==="бережный"?"#e0a06b":"var(--ink2)";
-  box.style.cursor="pointer";
-  box.onclick=toggleReady;
-  box.innerHTML=
-    `<div style="display:flex;align-items:baseline;gap:8px">`+
-      `<div style="font:600 16px var(--fu);color:${цвет}">${w.t}</div>`+
-      `<div class="dim" style="font-size:13px;flex:1">${w.d}</div>`+
-    `</div>`+
-    (READY_OPEN
-      ? `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd);font-size:12px">`+
-        `Сравниваю с твоей средней за месяц:<br>`+
-        r.части.map(c=>`${c.к} ${c.v>=0?"выше":"ниже"} нормы на ${Math.abs(Math.round(c.v*100))}%`).join("<br>")+
-        `</div>`
-      : "");
-}
-
+function toggleReady(){READY_OPEN=!READY_OPEN;renderTotem();}
 // ── Задание дня ──────────────────────────────────────────────────────
 // То, что Александр заметил у Finch: вчера опрос, сегодня «распиши день».
 // Никакой магии — пул типов и ротация. Задание добровольное: пропустил —
@@ -1998,7 +1918,6 @@ function startWalk(куда){
   // переваливает за полночь — а считалась удача в момент встречи, то есть
   // уже другого дня. Обещание «сегодня рыси везёт» не выполнялось чаще,
   // чем выполнялось.
-  PET.walkLuck=luckToday().k;
   // Снимок земли весит под двести килобайт: по мобильному он приезжает
   // секунды, и всё это время на экране пустой градиент. Греем заранее.
   const заранее=new Image();
@@ -2018,7 +1937,7 @@ function startWalk(куда){
   const послушалась=куда!=null&&куда!==undefined&&Math.random()>SVOYA_DOROGA;
   PET.walkLand=послушалась?куда:сама;
   PET.walkAim=куда??null;
-  savePet();renderWalk();renderTotem();
+  savePet();renderTotem();
   if(!PET.walks)летопись("Она впервые ушла бродить одна.");
   toast(PET.walkAim!=null&&PET.walkLand!==PET.walkAim
     ? "Ушла своей дорогой" : "Ушла бродить");
@@ -2079,9 +1998,10 @@ function walkLoot(){
   // Удача дня сдвигает пороги вверх и только вверх: в обычный день шансы
   // ровно те же, что были всегда, в удачный — выше. Хуже не становится
   // никогда, иначе это было бы наказание за случайность.
-  // Чистый путь работает как удачный день: только вверх, никогда вниз.
-  const заПуть=(исход==="чисто")?1:0;
-  const бонус=((PET.walkLuck??luckToday().k)+заПуть)*0.06;
+  // Единственное, что двигает шансы вверх, — пройденный путь. Раньше здесь
+  // сидела ещё и «удача дня»: случайное число решало за человека больше,
+  // чем его собственная сборка. Заслуга вместо везения.
+  const бонус=((исход==="чисто")?1:0)*0.06;
   const rare=(p%100)/100;
   const редкость=rare<0.05+бонус?2:rare<0.30+бонус*2?1:0;
   const земля=PET.walkLand??0;
@@ -2100,7 +2020,25 @@ function walkLoot(){
   return пул[p%пул.length];
 }
 
+// Состояние зверя и прогулка живут в одной рамке: это два сообщения об
+// одном и том же — что с ней сейчас. Пустую рамку прячем, черту между
+// половинами ставим, только если обе непустые.
+function сложитьКарточку(){
+  const ст=document.getElementById("totem-state");
+  const низ=document.getElementById("walk-box");
+  const карта=document.getElementById("walk-card");
+  if(!карта) return;
+  const верхЕсть=!!(ст&&ст.textContent.trim());
+  if(ст) ст.style.display=верхЕсть?"":"none";
+  карта.style.display=(верхЕсть||(низ&&низ.textContent.trim()))?"":"none";
+  if(низ) низ.style.cssText=верхЕсть
+    ? "margin-top:13px;padding-top:13px;border-top:1px solid var(--brd)" : "";
+}
 function renderWalk(){
+  рисоватьПрогулку();
+  сложитьКарточку();          // после любой из веток, а не только последней
+}
+function рисоватьПрогулку(){
   const box=document.getElementById("walk-box");
   if(!box)return;
   updateAway();
@@ -2139,7 +2077,10 @@ function renderWalk(){
   }
   const доля=Math.min(1,есть/цена);
   box.innerHTML=
-    `<div class="fname">До прогулки ${Math.min(есть,цена)} из ${цена}</div>`+
+    `<div class="lead">Прогулка</div>`+
+    `<div class="dim" style="margin-top:4px;font-size:12.5px">`+
+      `Копится от записанного дня. Наберётся ${цена} — уйдёт бродить и вернётся с находкой.</div>`+
+    `<div class="fname" style="margin-top:10px">${Math.min(есть,цена)} из ${цена}</div>`+
     `<div style="margin-top:10px;height:10px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden">`+
       `<div style="height:100%;width:${(доля*100).toFixed(1)}%;border-radius:6px;background:linear-gradient(90deg,#f0b429,#f6d365);transition:width .6s ease"></div>`+
     `</div>`+
@@ -2353,7 +2294,7 @@ function answerWalk(trait){
   // Подрост показываем сразу после встречи, а не пока её нет дома: смысл
   // ночного цикла в том, чтобы разницу увидели глазами.
   maybeGrowOvernight();
-  renderWalk();renderTotem();
+  renderTotem();
   toast(`+${камни} 💎`);
 }
 
@@ -2488,8 +2429,11 @@ function currentPhotoKey(){
   // Ночь — режим суток, а не награда за возраст.
   const ночь=(typeof nightPetKey==="function")?nightPetKey():null;
   if(ночь) return ночь;
-  if(stage<PHOTO_FRAMES) return String(stage);
-  return petState().k;
+  // Состояние спрашиваем для любого возраста — тот же принцип, что с ночью.
+  // Второй выход по стадии стоял здесь и съел бы всю партию состояний:
+  // кадры приехали бы, а показывался бы обычный дневной.
+  const с=petState();
+  return (с&&с.k)?с.k:String(stage);
 }
 // Пока рысь бродит — её на экране быть не должно. Иначе механика разваливается:
 // написано «ушла», а зверь лежит на месте. Показываем пейзаж той земли, куда
@@ -2620,10 +2564,13 @@ function renderTotem(){
   // в пять утра выходило «Доброй ночи · Рассвет».
   const ПРИВЕТ={dawn:"Доброе утро",day:"Добрый день",
                 sunset:"Добрый вечер",night:"Доброй ночи"};
-  document.getElementById("hello").textContent=ПРИВЕТ[timeKey()]||"Здравствуй";
-  const names={dawn:"Рассвет",day:"День",sunset:"Закат",night:"Ночь"};
+  const привет=ПРИВЕТ[timeKey()]||"Здравствуй";
+  document.getElementById("hello").textContent=
+    PET.name ? `${привет}, ${PET.name}` : привет;
+  // Фазу суток из подписи убрали: приветствие уже её называет, и «Добрый
+  // день · День» читалось как заикание. Осталась дата.
   document.getElementById("totem-date").textContent=
-    names[timeKey()]+" · "+new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"})
+    new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"})
     +(IS_DEMO?" · демо-данные":"");   // версия живёт в кабинете, не здесь
 
   drawVectorTotem(m);   // резервный зверь из сфер, живёт в data.js
@@ -2670,10 +2617,42 @@ function renderTotem(){
   // Копилку баллов не показываем: тратить их негде с тех пор, как убрали
   // лавку. Число, которое только растёт и ничего не делает, — пустой шум.
   // Само начисление осталось: оно уезжает боту в отчёте (поле pt).
+  // Имя и режим дня в одну строку: слева кто, справа какой сегодня день.
+  // Раньше режим жил отдельной карточкой на «Сегодня», а под именем шли
+  // три абзаца про сон и удачу — их убрали, они ни на что не влияли.
+  const красный=m==="red";
+  const готовность=(typeof readiness==="function")?readiness():null;
+  const рж=красный
+    ? {t:"Тяжёлые дни", d:"планы отменяются, вернутся сами"}
+    : (готовность?READY_WORDS[готовность.состояние]:null);
+  const цветРж=красный?"#c85a54"
+    :готовность&&готовность.состояние==="рабочий"?"#7fc0a4"
+    :готовность&&готовность.состояние==="бережный"?"#e0a06b":"var(--ink2)";
+  // Кто она и какой сегодня день — в шапке, справа от даты. Под зверем
+  // это была карточка ради двух строк.
+  // Под снимком: какой сегодня день и полоса до прогулки. Обе строки про
+  // сегодня, поэтому стоят вместе и на одной карточке со зверем.
+  const подвал=document.getElementById("totem-foot");
+  if(подвал){
+    const сегодня=LOG[todayKey()];
+    const записан=!!(сегодня&&(сегодня.s!=null||сегодня.m!=null||сегодня.e!=null));
+    подвал.innerHTML = (записан&&рж)
+      ? `<div onclick="toggleReady()" style="cursor:pointer">
+           <div style="font:600 15px var(--fu);color:${цветРж}">${рж.t}</div>
+           <div class="dim" style="font-size:12.5px;margin-top:2px">${рж.d}</div>
+           ${(READY_OPEN&&готовность)?`<div class="dim" style="margin-top:10px;padding-top:10px;
+             border-top:1px solid var(--brd);font-size:12px">Сравниваю с твоей средней за месяц:<br>`+
+             готовность.части.map(c=>`${c.к} ${c.v>=0?"выше":"ниже"} нормы на ${
+               Math.abs(Math.round(c.v*100))}%`).join("<br>")+`</div>`:""}
+         </div>`
+      : записан
+        ? `<div style="font:600 15px var(--fu)">День записан</div>
+           <div class="dim" style="font-size:12.5px;margin-top:2px">Итог появится, когда наберётся своя норма</div>`
+        : `<button class="btn" style="margin:0" onclick="go('checkin')">Внести данные</button>`;
+  }
   document.getElementById("totem-state").innerHTML=
     `<div>${сколько?"":`<div class="lead">Сферы ещё не оценены</div>`}
-        <div class="fname" style="margin:5px 0 0">${PET.name||state}</div>
-        ${PET.name?`<div class="dim" style="margin-top:3px">${state}</div>`:""}</div>
+        ${PET.name?"":`<div class="fname" style="margin:5px 0 0">${state}</div>`}</div>
      ${nameBlock()}
      ${сколько<SPHERES.length
        ? `<div class="dim" style="margin-top:12px">Оценено ${сколько} из ${SPHERES.length}.${PHOTO_MODE?"":
@@ -2698,34 +2677,10 @@ function renderTotem(){
         `<div class="dim" style="margin-top:8px">${п.w[0].toUpperCase()+п.w.slice(1)}.</div>`;
     }
   }
-  {
-    const сон=dreamToday();
-    if(сон) document.getElementById("totem-state").innerHTML+=
-      `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
-      `<b>Ей снилось.</b> ${сон}</div>`;
-  }
-  {
-    // Удача дня — рядом с прогулкой, а не в отдельном блоке: она про то,
-    // что рысь принесёт, и читаться должна вместе с ней.
-    const л=luckToday();
-    document.getElementById("totem-state").innerHTML+=
-      `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
-      `<b>Сегодня ${л.t}.</b> ${л.x}<br>`+
-      `Придёт ли она — решаешь ты. Что принесёт — решает не ты.</div>`;
-  }
-  {
-    // Часов до следующего подроста больше не пишем: он теперь случается
-    // не по таймеру на глазах, а за ночь. Число в подписи тикало бы,
-    // а картинка при этом не менялась — это и раздражало.
-    const done=growthStepsPassed();
-    document.getElementById("totem-state").innerHTML+=
-      `<div class="dim" style="margin-top:8px">${done>=GROWTH_STEPS
-        ? "Выросла полностью — тридцать дней позади"
-        : done===0
-          ? "Первый день вместе. Растёт сама, ничего делать не надо"
-          : `Стадия ${stageNow()} из ${PHOTO_FRAMES}`
-            +(stageReal()>stageNow()?" · за ночь подрастёт":" · растёт сама, ничего делать не надо")}</div>`;
-  }
+  // Карточка под зверем теперь бывает пустой: имя и режим уехали в шапку,
+  // а всё остальное появляется только по случаю. Пустую — прячем.
+  if(typeof renderWalk==="function") renderWalk();
+  сложитьКарточку();
   updatePhoto();
 }
 
@@ -2824,22 +2779,28 @@ function renderToday(){
 
   const body=document.getElementById("today-body");
   if(mode()==="red"){
-    const d=hardDays();
-    const помощь=`<div class="g" style="margin-bottom:12px;border-color:var(--accent)">
-      <div class="why">Вторую неделю подряд. Это не лень.
-      Живой человек здесь поможет больше, чем приложение.</div>
-      <div style="margin-top:10px">${HELP}</div></div>`;
-    body.innerHTML=(d>=10?помощь:"")+
-      `<div class="g"><div class="lead">Тяжёлые дни</div>
-      <div class="fname">Планы отменяются</div>
+    // Красный режим виден цветом: рамка и заголовок красные, чтобы день
+    // читался с одного взгляда. Телефон помощи убран — он появлялся сам
+    // и читался как приговор, а не как поддержка.
+    body.innerHTML=
+      `<div class="g" style="border-color:#c85a54">
+      <div class="lead" style="color:#c85a54">Тяжёлые дни</div>
+      <div class="fname" style="color:#c85a54">Планы отменяются</div>
       <div class="why">Ничего делать не надо. Вот всё, что сегодня считается:</div>
       ${BASICS.map(b=>`<div class="spark"><span class="d"></span><span>${b}</span></div>`).join("")}
-      <div class="dim" style="margin-top:12px">Задачи и баллы вернутся сами, когда станет полегче.</div></div>`
-      +(d>=10?"":`<div class="dim" style="margin-top:12px">${HELP}</div>`);
+      <div class="dim" style="margin-top:12px">Задачи и баллы вернутся сами, когда станет полегче.</div></div>`;
     document.getElementById("puzzle-title").style.display="none";
-    document.getElementById("puzzle").innerHTML="";
+    // Пустой блок разминки оставлял на экране рамку без содержимого.
+    const рз=document.getElementById("puzzle");
+    if(рз){ рз.innerHTML=""; рз.style.display="none"; }
     greyRow();     // в красном режиме дверь нужнее всего, а тут был выход
     return;
+  }
+  {
+    const рз=document.getElementById("puzzle");
+    if(рз) рз.style.display="";
+    const зг=document.getElementById("puzzle-title");
+    if(зг) зг.style.display="";
   }
 
   const list=tasksToday();
@@ -2947,9 +2908,11 @@ function renderDays(){
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
   const прошлый=dayKey()!==todayKey();
   const выбран=new Date(dayKey()+"T12:00:00");
+  // Дата вместо слогана — как на «Сегодня». Слоган читается один раз,
+  // а дата нужна каждый день: по ней видно, какой именно день заполняешь.
   document.getElementById("checkin-sub").textContent=прошлый
-    ? "Заполняем "+выбран.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})
-    : "Полминуты, и день записан";
+    ? "заполняем "+выбран.toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"})
+    : new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"});
   const b=document.querySelector('#v-checkin .btn');
   if(b) b.textContent=прошлый||!inTelegram?"Сохранить день":"Сохранить и закрыть";
 }
@@ -3176,7 +3139,7 @@ function go(v){
     if(n) n.classList.toggle("act2",x===v);});
   window.scrollTo(0,0);
   if(v==="totem"){renderTotem();renderWalk();renderDen();renderMarks();}
-  if(v==="today"){renderToday();renderReady();renderCard();}
+  if(v==="today"){renderToday();renderCard();}
   if(v==="checkin")openCheckin();
   if(v==="finds")renderFinds();
   if(v==="me")renderMe();
