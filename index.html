@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=101"></script>
-<script src="data.js?v=101"></script>
-<script src="deck.js?v=101"></script>
-<script src="expedition.js?v=101"></script>
+<script src="photos/list.js?v=102"></script>
+<script src="data.js?v=102"></script>
+<script src="deck.js?v=102"></script>
+<script src="expedition.js?v=102"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -587,7 +587,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="101 · 21.08.2026 12:54";
+const APP_VERSION="102 · 21.08.2026 13:31";
 
 let toastTimer=null;
 function toast(text){
@@ -617,6 +617,11 @@ const TG_ID=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.us
 // чей ящик открывали в прошлый раз, и при отсутствии номера берём его же.
 if(TG_ID) localStorage.setItem("last_user",String(TG_ID));
 const NS_ID=TG_ID||+(localStorage.getItem("last_user")||0);
+// Но если номер не пришёл, а ящик мы открыли по памяти — это может быть
+// чужой аккаунт на том же телефоне. Локально читаем и пишем как раньше
+// (иначе человек увидит пустое приложение), а вот в облако не лезем:
+// оно привязано к аккаунту, и туда мы залили бы чужие данные поверх своих.
+const АККАУНТ_ТОЧНЫЙ=!!TG_ID;
 const NS=NS_ID?"u"+NS_ID+":":"";
 const lsGet=k=>localStorage.getItem(NS+k);
 const lsSet=(k,v)=>localStorage.setItem(NS+k,v);
@@ -807,7 +812,12 @@ function decode(raw){
     touched:bits(+t[3]||0),pulse:num(t[4]),weight:num(t[5]),steps:num(t[6]),dist:num(t[7]),
     note:"",train:"нет"};
   const g=p[3].split(",");
-  const base=new Date(),list=p[5].split(";");
+  // Дата последнего дня приходит от бота (седьмое поле, с версии 2).
+  // Старые ссылки её не несут — для них остаётся прежний счёт от «сегодня»,
+  // но такие дни подтверждать нельзя: дата может быть не та.
+  const датаОтБота=(p[6]||"").match(/^\d{4}-\d{2}-\d{2}$/)?p[6]:null;
+  const base=датаОтБота?new Date(датаОтБота+"T12:00:00"):new Date();
+  const list=p[5].split(";");
   const days=list.map((s,i)=>{
     if(!s)return null;
     const a=s.split(","),d=new Date(base);
@@ -816,7 +826,8 @@ function decode(raw){
       pulse:num(a[3])??60,weight:num(a[4])??0,steps:num(a[5])??0,dist:num(a[6])??0,
       touched:bits(+a[7]||0)};
   }).filter(Boolean);
-  return {wheel,today,goals:{weight:+g[0]||78,sleep:+g[1]||7.5},spent:+p[4]||0,days};
+  return {wheel,today,goals:{weight:+g[0]||78,sleep:+g[1]||7.5},spent:+p[4]||0,days,
+          датыТочные:!!датаОтБота};
 }
 if(location.hash.length>2){
   try{
@@ -824,7 +835,10 @@ if(location.hash.length>2){
     if(p&&p.days.length>=1){
       DATA={...DATA,wheel:p.wheel,today:p.today,goals:p.goals,spent:p.spent};
       DAYS=p.days;IS_DEMO=false;
-      CONFIRM=p.days;                       // эти дни у бота уже есть
+      // Подтверждаем только когда даты приехали от бота. Без них ряд мог
+      // съехать на день или на неделю, и мы пометили бы доехавшими не те
+      // дни — а они после этого не отправляются больше никогда.
+      CONFIRM=p.датыТочные?p.days:null;
     }
   }catch(e){console.warn("Не разобрал данные из бота",e);}
 }
@@ -850,12 +864,18 @@ const saveLog=()=>{lsSet("log",JSON.stringify(LOG));cloudSave();};
 let CLOUD=(tg&&tg.CloudStorage&&inTelegram)?tg.CloudStorage:null;
 const CHUNK=3500;                      // у одного значения предел 4096 символов
 let cloudTimer=null, cloudReady=false;
+// Поднимается, когда облако не удалось разобрать: пока так, писать в него
+// запрещено — иначе затрём то, чего не смогли прочитать.
+let cloudBroken=false;
 
-function cloudSave(){
-  if(!CLOUD||!cloudReady) return;
-  // Пишем не чаще раза в 2 секунды: чек-ин дёргает сохранение много раз подряд
+function cloudSave(немедленно){
+  if(!CLOUD||!cloudReady||cloudBroken) return;
+  if(!АККАУНТ_ТОЧНЫЙ) return;      // чей ящик — не знаем, писать нельзя
+  // Пишем не чаще раза в 2 секунды: чек-ин дёргает сохранение много раз
+  // подряд. Но перед закрытием приложения ждать нельзя — sendData закрывает
+  // мини-апп через 0,7 секунды, и отложенная запись не случалась никогда.
   clearTimeout(cloudTimer);
-  cloudTimer=setTimeout(()=>{
+  const пиши=()=>{
     const log=JSON.stringify(LOG);
     const parts=Math.max(1,Math.ceil(log.length/CHUNK));
     CLOUD.setItem("log_n",String(parts),()=>{});
@@ -876,11 +896,13 @@ function cloudSave(){
     // дни — они лежат в том же try. Пустая строка ему просто скажет
     // «зверя нет», и он оставит своего в покое.
     CLOUD.setItem("pet","",()=>{});
-  },2000);
+  };
+  // Перед закрытием пишем сразу, в остальных случаях — с задержкой.
+  if(немедленно) пиши(); else cloudTimer=setTimeout(пиши,2000);
 }
 
 function cloudLoad(done){
-  if(!CLOUD){done&&done(false);return;}
+  if(!CLOUD||!АККАУНТ_ТОЧНЫЙ){done&&done(false);return;}
   // Раньше всё восстановление висело на одном ключе log_n: не прочитался —
   // выходили сразу, и зверь, колесо и цели не грузились вовсе. Приложение
   // выглядело как новый аккаунт, а перезаход «чинил», потому что со второго
@@ -989,7 +1011,14 @@ function cloudLoad(done){
         mergeLog();
         DATA.today=todayState();
         done&&done(true);
-      }catch(err){done&&done(false);}
+      }catch(err){
+        // Разобрать не смогли — про облако мы ничего не знаем. Заливать
+        // поверх свою копию нельзя: на устройстве, где данных меньше, это
+        // стёрло бы всё, что было только в облаке.
+        cloudBroken=true;
+        console.warn("Облако не разобралось",err);
+        done&&done(false);
+      }
     });
     });
   });
@@ -1100,7 +1129,11 @@ if(savedGoals) DATA.goals={...DATA.goals,...savedGoals};
 const savedWheel=(()=>{try{return JSON.parse(lsGet("wheel")||"null");}catch(e){return null;}})();
 if(savedWheel) DATA.wheel={...DATA.wheel,...savedWheel};
 
-const LS=JSON.parse(lsGet("pet")||"{}");
+const LS=(()=>{try{return JSON.parse(lsGet("pet")||"{}");}catch(e){
+  // Битая запись не должна останавливать приложение целиком: начинаем
+  // с чистого зверя, а настоящие данные подтянутся из облака.
+  return {};
+}})();
 // Все поля перечислены явно: то, чего здесь нет, после перезахода пропадёт.
 // Добавляешь механику — добавляй её поле сюда же, иначе оно живёт до закрытия.
 // fed, fedOn (кормление) и owned (магазин) убраны 20 августа: обе механики
@@ -2894,6 +2927,9 @@ function save(){
 // раньше, бот не узнал бы, когда её встречать.
 function sendDay(){
   const out=logPacket();
+  // Облако пишем немедленно: sendData закрывает мини-апп, и отложенная
+  // запись не случилась бы вовсе — облако отставало ровно на сеанс.
+  cloudSave(true);
   if(inTelegram){ setTimeout(()=>tg.sendData(out.packet),700); return; }
   // Записал — иди смотреть, что сегодня делать. Отдельной кнопки перехода
   // больше нет: она дублировала то, что и так происходит по сохранению.
