@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=90"></script>
-<script src="data.js?v=90"></script>
-<script src="deck.js?v=90"></script>
-<script src="expedition.js?v=90"></script>
+<script src="photos/list.js?v=91"></script>
+<script src="data.js?v=91"></script>
+<script src="deck.js?v=91"></script>
+<script src="expedition.js?v=91"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -507,6 +507,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="g" id="finds-intro"></div>
   <h2 id="h-lands">Земли</h2>
   <div class="sub" id="h-lands-sub" style="margin-bottom:10px">Куда она может уходить. Новые открываются за камни</div>
+  <div class="g" id="plan-box" style="margin-bottom:12px"></div>
   <div id="lands"></div>
   <h2 id="h-grid">Что принесла</h2>
   <div id="finds-grid"></div>
@@ -590,7 +591,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="90 · 21.08.2026 09:22";
+const APP_VERSION="91 · 21.08.2026 09:36";
 
 let toastTimer=null;
 function toast(text){
@@ -1922,9 +1923,6 @@ function startWalk(куда){
   // второго источника правды у прогулки быть не должно.
   if(typeof startExpedition==="function")
     startExpedition(PET.walkLand??0,(PET.nextPlan&&PET.nextPlan.route)||"тихая");
-  // План использован — снимаем, чтобы он не висел на все следующие дни.
-  // Маршрут при этом помним: он и есть настройка «как ходим по умолчанию».
-  if(PET.nextPlan) PET.nextPlan={route:PET.nextPlan.route};
   // Куда пошла. Выбрал сам — идёт туда, но примерно в четверти случаев
   // всё равно сворачивает своей дорогой: она живая, а не курьер.
   const открытые=(PET.lands||[0]).slice().sort((a,b)=>a-b);
@@ -2072,37 +2070,24 @@ function рисоватьПрогулку(){
   }
   const доля=Math.min(1,есть/цена);
   box.innerHTML=
-    `<div class="lead">Прогулка</div>`+
-    `<div class="dim" style="margin-top:4px;font-size:12.5px">`+
-      `Копится от записанного дня. Наберётся ${цена} — уйдёт бродить и вернётся с находкой.</div>`+
-    `<div class="fname" style="margin-top:10px">${Math.min(есть,цена)} из ${цена}</div>`+
-    `<div style="margin-top:10px;height:10px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden">`+
+    `<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">`+
+      `<div class="lead" style="margin:0">Прогулка</div>`+
+      `<div class="dim" style="font-size:12.5px">${Math.min(есть,цена)} из ${цена}</div>`+
+    `</div>`+
+    `<div style="margin-top:8px;height:10px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden">`+
       `<div style="height:100%;width:${(доля*100).toFixed(1)}%;border-radius:6px;background:linear-gradient(90deg,#f0b429,#f6d365);transition:width .6s ease"></div>`+
     `</div>`+
     (доля>=1
       ? (нДень()
           ? `<button class="btn" style="margin-top:12px" onclick="openAim()">Отпустить бродить</button>`
           : `<div class="dim" style="margin-top:10px">${walkAllowedNow()
-              ? "День закончен. Она никуда не пойдёт до утра."
+              ? "До утра никуда не пойдёт."
               : рассветВремя()+"."}</div>`)
-      : `<div class="dim" style="margin-top:8px">Зажигай сферы — энергия копится сама. Спящая сфера даёт втрое больше.</div>`)+
-    // Путь на завтра: выбрать можно когда угодно, в том числе ночью,
-    // и рысь при этом никуда не идёт. Утром останется одно нажатие.
-    планСтрока();
+      : "")+
+    "";
 }
 
 // Строка про завтрашний путь под полоской прогулки.
-function планСтрока(){
-  if(isWalking()) return "";
-  const п=PET.nextPlan;
-  const земля=(п&&п.land!=null&&typeof LANDS!=="undefined"&&LANDS[п.land])?LANDS[п.land].n:null;
-  const маршрут=(п&&п.route&&typeof ROUTES!=="undefined"&&ROUTES[п.route])?ROUTES[п.route].n:null;
-  return `<div class="dim" style="margin-top:10px;font-size:12.5px;cursor:pointer"
-     onclick="openPlan()">${земля
-       ? `На завтра выбрано: ${земля}${маршрут?` · ${маршрут.toLowerCase()}`:""} · <u>изменить</u>`
-       : `<u>Выбрать путь на завтра</u>`}</div>`;
-}
-
 // Сказать боту, когда ждать возвращения. Посылка закрывает мини-апп —
 // это ограничение телеграма, обойти нечем.
 function tellBotAboutWalk(){
@@ -3130,7 +3115,7 @@ function go(v){
   if(v==="totem"){renderTotem();renderWalk();renderMarks();}
   if(v==="today"){renderToday();renderCard();}
   if(v==="checkin")openCheckin();
-  if(v==="finds"){renderFinds();renderDen();}
+  if(v==="finds"){renderFinds();renderDen();renderPlan();}
   if(v==="me"){renderMe();renderGoals();}
   if(v==="wheel")renderWheel();
   if(v==="trend")renderTrend();

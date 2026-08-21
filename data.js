@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="90 · 21.08.2026 09:22";
+window.DATA_JS_VERSION="91 · 21.08.2026 09:36";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -991,9 +991,8 @@ function aimWalk(i){
     ? (i===null?"Пусть решит сама":`Запомнить · ${(LANDS[i]||LANDS[0]).n}`)
     : (i===null?"Пусть решит сама":`Отпустить · ${(LANDS[i]||LANDS[0]).n}`);
 }
-// Режим планирования: то же окно, но рысь никуда не уходит — выбор
-// запоминается на завтра. Вечером человек готовит путь, а не гонит зверя
-// в ночь; утром достаточно нажать «отпустить».
+// То же окно выбора земли, но рысь никуда не уходит: выбор запоминается
+// на завтра. Открывается только с «Находок».
 let aimPlanMode=false;
 function openPlan(){
   aimPlanMode=true;
@@ -1002,10 +1001,9 @@ function openPlan(){
 function openAim(планируем){
   aimPlanMode=!!планируем;
   if(!планируем&&(isWalking()||energyNow()<walkCost()))return;
-  // Ночью отправить нельзя, а спланировать можно: это и есть способ
-  // закончить день, а не получить ещё одну задачу.
+  // Ночью отправить нельзя, а выбрать путь на завтра можно.
   if(!планируем&&typeof нДень==="function"&&!нДень()){
-    toast(walkAllowedNow()?"День закончен. Можно выбрать путь на завтра":рассветВремя());
+    toast(walkAllowedNow()?"До утра никуда не пойдёт":рассветВремя());
     return;
   }
   if(!walkAllowedNow()){toast(рассветВремя());return;}
@@ -1028,8 +1026,8 @@ function openAim(планируем){
   const f=forkToday();
   const fb=document.getElementById("aim-fork");
   if(fb) fb.textContent=`Сегодня от развилки ${f[0]} и ${f[1]}. Она может свернуть своей дорогой — так бывает.`;
-  // Утром подставляем то, что выбрали вечером: смысл планирования в том,
-  // чтобы утром осталось одно нажатие. Планировали — увидишь свой выбор.
+  // Утром подставляем то, что выбрали вечером на «Находках»: остаётся
+  // одно нажатие.
   const план=PET.nextPlan;
   const заранее=(!планируем&&план&&план.land!=null)?план.land:null;
   PET.walkAim=заранее; aimWalk(заранее);
@@ -1061,7 +1059,7 @@ function goAim(){
   if(aimPlanMode){
     planTomorrow(PET.walkAim,(PET.nextPlan&&PET.nextPlan.route)||"тихая");
     aimPlanMode=false;
-    if(typeof renderWalk==="function") renderWalk();
+    if(typeof renderFinds==="function") renderFinds();
     toast("Путь на завтра запомнен");
     return;
   }
@@ -1259,6 +1257,27 @@ function renderGoals(){
       сИсторией.length<DAYS.length?" дней со сном":""}.</div>`;
   document.getElementById("g-weight").onchange=e=>setGoal("weight",e.target);
   document.getElementById("g-sleep").onchange=e=>setGoal("sleep",e.target);
+}
+
+// Путь на завтра: выбрать можно когда угодно, в том числе ночью, и рысь
+// при этом никуда не идёт. Живёт над списком земель — выбирают из них.
+function renderPlan(){
+  const box=document.getElementById("plan-box");
+  if(!box) return;
+  if(typeof isWalking==="function"&&isWalking()){ box.style.display="none"; return; }
+  box.style.display="";
+  const п=PET.nextPlan;
+  const земля=(п&&п.land!=null&&LANDS[п.land])?LANDS[п.land].n:null;
+  const маршрут=(п&&п.route&&typeof ROUTES!=="undefined"&&ROUTES[п.route])?ROUTES[п.route].n:null;
+  box.style.cursor="pointer";
+  box.onclick=openPlan;
+  box.innerHTML=земля
+    ? `<div class="lead">Путь на завтра</div>
+       <div style="margin-top:6px;font:600 15px var(--fu)">${земля}${
+         маршрут?` · <span class="dim" style="font-weight:400">${маршрут.toLowerCase()}</span>`:""}</div>
+       <div class="dim" style="margin-top:4px;font-size:12.5px">Утром останется одно нажатие · <u>изменить</u></div>`
+    : `<div class="lead">Путь на завтра</div>
+       <div class="dim" style="margin-top:6px;font-size:12.5px">Можно выбрать заранее, тогда утром останется одно нажатие. <u>Выбрать</u></div>`;
 }
 
 function renderTrend(){
