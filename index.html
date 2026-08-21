@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=91"></script>
-<script src="data.js?v=91"></script>
-<script src="deck.js?v=91"></script>
-<script src="expedition.js?v=91"></script>
+<script src="photos/list.js?v=92"></script>
+<script src="data.js?v=92"></script>
+<script src="deck.js?v=92"></script>
+<script src="expedition.js?v=92"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -120,6 +120,10 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
 .pill.sel small{color:var(--aink);opacity:.75}
 
 .fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* Силовые — три коротких числа в одну строку: им не нужна половина ширины */
+.fields3{grid-template-columns:repeat(3,1fr)}
+.fields3 label{font-size:11px}
+.fields3 input{font-size:17px}
 .field{border-radius:14px;padding:10px 12px;background:var(--card);border:1px solid var(--brd)}
 .field label{display:block;font-size:10px;color:var(--ink2);letter-spacing:.05em}
 .field input{width:100%;border:none;background:transparent;color:inherit;font:600 18px var(--fd);outline:none;padding:0}
@@ -535,25 +539,20 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <h2>Настроение</h2><div class="pills" id="p-mood"></div>
   <h2>Энергия</h2><div class="pills" id="p-energy"></div>
 
-  <h2>Тело — вписываешь сам</h2>
+  <h2>Тело</h2>
   <div class="fields">
     <div class="field"><label>пульс покоя</label><input id="f-pulse" type="number" inputmode="numeric"></div>
     <div class="field"><label>вес, кг</label><input id="f-weight" type="number" inputmode="decimal" step="0.1"></div>
     <div class="field"><label>шаги</label><input id="f-steps" type="number" inputmode="numeric"></div>
     <div class="field"><label>дистанция, км</label><input id="f-dist" type="number" inputmode="decimal" step="0.1"></div>
   </div>
-  <div class="sub" style="margin-top:8px">Бледным — вчерашние. Не мерил — оставь пустым</div>
-
-  <h2>Силовые — сколько сделал</h2>
-  <div class="fields">
+  <div class="fields fields3" style="margin-top:9px">
     <div class="field"><label>отжимания</label><input id="f-push" type="number" inputmode="numeric" oninput="readBody()"></div>
     <div class="field"><label>приседания</label><input id="f-squat" type="number" inputmode="numeric" oninput="readBody()"></div>
     <div class="field"><label>гиря</label><input id="f-kettle" type="number" inputmode="numeric" oninput="readBody()"></div>
   </div>
   <div class="sub" id="best-line" style="margin-top:8px"></div>
 
-
-  <h2>Тренировка</h2><div class="pills" id="p-train"></div>
 
   <h2>Что сегодня горело</h2>
   <div class="sub" style="margin-bottom:10px">Отметь, где сделал хотя бы минимум — сфера считается зажжённой</div>
@@ -591,7 +590,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="91 · 21.08.2026 09:36";
+const APP_VERSION="92 · 21.08.2026 09:48";
 
 let toastTimer=null;
 function toast(text){
@@ -2906,7 +2905,6 @@ function openCheckin(){
     ["дно","тяжело","ровно","отлично"],["1–2","3–5","6–8","9–10"]);
   pills(document.getElementById("p-energy"),[2,5,7,10],edit.energy,"energy",
     ["выжат","мало","средне","полный бак"],["1–2","3–5","6–8","9–10"]);
-  pills(document.getElementById("p-train"),["нет","зал","кардио","игра","другое"],edit.train,"train");
   spheresGrid(document.getElementById("sp-edit"),edit.touched,true,true);
   ПОЛЯ_ТЕЛА.forEach(([k,id])=>{
     const el=document.getElementById(id);
@@ -2981,7 +2979,7 @@ function save(){
     t:[...edit.touched],p:доп(edit.pulse,было.p),w:доп(edit.weight,было.w),
     st:доп(edit.steps,было.st),di:доп(edit.dist,было.di),
     pu:доп(edit.push,было.pu),sq:доп(edit.squat,было.sq),kb:доп(edit.kettle,было.kb),
-    tr:edit.train,n:было.n,pt:got,
+    tr:было.tr,n:было.n,pt:got,
     // Отметка «день не в счёт» не должна слетать при сохранении чек-ина,
     // и она обязана уезжать боту явным нулём тоже: иначе снять её нечем —
     // на стороне бота COALESCE оставит прежнюю единицу.
