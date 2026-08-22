@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=107"></script>
-<script src="data.js?v=107"></script>
-<script src="deck.js?v=107"></script>
-<script src="expedition.js?v=107"></script>
+<script src="photos/list.js?v=108"></script>
+<script src="data.js?v=108"></script>
+<script src="deck.js?v=108"></script>
+<script src="expedition.js?v=108"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -575,7 +575,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="107 · 22.08.2026 03:07";
+const APP_VERSION="108 · 22.08.2026 03:12";
 
 let toastTimer=null;
 function toast(text){
@@ -2009,9 +2009,7 @@ function рисоватьПрогулку(){
       (inTelegram&&!PET.walkTold
         ? `<button class="btn ghost" style="margin-top:12px" onclick="tellBotAboutWalk()">Пусть бот позовёт, когда вернётся</button>`+
           `<div class="dim" style="margin-top:6px;font-size:12px">Приложение при этом закроется</div>`
-        : inTelegram
-          ? `<div class="dim" style="margin-top:10px">Бот позовёт, когда она вернётся.</div>`
-          : "");
+        : "");
     return;
   }
   const доля=Math.min(1,есть/цена);
