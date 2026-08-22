@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=129"></script>
-<script src="data.js?v=129"></script>
-<script src="deck.js?v=129"></script>
-<script src="expedition.js?v=129"></script>
+<script src="photos/list.js?v=130"></script>
+<script src="data.js?v=130"></script>
+<script src="deck.js?v=130"></script>
+<script src="expedition.js?v=130"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -433,16 +433,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
       onclick="document.getElementById('aim-modal').style.display='none'">Не сейчас</button>
   </div>
 </div>
-<div id="release-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(6,8,14,.72);
-     align-items:center;justify-content:center;padding:18px">
-  <div class="g" style="max-width:360px;padding:22px">
-    <div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">День закрыт</div>
-    <div class="fname" id="release-title" style="margin-top:6px"></div>
-    <div class="why" id="release-text" style="margin-top:10px"></div>
-    <button class="btn" style="margin-top:14px" onclick="releaseWalk(1)">Пусть идёт</button>
-    <button class="btn ghost" style="margin-top:8px" onclick="releaseWalk(0)">Пусть останется дома</button>
-    <div class="dim" id="release-note" style="margin-top:8px;font-size:12px"></div>
-  </div>
+
 </div>
 <div id="once-modal" style="display:none;position:fixed;inset:0;z-index:70;background:rgba(4,6,10,.92);
      align-items:center;justify-content:center;padding:18px">
@@ -505,6 +496,8 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="g" id="goals"></div>
   <h2>Тема</h2>
   <div class="themes" id="themes"></div>
+  <h2>Связь с ботом</h2>
+  <div class="g" id="link-box"></div>
   <h2>Вид историй</h2>
   <div class="g">
     <div class="dim">Как выглядит страница, когда рысь приносит историю или что-нибудь про человека.</div>
@@ -549,6 +542,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 
 <section id="v-today" class="hidden">
   <div class="head"><h1>Задачи</h1><div class="sub" id="today-date"></div></div>
+  <div id="not-sent"></div>
   <div id="today-body"></div>
   <div class="g" id="card"></div>
   <div class="g quote" id="quote"></div>
@@ -633,7 +627,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="129 · 22.08.2026 17:42";
+const APP_VERSION="130 · 22.08.2026 18:14";
 
 let toastTimer=null;
 function toast(text){
@@ -648,6 +642,14 @@ const tg=window.Telegram&&window.Telegram.WebApp;
 // ничего не доказывает. Настоящий телеграм отдаёт initData — по нему и отличаем.
 // Без этой проверки кнопка «Сохранить» в браузере молча не делала ничего.
 const inTelegram=!!(tg&&tg.initData&&tg.initData.length>0);
+
+// Ушла ли последняя посылка боту. Ставится, когда после вызова sendData
+// приложение осталось открытым: удачная отправка закрывает его сама.
+let НЕ_УШЛО=false;
+// Что именно происходило при последней отправке. Складывается в память и
+// показывается в кабинете. Без этого разбор молчания невозможен: консоли
+// внутри телеграма нет, а сбой отправки не бросает исключений.
+let ОТПРАВКА=null;
 
 // Отправить данные боту приложение может ТОЛЬКО если его открыли кнопкой
 // из-под клавиатуры: так устроен телеграм, и обойти это без своего сервера
@@ -862,6 +864,45 @@ function showStory(s,опции){
   м.scrollTop=0;
   if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
 }
+// Связь с ботом: что было при последней отправке и кнопка «проверить».
+// Внутри телеграма нет консоли, а сбой отправки не бросает исключений —
+// без этого блока разбор молчания превращается в гадание, и один раз уже
+// стоил дня работы.
+function renderLink(){
+  const box=document.getElementById("link-box");
+  if(!box)return;
+  let п=null;
+  try{ п=JSON.parse(lsGet("отправка")||"null"); }catch(e){}
+  const мост=typeof TelegramWebviewProxy!=="undefined"||window.parent!==window;
+  const строка=(имя,знач)=>
+    `<div class="dim" style="font-size:12.5px">${имя}: <b>${знач}</b></div>`;
+  box.innerHTML=
+    строка("телеграм под нами", tg?"да":"нет")+
+    строка("платформа", (tg&&tg.platform)||"—")+
+    строка("версия клиента", (tg&&tg.version)||"—")+
+    строка("initData", (tg&&tg.initData||"").length+" символов")+
+    строка("мост до клиента", мост?"есть":"нет")+
+    (п?`<div class="dim" style="margin-top:10px;font-size:12.5px">
+         Последняя отправка: ${датаСловами(keyOf(new Date(п.когда)))},
+         ${п.дней} ${plural(п.дней,"день","дня","дней")}, ${п.байт} байт${
+         п.ошибка?`, ошибка: <b>${п.ошибка}</b>`:""}</div>`
+      :`<div class="dim" style="margin-top:10px;font-size:12.5px">
+         Отправок ещё не было.</div>`)+
+    `<button class="btn ghost" style="margin-top:12px" onclick="тестСвязи()">Проверить связь</button>
+     <div class="dim" style="margin-top:8px;font-size:12px">Отправит боту короткое
+     слово. Если приложение закроется, а бот ответит — связь есть.</div>`;
+}
+
+// Короткая проверка: одна строка вместо целого дня. Отделяет «не работает
+// мост» от «не нравится содержимое посылки».
+function тестСвязи(){
+  if(!tg||typeof tg.sendData!=="function"){ toast("Телеграма под нами нет"); return; }
+  try{
+    tg.sendData(JSON.stringify({type:"ping"}));
+    setTimeout(()=>toast("Окно не закрылось — телеграм посылку не принял"),1500);
+  }catch(e){ toast("Отказ: "+(e&&e.message||e)); }
+}
+
 function closeStory(){
   document.getElementById("story-modal").classList.remove("on");
 }
@@ -2854,6 +2895,20 @@ function tasksToday(деньНеделиИли){
 }
 function renderToday(){
   applyTheme();
+  // Если посылка боту не ушла, человек должен об этом знать. Молчание тут
+  // дорого стоило: восемнадцать дней лежали в телефоне, а он был уверен,
+  // что бот всё получил. Строка висит, пока день не уедет.
+  {
+    const п=document.getElementById("not-sent");
+    if(п) п.innerHTML=НЕ_УШЛО
+      ? `<div class="g" style="border-color:#c8a24a">
+           <div class="lead">День записан, но боту не ушёл</div>
+           <div class="dim" style="margin-top:6px">Так бывает, когда приложение
+           открыто не кнопкой «Открыть Баланс» под клавиатурой: из других мест
+           телеграм запрещает отправку. Ничего не потеряно — открой оттуда
+           и сохрани ещё раз, уедет всё сразу.</div>
+         </div>` : "";
+  }
   document.getElementById("today-date").textContent=
     new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"});
   // Раньше цитата подбиралась по самой слабой сфере — то есть била в больное.
@@ -3157,12 +3212,17 @@ function save(){
   // закрытия не происходило, человек не видел вообще ничего и решал,
   // что кнопка не работает. Данные при этом сохранялись.
   savedTick();
-  // Прогулка живёт сама по себе и от чек-ина не зависит: отпустить можно
-  // в любой момент от рассвета до заката, ничего не заполняя. Но если день
-  // закрыт и энергии как раз хватило — грех не предложить, это одно
-  // движение вместо двух. Отказ ничего не ломает: кнопка на «Тотеме»
-  // никуда не делась.
-  if(!isWalking()&&energyNow()>=walkCost()&&нДень()){ askRelease(); return; }
+  // Отправка идёт сразу и ничего не ждёт.
+  //
+  // Раньше между сохранением и отправкой стояло окно «Отпустить её бродить?»,
+  // и посылка уходила ТОЛЬКО после ответа на него. Закрыл приложение на этом
+  // окне — день записан у себя, а боту не ушло ничего, и узнать об этом было
+  // неоткуда. Так база бота простояла пустой при восемнадцати днях в
+  // приложении: каждое сохранение упиралось в этот вопрос.
+  //
+  // Предложение прогулки от этого не пропало: кнопка на «Тотеме» никуда
+  // не делась, и отпустить рысь можно в любой момент от рассвета до заката.
+  // Доставка данных важнее одного сэкономленного нажатия.
   sendDay();
 }
 
@@ -3187,14 +3247,31 @@ function sendDay(){
   // оттуда телеграм отправку запрещает) — говорим об этом вслух.
   // Данные при этом не теряются: неотправленные дни копятся в LOG
   // и уедут пачкой с первой удачной отправки.
-  if(inTelegram){
+  // Пробуем отправить всегда, когда под нами телеграм, а не только когда
+  // есть initData. Именно этот гард и убивал доставку: на запуске
+  // с клавиатурной кнопки — единственном, где отправка вообще разрешена —
+  // initData часто пустой, и мы не звали sendData ни разу. А с синей кнопки
+  // initData есть, мы звали, и клиент выбрасывал посылку. Оба пути молчали.
+  const мост=typeof TelegramWebviewProxy!=="undefined"||window.parent!==window;
+  if(tg&&typeof tg.sendData==="function"&&(inTelegram||мост)){
+    ОТПРАВКА={когда:Date.now(),байт:байт(out.packet),дней:out.days.length,
+              platform:tg.platform||"?",версия:tg.version||"?",
+              initData:(tg.initData||"").length,мост:мост,тип:typeof out.packet};
     setTimeout(()=>{
-      try{
-        tg.sendData(out.packet);
-      }catch(e){
-        toast("День записан. Боту уйдёт при заходе с кнопки под клавиатурой");
+      try{ tg.sendData(out.packet); ОТПРАВКА.ошибка=""; }
+      catch(e){ ОТПРАВКА.ошибка=String(e&&e.message||e); }
+      lsSet("отправка",JSON.stringify(ОТПРАВКА));
+      // Удачная отправка закрывает мини-апп — это и есть признак. Если через
+      // полторы секунды мы всё ещё живы, значит телеграм посылку выбросил.
+      // Молча: исключения он при этом не бросает, поэтому ловить нечего.
+      // Так бывает, когда приложение открыли не клавиатурной кнопкой, а
+      // синей кнопкой меню или по прямой ссылке — оттуда отправка запрещена.
+      // Раньше человек в этом случае не видел ничего и был уверен, что
+      // бот всё знает.
+      setTimeout(()=>{
+        НЕ_УШЛО=true;
         renderTotem(); go("today");
-      }
+      },1500);
     },700);
     return;
   }
@@ -3204,25 +3281,6 @@ function sendDay(){
   go("today");
 }
 
-function askRelease(){
-  const ч=walkHoursFor(stageNow());
-  document.getElementById("release-title").textContent="Отпустить её бродить?";
-  document.getElementById("release-text").textContent=
-    `Уйдёт часов на ${ч} — с находкой, историей или просто довольная. `+
-    `Будешь отмечать сделанное, вернётся раньше: каждая галочка тянет её домой.`;
-  document.getElementById("release-note").textContent=
-    inTelegram?"Приложение после ответа закроется — так уходит запись дня боту":"";
-  document.getElementById("release-modal").style.display="flex";
-}
-
-function releaseWalk(yes){
-  document.getElementById("release-modal").style.display="none";
-  if(yes){ startWalk(null); }   // из чек-ина отпускаем без выбора: он закрывает мини-апп
-  sendDay();
-}
-
-// Отметка «сохранено» прямо на кнопке: видно, что день записан, и можно
-// поправить и сохранить снова — кнопка вернётся в обычный вид.
 function savedTick(){
   const b=document.getElementById("save-btn");
   if(!b)return;
