@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=119"></script>
-<script src="data.js?v=119"></script>
-<script src="deck.js?v=119"></script>
-<script src="expedition.js?v=119"></script>
+<script src="photos/list.js?v=120"></script>
+<script src="data.js?v=120"></script>
+<script src="deck.js?v=120"></script>
+<script src="expedition.js?v=120"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -572,7 +572,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="119 · 22.08.2026 07:00";
+const APP_VERSION="120 · 22.08.2026 08:42";
 
 let toastTimer=null;
 function toast(text){
@@ -1384,6 +1384,11 @@ function завершитьСверку(){
   // показать «было → стало». Обнулится, когда придёт срок следующей.
   PET.calibratedAt=todayKey();
   PET.сверкаНа="";        // ручной вызов отработал
+  // Задачи после сверки другие: новый фокус — новый список. Отметки о
+  // сделанном хранятся местами в списке, поэтому их надо снять: иначе
+  // галочки переехали бы на дела, которых человек не делал.
+  // Сам день при этом не трогаем: что уже записано и зачтено, остаётся.
+  PET.doneTasks=[];
   // Фокус недели решается здесь и держится до следующей сверки. Считать
   // его каждый день нельзя: оценки могут сравняться, и фокус переехал бы
   // посреди недели, а неделя должна быть про одно.
@@ -3062,7 +3067,9 @@ function закрытьСверку(){
   завершитьСверку();
   renderWheel();
   toast("Сверено. Фокус недели обновлён");
-  go("today");
+  // Остаёмся на «Колесе»: человек только что проставил восемь оценок и
+  // хочет увидеть, что из них сложилось. Раньше отсюда кидало на «Задачи»,
+  // и колесо со свежими цифрами он не видел ни секунды.
 }
 function startRating(){
   // Всё, что нужно, лежит в верхнем блоке «Колеса»: и знакомство, и сверка.
