@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="116 · 22.08.2026 06:08";
+window.DATA_JS_VERSION="117 · 22.08.2026 06:20";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -1042,8 +1042,6 @@ function renderWheel(){
       <div style="font:600 28px var(--fd);color:${d.color}">${v||"—"}</div></div>
      <div class="dim" style="margin-top:7px">Что сюда входит</div>
      <div class="parts">${d.parts.map(p=>`<span class="part">${p}</span>`).join("")}</div>
-     <div class="lead" style="margin-top:16px">Чем разжечь</div>
-     ${d.spark.map(a=>`<div class="spark"><span class="d"></span><span>${a}</span></div>`).join("")}
      ${(v && !пораСверять())
         ? ``
         : `<div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
