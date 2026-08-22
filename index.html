@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=130"></script>
-<script src="data.js?v=130"></script>
-<script src="deck.js?v=130"></script>
-<script src="expedition.js?v=130"></script>
+<script src="photos/list.js?v=131"></script>
+<script src="data.js?v=131"></script>
+<script src="deck.js?v=131"></script>
+<script src="expedition.js?v=131"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -496,8 +496,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="g" id="goals"></div>
   <h2>Тема</h2>
   <div class="themes" id="themes"></div>
-  <h2>Связь с ботом</h2>
-  <div class="g" id="link-box"></div>
   <h2>Вид историй</h2>
   <div class="g">
     <div class="dim">Как выглядит страница, когда рысь приносит историю или что-нибудь про человека.</div>
@@ -627,7 +625,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="130 · 22.08.2026 18:14";
+const APP_VERSION="131 · 22.08.2026 18:27";
 
 let toastTimer=null;
 function toast(text){
@@ -646,10 +644,6 @@ const inTelegram=!!(tg&&tg.initData&&tg.initData.length>0);
 // Ушла ли последняя посылка боту. Ставится, когда после вызова sendData
 // приложение осталось открытым: удачная отправка закрывает его сама.
 let НЕ_УШЛО=false;
-// Что именно происходило при последней отправке. Складывается в память и
-// показывается в кабинете. Без этого разбор молчания невозможен: консоли
-// внутри телеграма нет, а сбой отправки не бросает исключений.
-let ОТПРАВКА=null;
 
 // Отправить данные боту приложение может ТОЛЬКО если его открыли кнопкой
 // из-под клавиатуры: так устроен телеграм, и обойти это без своего сервера
@@ -864,45 +858,6 @@ function showStory(s,опции){
   м.scrollTop=0;
   if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
 }
-// Связь с ботом: что было при последней отправке и кнопка «проверить».
-// Внутри телеграма нет консоли, а сбой отправки не бросает исключений —
-// без этого блока разбор молчания превращается в гадание, и один раз уже
-// стоил дня работы.
-function renderLink(){
-  const box=document.getElementById("link-box");
-  if(!box)return;
-  let п=null;
-  try{ п=JSON.parse(lsGet("отправка")||"null"); }catch(e){}
-  const мост=typeof TelegramWebviewProxy!=="undefined"||window.parent!==window;
-  const строка=(имя,знач)=>
-    `<div class="dim" style="font-size:12.5px">${имя}: <b>${знач}</b></div>`;
-  box.innerHTML=
-    строка("телеграм под нами", tg?"да":"нет")+
-    строка("платформа", (tg&&tg.platform)||"—")+
-    строка("версия клиента", (tg&&tg.version)||"—")+
-    строка("initData", (tg&&tg.initData||"").length+" символов")+
-    строка("мост до клиента", мост?"есть":"нет")+
-    (п?`<div class="dim" style="margin-top:10px;font-size:12.5px">
-         Последняя отправка: ${датаСловами(keyOf(new Date(п.когда)))},
-         ${п.дней} ${plural(п.дней,"день","дня","дней")}, ${п.байт} байт${
-         п.ошибка?`, ошибка: <b>${п.ошибка}</b>`:""}</div>`
-      :`<div class="dim" style="margin-top:10px;font-size:12.5px">
-         Отправок ещё не было.</div>`)+
-    `<button class="btn ghost" style="margin-top:12px" onclick="тестСвязи()">Проверить связь</button>
-     <div class="dim" style="margin-top:8px;font-size:12px">Отправит боту короткое
-     слово. Если приложение закроется, а бот ответит — связь есть.</div>`;
-}
-
-// Короткая проверка: одна строка вместо целого дня. Отделяет «не работает
-// мост» от «не нравится содержимое посылки».
-function тестСвязи(){
-  if(!tg||typeof tg.sendData!=="function"){ toast("Телеграма под нами нет"); return; }
-  try{
-    tg.sendData(JSON.stringify({type:"ping"}));
-    setTimeout(()=>toast("Окно не закрылось — телеграм посылку не принял"),1500);
-  }catch(e){ toast("Отказ: "+(e&&e.message||e)); }
-}
-
 function closeStory(){
   document.getElementById("story-modal").classList.remove("on");
 }
@@ -3254,13 +3209,8 @@ function sendDay(){
   // initData есть, мы звали, и клиент выбрасывал посылку. Оба пути молчали.
   const мост=typeof TelegramWebviewProxy!=="undefined"||window.parent!==window;
   if(tg&&typeof tg.sendData==="function"&&(inTelegram||мост)){
-    ОТПРАВКА={когда:Date.now(),байт:байт(out.packet),дней:out.days.length,
-              platform:tg.platform||"?",версия:tg.version||"?",
-              initData:(tg.initData||"").length,мост:мост,тип:typeof out.packet};
     setTimeout(()=>{
-      try{ tg.sendData(out.packet); ОТПРАВКА.ошибка=""; }
-      catch(e){ ОТПРАВКА.ошибка=String(e&&e.message||e); }
-      lsSet("отправка",JSON.stringify(ОТПРАВКА));
+      try{ tg.sendData(out.packet); }catch(e){}
       // Удачная отправка закрывает мини-апп — это и есть признак. Если через
       // полторы секунды мы всё ещё живы, значит телеграм посылку выбросил.
       // Молча: исключения он при этом не бросает, поэтому ловить нечего.
