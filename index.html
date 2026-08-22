@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=112"></script>
-<script src="data.js?v=112"></script>
-<script src="deck.js?v=112"></script>
-<script src="expedition.js?v=112"></script>
+<script src="photos/list.js?v=113"></script>
+<script src="data.js?v=113"></script>
+<script src="deck.js?v=113"></script>
+<script src="expedition.js?v=113"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -587,7 +587,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="112 · 22.08.2026 04:48";
+const APP_VERSION="113 · 22.08.2026 04:53";
 
 let toastTimer=null;
 function toast(text){
@@ -1376,7 +1376,6 @@ function свежие(окно){
 // переписанных резюме и собеседований, после которых не перезвонили.
 // Каждое из них требовало усилия ровно тогда, когда его взять неоткуда.
 // Счётчик считает сделанное. Только вверх, без обнуления, никогда не падает.
-const TRY_MARKS=[10,25,50,100,200,350,500,1000];
 const triesOf=c=>(PET.tries||{})[c]||0;
 // Считается сам, при отметке сферы в чек-ине. Отдельной кнопки нет
 // намеренно: нажимать «+ попытка» после отправленного отклика — значит
@@ -1389,8 +1388,7 @@ const triesOf=c=>(PET.tries||{})[c]||0;
 function addTry(code,тихо){
   PET.tries={...(PET.tries||{})};
   PET.tries[code]=triesOf(code)+1;
-  const n=PET.tries[code], s=byCode(code);
-  if(TRY_MARKS.includes(n))
+  const n=PET.tries[code];
   savePet();
   if(тихо) return;
   renderWheel();
