@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=115"></script>
-<script src="data.js?v=115"></script>
-<script src="deck.js?v=115"></script>
-<script src="expedition.js?v=115"></script>
+<script src="photos/list.js?v=116"></script>
+<script src="data.js?v=116"></script>
+<script src="deck.js?v=116"></script>
+<script src="expedition.js?v=116"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -577,7 +577,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="115 · 22.08.2026 05:13";
+const APP_VERSION="116 · 22.08.2026 06:08";
 
 let toastTimer=null;
 function toast(text){
@@ -1154,6 +1154,8 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          findAt:LS.findAt||{},
          // когда колесо последний раз пересчитывалось само + что оно сдвинуло
          calibratedAt:LS.calibratedAt||"", wheelPrev:LS.wheelPrev||null,
+         // фокус недели: какие сферы и с какого понедельника
+         focus:LS.focus||[], focusAt:LS.focusAt||"",
          wheelSnapAt:LS.wheelSnapAt||"",
          // какие истории про людей уже слышал — чтобы не повторялись
          storiesSeen:LS.storiesSeen||[], pendingStoryIndex:LS.pendingStoryIndex??null,
@@ -1201,18 +1203,32 @@ function plural(n,o,f,m){const a=Math.abs(n)%100,b=a%10;
 // Теперь приложение решает само и по делу: если человек раз за разом что-то
 // в сфере делает, а оценка не растёт — значит результат от него не зависит,
 // и тыкать в эту сферу каждый день незачем. Пять попыток — достаточный знак.
-const SLOW_TRIES=5;
-// Половина условия была мёртвой: PET.slow не записывалось нигде с тех пор,
-// как 19 августа убрали ручной переключатель долгих сфер. Осталось то,
-// что работает само: пять попыток без роста оценки — сфера долгая.
-const isSlow=c=>triesOf(c)>=SLOW_TRIES;
+// Самая слабая сфера — просто самая низкая оценка. Никаких поправок:
+// раньше тут были «долгие сферы», из-за которых фокус уезжал с той сферы,
+// которой человек как раз занимался, и экран писал «ниже всех» про сферу,
+// которая ниже всех не была.
+const оценённые=()=>{
+  const есть=SPHERES.filter(s=>(DATA.wheel[s.code]||0)>0);
+  return есть.length?есть:SPHERES;
+};
 const weakest=()=>{
-  const оценённые=SPHERES.filter(s=>(DATA.wheel[s.code]||0)>0);
-  const база=оценённые.length?оценённые:SPHERES;
-  const быстрые=база.filter(s=>!isSlow(s.code));
-  const из=быстрые.length?быстрые:база;      // все долгие — тогда как раньше
+  const из=оценённые();
   return из.reduce((m,s)=>(DATA.wheel[s.code]||0)<(DATA.wheel[m.code]||0)?s:m,из[0]);
 };
+// Сколько сфер делят самую низкую оценку. Их может быть от одной до всех
+// восьми, и неделя делится между ними поровну: одна слабая забирает все
+// двадцать одну задачу недели, четыре слабых — по пять-шесть каждой.
+const ФОКУС_МАКС=4;
+function слабыеСферы(){
+  const из=оценённые();
+  const мин=Math.min(...из.map(s=>DATA.wheel[s.code]||0));
+  const все=из.filter(s=>(DATA.wheel[s.code]||0)===мин);
+  if(все.length<=ФОКУС_МАКС) return все.map(s=>s.code);
+  // Ничья восьми сфер бывает сразу после первой сверки. Берём четыре,
+  // но не наугад при каждой перерисовке: жребий один на неделю.
+  const r=rngFrom(понедельник(new Date()).getTime());
+  return все.map(s=>s.code).sort(()=>r()-0.5).slice(0,ФОКУС_МАКС);
+}
 // ── Удача дня ────────────────────────────────────────────────────────
 // Взято из Stardew Valley: удача дня определяется утром и не зависит ни
 // от чего, что ты сделал. Мир честно признаёт, что часть результата не про
@@ -1311,22 +1327,21 @@ function rememberStory(i){
 // Правило простое и мягкое: смотрим две недели. Горела почти всегда — плюс
 // один. Не горела совсем — минус один. Между — стоит. Двигаем не чаще раза
 // в неделю, чтобы оценка не дёргалась от одного удачного дня.
-const СВЕРКА_ЧЕРЕЗ=7;                    // дней между сверками
-// Сколько дней прошло с прошлой сверки. Ни разу не сверялся — считаем,
-// что пора: колесо у него стоит с самого знакомства.
-function днейСоСверки(){
-  if(!PET.calibratedAt) return СВЕРКА_ЧЕРЕЗ;
-  // По календарным дням, а не по часам: сверялся неделю назад в полдень,
-  // зашёл утром — по часам выходило шесть дней, и сверка не предлагалась.
-  const было=new Date(PET.calibratedAt+"T00:00:00");
-  const сейчас=new Date(); сейчас.setHours(0,0,0,0);
-  return Math.round((сейчас-было)/864e5);
+// Понедельник той недели, в которой лежит день. Воскресенье в русской
+// неделе последнее, а getDay() считает его нулём — отсюда поправка.
+function понедельник(д){
+  const t=new Date(д); t.setHours(0,0,0,0);
+  const сдвиг=(t.getDay()+6)%7;
+  t.setDate(t.getDate()-сдвиг);
+  return t;
 }
 function пораСверять(){
-  const прошло=днейСоСверки();
-  // Отрицательное значит, что часы были сдвинуты вперёд, а потом поправлены.
-  // Тогда сверка не предлагалась бы месяц — считаем, что пора.
-  const пора=rated().length>0 && (прошло>=СВЕРКА_ЧЕРЕЗ || прошло<0);
+  // Сверка раз в календарную неделю, считая от понедельника. Пропустил
+  // понедельник — сверишься в среду, но следующая всё равно с понедельника:
+  // иначе «неделя фокуса» уползала бы по дням от раза к разу.
+  const этотПн=понедельник(new Date());
+  const было=PET.calibratedAt?new Date(PET.calibratedAt+"T00:00:00"):null;
+  const пора=rated().length>0 && (!было || было<этотПн);
   // Снимок «как было» делаем в момент, когда сверка открылась, а не когда
   // закрылась: иначе сравнивать нечего, человек уже всё поменял. Признак
   // снятого снимка — дата последней сверки, к которой он относится: так он
@@ -1354,7 +1369,19 @@ function завершитьСверку(){
   // wheelPrev не трогаем: он снят при открытии сверки и нужен, чтобы
   // показать «было → стало». Обнулится, когда придёт срок следующей.
   PET.calibratedAt=todayKey();
+  // Фокус недели решается здесь и держится до следующей сверки. Считать
+  // его каждый день нельзя: оценки могут сравняться, и фокус переехал бы
+  // посреди недели, а неделя должна быть про одно.
+  PET.focus=слабыеСферы();
+  PET.focusAt=keyOf(понедельник(new Date()));
   savePet();
+}
+// Фокус текущей недели. Если сверки ещё не было или неделя сменилась,
+// а сверку не сделали, считаем на лету — но не запоминаем.
+function фокусНедели(){
+  const пн=keyOf(понедельник(new Date()));
+  if(PET.focusAt===пн && (PET.focus||[]).length) return PET.focus;
+  return слабыеСферы();
 }
 // Записи за последние N календарных дней. DAYS хранит записи, а не дни:
 // после месяца без приложения slice(-30) отдавал записи трёхмесячной
@@ -1404,7 +1431,6 @@ function countTries(key,сферы){
 }
 
 
-function dormant(c){let n=0;for(let i=DAYS.length-1;i>=0;i--){if(DAYS[i].touched.includes(c))break;n++;}return n;}
 const BASE=10;
 const ptsFor=c=>BASE;                 // одна цена: сферу задели — десять
 // Замер тела — тоже работа по себе, и энергию он даёт наравне со сферой.
@@ -2602,22 +2628,31 @@ function pokeTotem(){
 // со зверем: на десятой стадии ряды с двумя правилами и умножение в столбик.
 const PUZZLES_PER_DAY=3;
 // ── Сегодня ──────────────────────────────────────────────────────────
-function tasksToday(){
-  // Пока колесо ровное (данных нет), «самая слабая» выбирается наугад —
-  // и человек получал бы три задачи из одной сферы. Даём разные.
-  const vals=SPHERES.map(s=>DATA.wheel[s.code]||0);
-  if(!hasData()||Math.max(...vals)===Math.min(...vals)){
-    const d=new Date().getDate();
-    return [0,1,2,3,4].map(i=>{
-      const s=SPHERES[(d*3+i*5)%SPHERES.length];
-      return {s,a:s.spark[(d+i)%s.spark.length]};
-    });
+// Сколько задач показываем в день. Двадцать одна задача на сферу — это
+// ровно семь дней по три. Число можно поднять, логика не изменится:
+// недельный запас так же делится между слабыми сферами поровну.
+const ЗАДАЧ_В_ДЕНЬ=3;
+// Какой это день недели: понедельник нулевой, воскресенье шестое.
+const деньНедели=()=>(new Date().getDay()+6)%7;
+function tasksToday(деньНеделиИли){
+  // До первой сверки фокуса нет и выдумывать его не из чего: экран зовёт
+  // сверяться, а не подсовывает случайные задачи из случайных сфер.
+  if(!rated().length) return [];
+  const фокус=фокусНедели().map(byCode).filter(Boolean);
+  if(!фокус.length) return [];
+  const день=деньНеделиИли??деньНедели(), список=[];
+  for(let i=0;i<ЗАДАЧ_В_ДЕНЬ;i++){
+    // Место в недельном запасе: с нуля в понедельник и дальше подряд.
+    // Сферы идут по кругу, поэтому запас делится между ними поровну.
+    const место=день*ЗАДАЧ_В_ДЕНЬ+i;
+    const s=фокус[место%фокус.length];
+    // Внутри своей сферы задачи идут подряд. Остаток от деления нужен
+    // на будущее: поднимем число задач в день — мест станет больше, чем
+    // задач, и пусть лучше повторится, чем день окажется пустым.
+    const номер=Math.floor(место/фокус.length)%s.spark.length;
+    список.push({s,a:s.spark[номер]});
   }
-  const w=weakest(),list=w.spark.map(a=>({s:w,a}));
-  SPHERES.filter(s=>s.code!==w.code&&dormant(s.code)>=3)
-    .sort((a,b)=>dormant(b.code)-dormant(a.code)).slice(0,2)
-    .forEach(s=>list.push({s,a:s.spark[0]}));
-  return list;
+  return список;
 }
 function renderToday(){
   applyTheme();
@@ -2625,7 +2660,7 @@ function renderToday(){
     new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"});
   // Раньше цитата подбиралась по самой слабой сфере — то есть била в больное.
   // Теперь просто хорошая мысль дня, а в тяжёлые дни её нет совсем.
-  const w=weakest(),box=document.getElementById("quote");
+  const box=document.getElementById("quote");
   if(mode()==="red"){ box.style.display="none"; }
   else {
     box.style.display="";
@@ -2649,7 +2684,7 @@ function renderToday(){
       <div class="fname" style="color:#c85a54">Планы отменяются</div>
       <div class="why">Ничего делать не надо. Вот всё, что сегодня считается:</div>
       ${BASICS.map(b=>`<div class="spark"><span class="d"></span><span>${b}</span></div>`).join("")}
-      <div class="dim" style="margin-top:12px">Задачи и баллы вернутся сами, когда станет полегче.</div></div>`;
+      <div class="dim" style="margin-top:12px">Задачи вернутся сами, когда станет полегче.</div></div>`;
     document.getElementById("puzzle-title").style.display="none";
     // Пустой блок разминки оставлял на экране рамку без содержимого.
     const рз=document.getElementById("puzzle");
@@ -2665,18 +2700,28 @@ function renderToday(){
   }
 
   const list=tasksToday();
-  const шапка=hasData()
+  const фокус=rated().length?фокусНедели().map(byCode).filter(Boolean):[];
+  // Оценка называется только когда сфера одна: при нескольких слабых
+  // писать чью-то одну цифру нечестно, они делят неделю поровну.
+  const шапка=!фокус.length
     ? `<div class="g" style="margin-bottom:12px">
-        <div class="lead">Фокус недели</div><div class="fname">${w.ic} ${w.name}</div>
-        <div class="why">Оценка ${DATA.wheel[w.code]} из 10 — ниже всех.
-          На этой неделе смотрим сюда.</div></div>`
-    : `<div class="g" style="margin-bottom:12px">
-        <div class="lead">Фокус недели</div><div class="fname">Появится после первого чек-ина</div>
-        <div class="why">Система сама найдёт сторону, которой достаётся меньше всего,
-          и будет тянуть внимание туда. Пока просто выбери, чем заняться.</div></div>`;
-  body.innerHTML=шапка+`
+        <div class="lead">Фокус недели</div><div class="fname">Начинается со сверки</div>
+        <div class="why">Оцени восемь сторон жизни, и самая слабая заберёт себе
+          эту неделю: каждый день по три дела именно по ней.</div>
+        <button class="btn" style="margin-top:12px" onclick="go('wheel')">Свериться</button></div>`
+    : фокус.length===1
+      ? `<div class="g" style="margin-bottom:12px">
+          <div class="lead">Фокус недели</div><div class="fname">${фокус[0].ic} ${фокус[0].name}</div>
+          <div class="why">Оценка ${DATA.wheel[фокус[0].code]} из 10 — ниже всех.
+            На этой неделе смотрим сюда.</div></div>`
+      : `<div class="g" style="margin-bottom:12px">
+          <div class="lead">Фокус недели</div>
+          <div class="fname">${фокус.map(f=>f.ic+" "+f.name).join(" · ")}</div>
+          <div class="why">Оценка ${DATA.wheel[фокус[0].code]} из 10 у каждой — ниже всех.
+            Неделя делится между ними поровну.</div></div>`;
+  body.innerHTML=шапка+(list.length?`
     <h2>Что зажечь сегодня</h2>
-    <div class="g" id="tasks"></div>`;
+    <div class="g" id="tasks"></div>`:`<div class="g" id="tasks" style="display:none"></div>`);
   const tb=document.getElementById("tasks");
   // Ни баллов, ни пометки «уже горит» справа: это просто список дел на день.
   // Баллы всё равно негде тратить, а «уже горит» читалось как непонятный ярлык.
