@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="105 · 22.08.2026 02:53";
+window.DATA_JS_VERSION="106 · 22.08.2026 03:00";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -1273,7 +1273,7 @@ function renderWheel(){
   el.querySelectorAll("path[data-c]").forEach(p=>p.onclick=()=>{picked=p.dataset.c;renderWheel();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
 
-  const d=byCode(picked)||weakest(),v=DATA.wheel[d.code]||0,dm=dormant(d.code);
+  const d=byCode(picked)||weakest(),v=DATA.wheel[d.code]||0;
   document.getElementById("wheel-detail").innerHTML=
     `<div style="display:flex;justify-content:space-between;align-items:center">
       <div class="fname" style="margin:0">${d.ic} ${d.name}</div>
@@ -1282,17 +1282,8 @@ function renderWheel(){
      <div class="parts">${d.parts.map(p=>`<span class="part">${p}</span>`).join("")}</div>
      <div class="lead" style="margin-top:16px">Чем разжечь</div>
      ${d.spark.map(a=>`<div class="spark"><span class="d"></span><span>${a}</span></div>`).join("")}
-     <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--brd)">
-       <div class="dim" style="flex:1">${!hasData()?"дней ещё не записано":dm===0?"сегодня уже задета":dm===1?"не трогал вчера":"не трогал "+dm+" "+plural(dm,"день","дня","дней")}</div>
-       <div class="pts">+${ptsFor(d.code)}</div></div>
      ${(v && !пораСверять())
-        ? `<div class="dim" style="margin-top:16px;padding-top:13px;border-top:1px solid var(--brd)">
-            ${(()=>{const л=litDays(d.code,WHEEL_WINDOW);
-              return `Горело ${л.горело} ${plural(л.горело,"день","дня","дней")} из ${л.из}.`;})()}<br>
-            Оценка держится неделю. ${(()=>{
-              const ост=СВЕРКА_ЧЕРЕЗ-днейСоСверки();
-              return ост<=0?"Сверка — сегодня."
-                :`Следующая сверка через ${ост} ${plural(ост,"день","дня","дней")}.`;})()}</div>`
+        ? ``
         : `<div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
            <div class="scale" id="wheel-scale"></div>`}
 `;

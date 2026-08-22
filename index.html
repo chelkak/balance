@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=105"></script>
-<script src="data.js?v=105"></script>
-<script src="deck.js?v=105"></script>
-<script src="expedition.js?v=105"></script>
+<script src="photos/list.js?v=106"></script>
+<script src="data.js?v=106"></script>
+<script src="deck.js?v=106"></script>
+<script src="expedition.js?v=106"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -576,7 +576,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="105 · 22.08.2026 02:53";
+const APP_VERSION="106 · 22.08.2026 03:00";
 
 let toastTimer=null;
 function toast(text){
@@ -1312,7 +1312,6 @@ function rememberStory(i){
 // Правило простое и мягкое: смотрим две недели. Горела почти всегда — плюс
 // один. Не горела совсем — минус один. Между — стоит. Двигаем не чаще раза
 // в неделю, чтобы оценка не дёргалась от одного удачного дня.
-const WHEEL_WINDOW=14;      // окно, за которое считаем «сколько горело»
 const СВЕРКА_ЧЕРЕЗ=7;                    // дней между сверками
 // Сколько дней прошло с прошлой сверки. Ни разу не сверялся — считаем,
 // что пора: колесо у него стоит с самого знакомства.
@@ -1360,17 +1359,11 @@ function завершитьСверку(){
 }
 // Записи за последние N календарных дней. DAYS хранит записи, а не дни:
 // после месяца без приложения slice(-30) отдавал записи трёхмесячной
-// давности, и по ним считались и режим, и «горело столько-то из стольких».
+// давности, и по ним считался режим дня.
 function свежие(окно){
   const край=new Date(); край.setHours(0,0,0,0);
   край.setDate(край.getDate()-(окно-1));
   return DAYS.filter(d=>d.date>=край);
-}
-// Сколько дней из последних N сфера горела. Серые дни не в счёт — они
-// не про эту сферу и не должны тянуть оценку вниз.
-function litDays(code,окно){
-  const дни=свежие(окно).filter(d=>!d.grey);
-  return {горело:дни.filter(d=>(d.touched||[]).includes(code)).length,из:дни.length};
 }
 // ── Счётчик попыток ──────────────────────────────────────────────────
 // Весь мир меряет результат: есть работа или нет. Девять месяцев поиска
