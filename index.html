@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=109"></script>
-<script src="data.js?v=109"></script>
-<script src="deck.js?v=109"></script>
-<script src="expedition.js?v=109"></script>
+<script src="photos/list.js?v=110"></script>
+<script src="data.js?v=110"></script>
+<script src="deck.js?v=110"></script>
+<script src="expedition.js?v=110"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -59,7 +59,7 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
    приветствие с именем на одной, дата с режимом дня на другой. */
 #totem-head{display:grid;grid-template-columns:minmax(0,1fr) 38px;
   column-gap:12px;row-gap:3px;margin-bottom:14px}
-#totem-head h1{margin:0;grid-column:1}
+#totem-head h1{margin:0;grid-column:1;font-size:21px;line-height:1.28;overflow-wrap:anywhere}
 #totem-head .sub{margin:0;grid-column:1}
 #totem-head #cabinet-btn{grid-column:2;grid-row:1 / span 2;align-self:center}
 .aim{border:2px solid transparent;transition:border-color .2s}
@@ -120,8 +120,10 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
 .stat span{font-size:10.5px;color:var(--ink2)}
 
 .pills{display:flex;gap:6px}
-.pill{flex:1;text-align:center;padding:14px 2px;border-radius:14px;cursor:pointer;user-select:none;
-  background:var(--card);border:1px solid var(--brd);font-size:13px;font-weight:500;line-height:1.2}
+.pill{flex:1;text-align:center;padding:8px 2px;border-radius:14px;cursor:pointer;user-select:none;
+  background:var(--card);border:1px solid var(--brd);font-size:13px;font-weight:500;line-height:1.2;
+  min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  white-space:nowrap;overflow:hidden}
 .pill small{display:block;font-size:9.5px;color:var(--ink2);margin-top:2px;font-weight:400}
 .pill.sel{background:var(--accent);color:var(--aink);border-color:transparent}
 .pill.sel small{color:var(--aink);opacity:.75}
@@ -593,7 +595,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="109 · 22.08.2026 03:20";
+const APP_VERSION="110 · 22.08.2026 03:29";
 
 let toastTimer=null;
 function toast(text){
@@ -2861,7 +2863,7 @@ function openCheckin(){
   pills(document.getElementById("p-mood"),[2,4,7,10],edit.mood,"mood",
     ["дно","тяжело","ровно","отлично"],["1–2","3–5","6–8","9–10"]);
   pills(document.getElementById("p-energy"),[2,5,7,10],edit.energy,"energy",
-    ["выжат","мало","средне","полный бак"],["1–2","3–5","6–8","9–10"]);
+    ["выжат","мало","средне","полный"],["1–2","3–5","6–8","9–10"]);
   ПОЛЯ_ТЕЛА.forEach(([k,id])=>{
     const el=document.getElementById(id);
     el.value=edit[k]??"";
