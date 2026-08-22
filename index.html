@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=124"></script>
-<script src="data.js?v=124"></script>
-<script src="deck.js?v=124"></script>
-<script src="expedition.js?v=124"></script>
+<script src="photos/list.js?v=125"></script>
+<script src="data.js?v=125"></script>
+<script src="deck.js?v=125"></script>
+<script src="expedition.js?v=125"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -633,7 +633,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="124 · 22.08.2026 11:27";
+const APP_VERSION="125 · 22.08.2026 13:47";
 
 let toastTimer=null;
 function toast(text){
@@ -1275,18 +1275,15 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          сверено:LS.сверено||[],
          wheelSnapAt:LS.wheelSnapAt||"",
          // какие истории про людей уже слышал — чтобы не повторялись
-         storiesSeen:LS.storiesSeen||[], pendingStoryIndex:LS.pendingStoryIndex??null,
+         storiesSeen:LS.storiesSeen||[],
          // земли, камни, задачки
          stones:LS.stones||0, lands:LS.lands||[0],
-         // Эти четыре терялись при каждом закрытии, и каждое по-своему:
+         // Эти три терялись при каждом закрытии, и каждое по-своему:
          // dayStonesOn — защита от повторной выдачи камней за день, без неё
          //   восемь камней капали заново после каждого сохранения;
-         // pendingStory — отложенная история про живого человека, она
-         //   выпадает при чек-ине и показывается при следующем заходе,
-         //   то есть ровно после перезапуска, которого не переживала;
          // walkRoll2 — второе число для правила «Старой просеки»;
          // open — какие разделы «Находок» человек развернул.
-         dayStonesOn:LS.dayStonesOn||"", pendingStory:LS.pendingStory??null,
+         dayStonesOn:LS.dayStonesOn||"",
          walkRoll2:LS.walkRoll2??null, open:LS.open||{},
          den:LS.den||[], heard:LS.heard||0, tries:LS.tries||{}, exportedAt:LS.exportedAt||0, once:LS.once||0, puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0,
          puzzleKinds:(LS.puzzleOn===todayKey()?LS.puzzleKinds:[])||[]};
@@ -2649,19 +2646,6 @@ function startBlinkLoop(){
 function renderTotem(){
   applyTheme();
   maybeGrowOvernight();
-  // Показываем находку, если она выпала при вчерашнем/сегодняшнем закрытии
-  // дня — мини-апп в Телеграме закрывается сразу после сохранения (sendData),
-  // так что показать её тогда же не получится, только при следующем заходе.
-  // Проверяем в самом начале — иначе ветка «Знакомство» ниже выходит раньше.
-  // Отложенная история ждёт, пока отыграет событие входа: иначе она
-  // выскакивает поверх письма или встречи с рысью и съедает их.
-  if(PET.pendingStory&&getComputedStyle(document.getElementById("event-modal")).display==="none"){
-    const _s=PET.pendingStory;
-    rememberStory(PET.pendingStoryIndex);
-    PET.pendingStory=null; PET.pendingStoryIndex=null;
-    savePet();
-    setTimeout(()=>showStory(_s),500);
-  }
   const h=new Date().getHours(),m=mode();
   // Приветствие и время суток должны говорить одно и то же. Приветствие
   // считалось по круглым часам, а время суток — по солнцу, и на рассвете
@@ -3131,12 +3115,12 @@ function save(){
     go("today");
     return;
   }
-  if(Math.random()<0.15){
-    const выбор=pickStory(weakest().code,Math.floor(Math.random()*1e9));
-    PET.pendingStory=выбор.s;
-    PET.pendingStoryIndex=выбор.i;
-    savePet();
-  }
+  // Историю приносит только рысь с прогулки. Раньше она с шансом 15% ещё
+  // и выпадала при сохранении дня — и тогда у неё было два источника
+  // с разным смыслом: принесла рысь — подарок, всплыла после сохранения —
+  // просто окно. Александр заметил это 22 августа, сохранив день несколько
+  // раз подряд при проверке и получив две истории: «разве не рысь должна
+  // приносить её?». Механика теперь читается одной фразой.
   // Сначала показываем, что записано, и только потом шлём боту. Раньше было
   // наоборот: sendData закрывает мини-апп, код выходил сразу — и если
   // закрытия не происходило, человек не видел вообще ничего и решал,
