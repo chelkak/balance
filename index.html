@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=122"></script>
-<script src="data.js?v=122"></script>
-<script src="deck.js?v=122"></script>
-<script src="expedition.js?v=122"></script>
+<script src="photos/list.js?v=123"></script>
+<script src="data.js?v=123"></script>
+<script src="deck.js?v=123"></script>
+<script src="expedition.js?v=123"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -633,7 +633,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="122 · 22.08.2026 09:53";
+const APP_VERSION="123 · 22.08.2026 11:15";
 
 let toastTimer=null;
 function toast(text){
@@ -648,6 +648,17 @@ const tg=window.Telegram&&window.Telegram.WebApp;
 // ничего не доказывает. Настоящий телеграм отдаёт initData — по нему и отличаем.
 // Без этой проверки кнопка «Сохранить» в браузере молча не делала ничего.
 const inTelegram=!!(tg&&tg.initData&&tg.initData.length>0);
+
+// Отправить данные боту приложение может ТОЛЬКО если его открыли кнопкой
+// из-под клавиатуры. Телеграм даёт такой запуск отличительный признак —
+// query_id в initDataUnsafe. Открыли синей кнопкой меню рядом с полем ввода,
+// по прямой ссылке или из инлайна — query_id нет, и tg.sendData молча
+// не делает ничего: ни ошибки, ни письма боту.
+//
+// Из-за этого у Александра база бота простояла пустой всё время, пока в
+// приложении копились дни: он заходил через кнопку меню. Ни одна проверка
+// такое не ловит — со стороны приложения всё отработало без сбоя.
+const МОЖНО_СЛАТЬ=!!(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.query_id);
 
 // ── Своя память у каждого аккаунта ───────────────────────────────────
 // localStorage общий для всего телеграма на телефоне: он привязан к адресу
@@ -3149,6 +3160,14 @@ function sendDay(){
   // Облако пишем немедленно: sendData закрывает мини-апп, и отложенная
   // запись не случилась бы вовсе — облако отставало ровно на сеанс.
   cloudSave(true);
+  // Открыли не с той кнопки — отправить нечем. Данные не теряются: они
+  // лежат у себя и в облаке и уедут с первой же правильной отправки,
+  // потому что неподтверждённые дни копятся в LOG и шлются пачкой.
+  // Но молчать об этом нельзя: человек будет думать, что бот всё знает.
+  if(inTelegram&&!МОЖНО_СЛАТЬ){
+    toast("День записан. Боту уйдёт при заходе с кнопки под клавиатурой");
+    renderTotem(); go("today"); return;
+  }
   if(inTelegram){ setTimeout(()=>tg.sendData(out.packet),700); return; }
   // Записал — иди смотреть, что сегодня делать. Отдельной кнопки перехода
   // больше нет: она дублировала то, что и так происходит по сохранению.
