@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=118"></script>
-<script src="data.js?v=118"></script>
-<script src="deck.js?v=118"></script>
-<script src="expedition.js?v=118"></script>
+<script src="photos/list.js?v=119"></script>
+<script src="data.js?v=119"></script>
+<script src="deck.js?v=119"></script>
+<script src="expedition.js?v=119"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -551,7 +551,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="seg" id="period"></div>
   <div style="text-align:center;margin:6px 0 2px">
     <svg id="wheel" viewBox="0 0 330 330" width="100%" style="max-width:350px"></svg></div>
-  <div class="g" id="wheel-detail"></div>
 </section>
 
 <section id="v-trend" class="hidden">
@@ -573,7 +572,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="118 · 22.08.2026 06:49";
+const APP_VERSION="119 · 22.08.2026 07:00";
 
 let toastTimer=null;
 function toast(text){
@@ -3066,11 +3065,8 @@ function закрытьСверку(){
   go("today");
 }
 function startRating(){
-  const первая=SPHERES.find(s=>!(DATA.wheel[s.code]||0));
-  picked=первая?первая.code:null;
+  // Всё, что нужно, лежит в верхнем блоке «Колеса»: и знакомство, и сверка.
   go("wheel");
-  if(первая) setTimeout(()=>document.getElementById("wheel-detail")
-    .scrollIntoView({behavior:"smooth",block:"center"}),60);
 }
 
 let period="week";

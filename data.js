@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="118 · 22.08.2026 06:49";
+window.DATA_JS_VERSION="119 · 22.08.2026 07:00";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -984,13 +984,20 @@ function renderWheel(){
   // изменилось с прошлого раза.
   const шапка=document.getElementById("wheel-calib");
   if(шапка){
-    if(пораСверять()){
+    // Знакомство и сверка — одно и то же действие, и место у него одно.
+    const знакомство=rated().length<SPHERES.length;
+    if(пораСверять()||знакомство){
       шапка.style.display="";
       // Какую сферу спрашиваем сейчас: первую, которую на этой сверке ещё
       // не трогали. Порядок обычный, как в колесе.
-      const очередь=SPHERES.filter(sp=>!(PET.сверено||[]).includes(sp.code));
+      const очередь=знакомство
+        ? SPHERES.filter(sp=>!(DATA.wheel[sp.code]||0))
+        : SPHERES.filter(sp=>!(PET.сверено||[]).includes(sp.code));
       const сп=очередь[0];
-      if(!сп){ закрытьСверку(); return; }
+      if(!сп){
+        if(знакомство) return;      // все восемь только что оценены
+        закрытьСверку(); return;
+      }
       const было=(PET.wheelPrev||{})[сп.code]||0;
       const сейчас=DATA.wheel[сп.code]||0;
       const шаг=SPHERES.length-очередь.length;
@@ -1022,6 +1029,19 @@ function renderWheel(){
           savePet();
           cloudSave();
           if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+          // Знакомство пройдено — зверь собран, дальше первый чек-ин.
+          if(знакомство && rated().length>=SPHERES.length){
+            PET.сверено=[]; savePet();
+            шапка.innerHTML=
+              `<div class="lead">Знакомство пройдено</div>`+
+              `<div class="fname" style="margin-top:6px">Зверь собран</div>`+
+              `<div class="why" style="margin-top:6px">Все ${SPHERES.length} ${
+                plural(SPHERES.length,"сфера","сферы","сфер")} оценены. Теперь он выглядит
+                ровно так, как сейчас устроена твоя жизнь. Осталось записать сегодняшний день.</div>`;
+            if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
+            setTimeout(()=>go("checkin"),1600);
+            return;
+          }
           renderWheel();
         });
       }
@@ -1042,6 +1062,15 @@ function renderWheel(){
         : `Данных за ${slice.length} ${plural(slice.length,"день","дня","дней")}`
           +(slice.length<need?` из ${need} — копим дальше`:"");
 
+  // Какую сферу сейчас спрашивают — её сектор и подсвечен. Нажимать
+  // сектора больше нельзя: карточки, которую они открывали, больше нет.
+  picked=(function(){
+    if(!(пораСверять()||rated().length<SPHERES.length)) return null;
+    const о=rated().length<SPHERES.length
+      ? SPHERES.filter(sp=>!(DATA.wheel[sp.code]||0))
+      : SPHERES.filter(sp=>!(PET.сверено||[]).includes(sp.code));
+    return о.length?о[0].code:null;
+  })();
   const cx=165,cy=163,R=112,n=SPHERES.length,st=2*Math.PI/n;
   const arc=(i,r)=>{const a0=-Math.PI/2+i*st,a1=a0+st;
     return `M${cx},${cy} L${cx+r*Math.cos(a0)},${cy+r*Math.sin(a0)} A${r},${r} 0 0 1 ${cx+r*Math.cos(a1)},${cy+r*Math.sin(a1)} Z`;};
@@ -1055,63 +1084,14 @@ function renderWheel(){
       stroke="${d.color}" stroke-width="${picked===d.code?2:.8}" stroke-dasharray="3 3"
       data-c="${d.code}" style="cursor:pointer"/>`; return; }
     s+=`<path d="${arc(i,R*v/10)}" fill="${d.color}" fill-opacity="${picked===d.code?".95":".6"}"
-      stroke="${d.color}" stroke-width="${picked===d.code?2:.8}" data-c="${d.code}" style="cursor:pointer"/>`;});
+      stroke="${d.color}" stroke-width="${picked===d.code?2:.8}"/>`;});
   SPHERES.forEach((d,i)=>{const a=-Math.PI/2+i*st+st/2,v=DATA.wheel[d.code]||0;
     s+=`<text x="${cx+(R+20)*Math.cos(a)}" y="${cy+(R+20)*Math.sin(a)}" font-size="9.5"
       text-anchor="middle" dominant-baseline="middle" fill="currentColor" opacity=".65">${d.name}</text>`;
     if(v>=3)s+=`<text x="${cx+(R*v/10-12)*Math.cos(a)}" y="${cy+(R*v/10-12)*Math.sin(a)}" font-size="10.5"
       font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="middle">${v}</text>`;});
   const el=document.getElementById("wheel");el.innerHTML=s;
-  el.querySelectorAll("path[data-c]").forEach(p=>p.onclick=()=>{picked=p.dataset.c;renderWheel();
-    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
 
-  const d=byCode(picked)||weakest(),v=DATA.wheel[d.code]||0;
-  document.getElementById("wheel-detail").innerHTML=
-    `<div style="display:flex;justify-content:space-between;align-items:center">
-      <div class="fname" style="margin:0">${d.ic} ${d.name}</div>
-      <div style="font:600 28px var(--fd);color:${d.color}">${v||"—"}</div></div>
-     <div class="dim" style="margin-top:7px">Что сюда входит</div>
-     <div class="parts">${d.parts.map(p=>`<span class="part">${p}</span>`).join("")}</div>
-     ${(v && !пораСверять())
-        ? ``
-        : `<div class="lead" style="margin-top:16px">Насколько эта часть жизни тебя сейчас держит</div>
-           <div class="scale" id="wheel-scale"></div>`}
-`;
-  // Оценки ставятся здесь: без этого телу зверя нечем меняться.
-  // Шкалы нет у уже оценённой сферы — колесо спрашивает один раз,
-  // дальше двигается само от чек-инов.
-  const sc=document.getElementById("wheel-scale");
-  if(!sc)return;
-  sc.innerHTML=[1,2,3,4,5,6,7,8,9,10].map(n=>
-    `<div class="sn ${n===v?"on":""}" data-n="${n}">${n}</div>`).join("");
-  sc.querySelectorAll(".sn").forEach(el=>el.onclick=()=>{
-    const знакомство=rated().length<SPHERES.length;      // ещё не все сферы оценены
-    DATA.wheel[d.code]=+el.dataset.n;
-    lsSet("wheel",JSON.stringify(DATA.wheel));
-    cloudSave();
-    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
-
-    if(!знакомство){ renderWheel(); return; }            // правим оценку задним числом — не прыгаем
-
-    const следующая=SPHERES.find(s=>!(DATA.wheel[s.code]||0));
-    if(следующая){
-      picked=следующая.code;
-      renderWheel();
-      document.getElementById("wheel-detail").scrollIntoView({behavior:"smooth",block:"center"});
-      return;
-    }
-    // Оценены все — зверь собран, дальше первый чек-ин
-    picked=null;
-    renderWheel();
-    document.getElementById("wheel-detail").innerHTML=
-      `<div class="lead">Знакомство пройдено</div>
-       <div class="fname">Зверь собран</div>
-       <div class="why">Все ${SPHERES.length} ${plural(SPHERES.length,"сфера","сферы","сфер")} оценены. Теперь он выглядит ровно так,
-         как сейчас устроена твоя жизнь. Осталось записать сегодняшний день.</div>`;
-    document.getElementById("wheel-detail").scrollIntoView({behavior:"smooth",block:"center"});
-    if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
-    setTimeout(()=>go("checkin"),1600);
-  });
 }
 
 // ── Экраны, переехавшие из index.html ────────────────────────────────
