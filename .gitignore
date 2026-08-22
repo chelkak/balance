@@ -1,6 +1,10 @@
 # Публикация делает git add -A по всей папке: любой файл, случайно
 # оказавшийся здесь, уедет на публичный адрес. Так уже уезжали личные
 # фотографии. Пускаем только то, что собирает выложить.py.
+#
+# Папки снимков открыты по расширению, а не целиком: раньше стояло
+# «!photos/**», и вместе с картинками уехал бы любой файл, случайно
+# положенный рядом — заметка, копия базы, выгрузка переписки.
 *
 !.gitignore
 !index.html
@@ -8,8 +12,23 @@
 !deck.js
 !expedition.js
 !photos/
-!photos/**
+!photos/list.js
+!photos/**/
+!photos/**/*.jpg
+!photos/**/*.jpeg
+!photos/**/*.png
+!photos/**/*.webp
+!photos/*.jpg
+!photos/*.jpeg
+!photos/*.png
+!photos/*.webp
 !pet/
-!pet/**
+!pet/*.jpg
+!pet/*.jpeg
+!pet/*.png
+!pet/*.webp
 !land/
-!land/**
+!land/*.jpg
+!land/*.jpeg
+!land/*.png
+!land/*.webp

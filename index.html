@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=102"></script>
-<script src="data.js?v=102"></script>
-<script src="deck.js?v=102"></script>
-<script src="expedition.js?v=102"></script>
+<script src="photos/list.js?v=103"></script>
+<script src="data.js?v=103"></script>
+<script src="deck.js?v=103"></script>
+<script src="expedition.js?v=103"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -587,7 +587,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="102 · 21.08.2026 13:31";
+const APP_VERSION="103 · 22.08.2026 00:43";
 
 let toastTimer=null;
 function toast(text){
@@ -965,7 +965,11 @@ function cloudLoad(done){
           PET.deckSeed=PET.deckSeed||cp.deckSeed||0;
           PET.finds=объединить(PET.finds,cp.finds);
           PET.lands=объединить(PET.lands,cp.lands);
-          PET.den=объединить(PET.den,cp.den);
+          // Полка — ровно DEN_SLOTS мест, и объединять её как список нельзя:
+          // две разные полки с двух телефонов давали до двенадцати вещей
+          // в шести местах, и все они шли в расчёт силы.
+          // Своя полка сильнее облачной: её только что собрали руками.
+          PET.den=объединить(PET.den,cp.den).slice(0,DEN_SLOTS);
           PET.findAt={...(cp.findAt||{}),...(PET.findAt||{})};
           // Характер и попытки: по каждому ключу берём большее число.
           // Написано в две строки вместо цикла нарочно — чтобы проверка
@@ -1030,9 +1034,12 @@ function logPacket(){
   // утром человек вносит пульс и вес, и это уже данные, а не черновик.
   // Одни галочки сфер без единой цифры не шлём — это ещё не запись дня,
   // и бот принял бы её за закрытый день с пустыми показателями.
+  // Помеченный серый день — тоже запись, даже если цифр в нём нет:
+  // человек сказал «этот день не в счёт», и бот обязан это узнать,
+  // иначе в его отчёте день так и останется провалом.
   const готов=e=>!!e&&(e.s!=null||e.m!=null||e.e!=null||
                        e.p!=null||e.w!=null||e.st!=null||e.di!=null||
-                       e.pu!=null||e.sq!=null||e.kb!=null);
+                       e.pu!=null||e.sq!=null||e.kb!=null||e.grey!==undefined);
   const today=готов(LOG[todayKey()])?LOG[todayKey()]:null;
   let days=today?[today]:[];
   // Только то, что ещё не уезжало. Повторная отправка старой копии
@@ -1099,6 +1106,7 @@ function mergeLog(){
   // первого замера остаётся null, и графики просто не рисуют этот кусок.
   let p=null,w=null;
   DAYS.forEach(d=>{
+    d.pulse0=d.pulse; d.weight0=d.weight;   // что человек правда мерил
     if(d.pulse!=null)p=d.pulse; else d.pulse=p;
     if(d.weight!=null)w=d.weight; else d.weight=w;
   });
@@ -1177,7 +1185,11 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          chronicle:LS.chronicle||[], questOn:LS.questOn||"",
          den:LS.den||[], heard:LS.heard||0, tries:LS.tries||{}, exportedAt:LS.exportedAt||0, once:LS.once||0, seasonSeen:LS.seasonSeen||"", puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0,
          puzzleKinds:(LS.puzzleOn===todayKey()?LS.puzzleKinds:[])||[]};
-const savePet=()=>{lsSet("pet",JSON.stringify(PET));cloudSave();};
+// Обычное сохранение откладывает запись в облако на две секунды: чек-ин
+// дёргает его десятки раз подряд. Но у редких и необратимых событий —
+// отпустил рысь, встретил её — второго шанса нет: человек закрывает
+// приложение сразу, и отложенная запись не случалась никогда.
+const savePet=(немедленно)=>{lsSet("pet",JSON.stringify(PET));cloudSave(немедленно);};
 if(!LS.bornAt) savePet();   // фиксируем момент рождения зверя раз и навсегда
 
 // Переезд со старой версии: баллы раньше считались по окну, теперь копятся.
@@ -1300,8 +1312,8 @@ function laterCapsule(){document.getElementById("capsule-modal").style.display="
 // Ни счётчика серых дней, ни лимита, ни предложения от приложения:
 // «может, отметишь день серым?» читается как «ты ведь всё равно не сделаешь».
 const isGrey=k=>!!(LOG[k]&&LOG[k].grey);
-function toggleGrey(){
-  const k=dayKey();
+function toggleGrey(k){
+  k=k||todayKey();
   const было=isGrey(k);
   LOG[k]={...(LOG[k]||{d:k}),grey:было?0:1};
   if(!было&&!LOG[k].t) LOG[k].t=[];
@@ -1355,14 +1367,18 @@ function днейСоСверки(){
   return Math.round((сейчас-было)/864e5);
 }
 function пораСверять(){
-  const пора=rated().length>0 && днейСоСверки()>=СВЕРКА_ЧЕРЕЗ;
-  // Снимок «как было» делаем в тот момент, когда сверка открылась, а не
-  // когда закрылась: иначе сравнивать нечего — человек уже всё поменял.
-  if(пора && !PET.wheelSnapAt){
-    PET.wheelPrev={...DATA.wheel}; PET.wheelSnapAt=todayKey(); savePet();
-  }
-  if(!пора && PET.wheelSnapAt && PET.wheelSnapAt!==PET.calibratedAt){
-    PET.wheelSnapAt=PET.calibratedAt; savePet();   // сверка закрыта, снимок отработал
+  const прошло=днейСоСверки();
+  // Отрицательное значит, что часы были сдвинуты вперёд, а потом поправлены.
+  // Тогда сверка не предлагалась бы месяц — считаем, что пора.
+  const пора=rated().length>0 && (прошло>=СВЕРКА_ЧЕРЕЗ || прошло<0);
+  // Снимок «как было» делаем в момент, когда сверка открылась, а не когда
+  // закрылась: иначе сравнивать нечего, человек уже всё поменял. Признак
+  // снятого снимка — дата последней сверки, к которой он относится: так он
+  // обновляется каждую неделю, а не остаётся с первого раза навсегда.
+  if(пора && PET.wheelSnapAt!==(PET.calibratedAt||"—")){
+    PET.wheelPrev={...DATA.wheel};
+    PET.wheelSnapAt=PET.calibratedAt||"—";
+    savePet();
   }
   return пора;
 }
@@ -1372,8 +1388,8 @@ function итогиСверки(новые){
   const было=PET.wheelPrev||{};
   const строки=[];
   SPHERES.forEach(sp=>{
-    const б=было[sp.code], н=новые[sp.code];
-    if(!б||!н||б===н) return;
+    const б=было[sp.code]||0, н=новые[sp.code]||0;
+    if(!н||б===н) return;
     строки.push({c:sp.code, n:sp.name, было:б, стало:н});
   });
   return строки.sort((a,b)=>(b.стало-b.было)-(a.стало-a.было));
@@ -1384,10 +1400,18 @@ function завершитьСверку(){
   PET.calibratedAt=todayKey();
   savePet();
 }
+// Записи за последние N календарных дней. DAYS хранит записи, а не дни:
+// после месяца без приложения slice(-30) отдавал записи трёхмесячной
+// давности, и по ним считались и режим, и «горело столько-то из стольких».
+function свежие(окно){
+  const край=new Date(); край.setHours(0,0,0,0);
+  край.setDate(край.getDate()-(окно-1));
+  return DAYS.filter(d=>d.date>=край);
+}
 // Сколько дней из последних N сфера горела. Серые дни не в счёт — они
 // не про эту сферу и не должны тянуть оценку вниз.
 function litDays(code,окно){
-  const дни=DAYS.slice(-окно).filter(d=>!d.grey);
+  const дни=свежие(окно).filter(d=>!d.grey);
   return {горело:дни.filter(d=>(d.touched||[]).includes(code)).length,из:дни.length};
 }
 // ── Счётчик попыток ──────────────────────────────────────────────────
@@ -1424,7 +1448,11 @@ function countTries(key,сферы){
   PET.triedOn=PET.triedOn||{};
   const было=new Set(PET.triedOn[key]||[]);
   (сферы||[]).forEach(c=>{ if(!было.has(c)){ addTry(c,true); было.add(c); } });
-  PET.triedOn={[key]:[...было]};        // помним только последний день
+  // Помним несколько последних дней, а не один: человек заполняет
+  // сегодня, потом возвращается к пропущенному, потом снова к сегодня.
+  const все={...(PET.triedOn||{}), [key]:[...было]};
+  PET.triedOn={};
+  Object.keys(все).sort().slice(-14).forEach(k=>PET.triedOn[k]=все[k]);
   savePet();
 }
 
@@ -1478,16 +1506,6 @@ function deckOrder(){
 }
 const dayIndex=()=>Math.max(0,Math.floor((Date.now()-(PET.bornAt||Date.now()))/86400000));
 
-// Свой перемешанный порядок для любого набора карт: у вопросов дня он должен
-// отличаться от порядка колоды, иначе вопрос и карта дня будут ходить парой.
-function ownOrder(list,соль){
-  const r=rngFrom((PET.deckSeed||1)+соль),a=list.map((_,i)=>i);
-  for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
-  return a;
-}
-// Вопрос дня для «строки про день». Пустое поле с подписью «Необязательно»
-// не подсказывает ничего: непонятно, что писать и кому. Конкретный вопрос —
-// подсказывает. Меняется каждый день и берётся из той же запечатанной колоды.
 // ── Метки: зверь, которого больше ни у кого нет ──────────────────────
 // ── Выгрузка ─────────────────────────────────────────────────────────
 // Мы пообещали человеку, что письмо вернётся через год. Данные лежат
@@ -1581,22 +1599,26 @@ const READY_MIN_DAYS=7;
 // личную мерку по сну и пульсу — и «готовность дня» начинает врать ровно
 // тогда, когда она важнее всего.
 function personalNorm(field,дней=28){
-  const все=DAYS.slice(-дней).filter(d=>!d.grey).map(d=>d[field]).filter(v=>v!=null&&v>0);
+  const все=свежие(дней).filter(d=>!d.grey).map(d=>d[field]).filter(v=>v!=null&&v>0);
   return все.length>=3?avg(все):null;
 }
 function readiness(){
-  const свежие=DAYS.slice(-14).filter(d=>!d.grey&&(d.sleep!=null||d.energy!=null));
-  if(DAYS.length<READY_MIN_DAYS||!свежие.length)return null;
+  const заПолмесяца=свежие(14).filter(d=>!d.grey&&(d.sleep!=null||d.energy!=null));
+  if(DAYS.length<READY_MIN_DAYS||!заПолмесяца.length)return null;
 
   const последний=[...DAYS].reverse().find(d=>!d.grey&&(d.sleep!=null||d.energy!=null));
   if(!последний)return null;
+  // Готовность — про сегодня. После месяца без приложения она считалась
+  // по записи месячной давности и показывалась как сегодняшнее состояние.
+  // Нет свежей записи — нет и ответа: выдумывать его не из чего.
+  if(Math.round((Date.now()-последний.date.getTime())/864e5)>1) return null;
 
   const части=[];
   const сонН=personalNorm("sleep"), энН=personalNorm("energy"), пулН=personalNorm("pulse");
   if(последний.sleep!=null&&сонН) части.push({к:"сон",v:(последний.sleep-сонН)/Math.max(1,сонН)});
   if(последний.energy!=null&&энН) части.push({к:"энергия",v:(последний.energy-энН)/Math.max(1,энН)});
   // Пульс покоя выше нормы — организм ещё не восстановился, поэтому знак обратный
-  const пульс=[...DAYS].reverse().find(d=>d.pulse!=null&&d.pulse>0);
+  const пульс=[...свежие(14)].reverse().find(d=>d.pulse!=null&&d.pulse>0);
   if(пульс&&пулН) части.push({к:"пульс",v:-(пульс.pulse-пулН)/Math.max(1,пулН)});
   if(!части.length)return null;
 
@@ -1766,8 +1788,11 @@ function walkAllowedNow(){
 function рассветВремя(){
   const с=солнце();
   if(с.восход==null) return "Она ещё спит";
-  const т=с.восход-СУМЕРКИ;
-  const ч=Math.floor(т), м=Math.round((т%1)*60);
+  const т=Math.max(0,с.восход-СУМЕРКИ);
+  // Минуты округляем через общее число, иначе выходило «к 7:60»:
+  // Math.round отдельно от часов даёт шестьдесят.
+  const всего=Math.round(т*60);
+  const ч=Math.floor(всего/60)%24, м=всего%60;
   return `Она ещё спит. Проснётся в сумерках, к ${ч}:${String(м).padStart(2,"0")}`;
 }
 function нДень(){
@@ -1804,10 +1829,11 @@ function maybeGrowOvernight(){
   if(!PET.stageSeen){                       // первый заход: догоняем молча
     PET.stageSeen=real; PET.stageSeenOn=todayKey(); savePet(); return;
   }
-  if(real<=PET.stageSeen||isWalking()) return;
+  if(real<=PET.stageSeen||(isWalking()&&!walkDone())) return;
   if(new Date().getHours()<5||PET.stageSeenOn===todayKey()) return;
-  PET.stageSeen=real; PET.stageSeenOn=todayKey(); savePet();
-  летопись(`За ночь она подросла — стадия ${real} из ${PHOTO_FRAMES}.`);
+  const шаг=PET.stageSeen+1;
+  PET.stageSeen=шаг; PET.stageSeenOn=todayKey(); savePet();
+  летопись(`За ночь она подросла — стадия ${шаг} из ${PHOTO_FRAMES}.`);
   setTimeout(()=>toast("За ночь она подросла"),900);
 }
 // Было 40+стадия*6 — на третьей стадии 58, а за обычный день капает 20-30.
@@ -1862,28 +1888,33 @@ function startWalk(куда){
   PET.walkNight=0;
   PET.walkTold=0;
   PET.walkRoll=Math.random();          // что она принесёт — решается на выходе
+  PET.walkRoll2=Math.random();         // запасное — для правила Старой просеки
   PET.walkPick=Math.floor(Math.random()*1e9);
   // Удачу тоже запоминаем здесь. Прогулка длится до восьми часов и легко
   // переваливает за полночь — а считалась удача в момент встречи, то есть
   // уже другого дня. Обещание «сегодня рыси везёт» не выполнялось чаще,
   // чем выполнялось.
-  // Снимок земли весит под двести килобайт: по мобильному он приезжает
-  // секунды, и всё это время на экране пустой градиент. Греем заранее.
-  const заранее=new Image();
-  заранее.src=landPhoto(PET.walkLand??куда??0);
-  // Игровой слой поверх прогулки: снимок полки и маршрут фиксируются
-  // на выходе. Время и земля остаются за walkStart/walkBack/walkLand —
-  // второго источника правды у прогулки быть не должно.
-  if(typeof startExpedition==="function")
-    startExpedition(PET.walkLand??0,(PET.nextPlan&&PET.nextPlan.route)||"тихая");
   // Куда пошла. Выбрал сам — идёт туда, но примерно в четверти случаев
   // всё равно сворачивает своей дорогой: она живая, а не курьер.
+  //
+  // Землю выбираем ПЕРЕД запуском экспедиции. Раньше было наоборот, и
+  // маршрут строился для прошлой земли: в вечернем разборе показывалась
+  // не та, следы записывались не туда, «Хозяин места» открывался в чужой.
   const открытые=(PET.lands||[0]).slice().sort((a,b)=>a-b);
   const сама=открытые[Math.floor(Math.random()*открытые.length)];
   const послушалась=куда!=null&&куда!==undefined&&Math.random()>SVOYA_DOROGA;
   PET.walkLand=послушалась?куда:сама;
   PET.walkAim=куда??null;
-  savePet();renderTotem();
+  // Снимок земли весит под двести килобайт: по мобильному он приезжает
+  // секунды, и всё это время на экране пустой градиент. Греем заранее.
+  const заранее=new Image();
+  заранее.src=landPhoto(PET.walkLand);
+  // Игровой слой поверх прогулки: снимок полки и маршрут фиксируются
+  // на выходе. Время и земля остаются за walkStart/walkBack/walkLand —
+  // второго источника правды у прогулки быть не должно.
+  if(typeof startExpedition==="function")
+    startExpedition(PET.walkLand,(PET.nextPlan&&PET.nextPlan.route)||"тихая");
+  savePet(true);renderTotem();
   if(!PET.walks)летопись("Она впервые ушла бродить одна.");
   toast(PET.walkAim!=null&&PET.walkLand!==PET.walkAim
     ? "Ушла своей дорогой" : "Ушла бродить");
@@ -1902,15 +1933,19 @@ function startWalk(куда){
 // До этого добыча решалась одним случайным числом: собранная полка меняла
 // только текст вечернего разбора. Человек за две прогулки понимал, что
 // возится зря, — и был прав, связи действительно не было.
+// Путь принадлежит прогулке, а не дню. Раньше исход требовал сегодняшней
+// даты: рысь уходила вечером, возвращалась за полночь, а встретить её могли
+// и через три дня — и добыча за пройденный путь молча пропадала.
+const этотПоход=п=>!!п&&(п.w?п.w===PET.walkStart:п.d===todayKey());
 function походИсход(){
   const п=PET.lastExpedition;
-  return (п&&п.d===todayKey())?п.исход:null;
+  return этотПоход(п)?п.исход:null;
 }
 // Одна фраза о том, чем кончился путь и почему. Берётся из того же исхода,
 // что двигает добычу, — иначе слова и расчёт разъедутся.
 function походПричина(){
   const п=PET.lastExpedition;
-  if(!п||п.d!==todayKey()) return "";
+  if(!этотПоход(п)) return "";
   const земля=(LANDS[п.land]||LANDS[0]).n.toLowerCase();
   if(п.исход==="чисто")
     return `Путь через ${земля} прошла целиком — собранное на полке сработало.`;
@@ -1923,9 +1958,17 @@ function походПричина(){
     : "Одну встречу обошла стороной. В следующий раз пригодится другая вещь.";
 }
 function walkLoot(){
-  const r=PET.walkRoll??Math.random();
-  const пик=PET.walkPick??0;
+  const п=PET.lastExpedition;
   const исход=походИсход();
+  // Старая просека — легендарное правило болота: «после чистого пути можно
+  // выбрать один результат из двух». Раньше оно считалось в разборе и
+  // умирало там же: карточка обещала, а не происходило ничего. Меньшее
+  // число — лучшая добыча (см. пороги ниже), поэтому берём меньшее.
+  const второе=PET.walkRoll2;
+  const просека=этотПоход(п)&&п.выбор&&второе!=null;
+  const r=просека?Math.min(PET.walkRoll??Math.random(),второе)
+                 :(PET.walkRoll??Math.random());
+  const пик=PET.walkPick??0;
   // Дошла чисто — пороги сдвигаются в её пользу. Повернула — предмета нет,
   // но день не пустой: остаются след, наблюдение или история, и знание
   // земли, которое записала сама экспедиция. Наказания тут нет, есть разница.
@@ -2218,9 +2261,9 @@ function answerWalk(trait){
   }
   PET.stones=(PET.stones||0)+камни;
   PET.walks=(PET.walks||0)+1;
-  PET.walkStart=0;PET.walkRoll=null;PET.walkPick=null;PET.walkBack=0;PET.walkNight=0;
+  PET.walkStart=0;PET.walkRoll=null;PET.walkRoll2=null;PET.walkPick=null;PET.walkBack=0;PET.walkNight=0;
   PET.traceStep=0;
-  savePet();
+  savePet(true);
   soundStop();
   document.getElementById("walk-modal").style.display="none";
   document.getElementById("legend-modal").style.display="none";
@@ -2240,22 +2283,15 @@ function natureWords(){
 function mode(){
   // Серый день человек сам пометил как выпавший — он не должен решать,
   // в каком режиме приложение. Иначе неделя болезни включает красный.
-  const moods=DAYS.filter(d=>!d.grey).slice(-3).map(d=>d.mood).filter(v=>v!=null);
+  const moods=свежие(7).filter(d=>!d.grey).slice(-3).map(d=>d.mood).filter(v=>v!=null);
   if(!moods.length) return "green";
   const a=moods.reduce((x,y)=>x+y,0)/moods.length;
   // «тяжело» пишет 4, и раньше красный не включался никогда.
-  if(a<=4||(moods.length>=2&&moods.slice(-2).every(m=>m<=4))) return "red";
+  // Одной записи для красного мало: единственный тяжёлый вечер — ещё не
+  // полоса, а экран по нему отменял человеку весь день.
+  if(moods.length>=2&&(a<=4||moods.slice(-2).every(m=>m<=4))) return "red";
   if(a<=6||(moods.length>=2&&moods.slice(-2).every(m=>m<=6))) return "yellow";
   return "green";
-}
-// Сколько дней подряд тяжело. Считаем по календарю: пропущенные дни
-// не обрывают счёт, иначе после паузы он всегда обнулялся бы.
-function hardDays(){
-  let n=0;
-  for(let i=DAYS.length-1;i>=0;i--){
-    if(DAYS[i].mood!=null&&DAYS[i].mood<=4) n++; else break;
-  }
-  return n;
 }
 // ── Тотем ────────────────────────────────────────────────────────────
 // Сытость и кормёжка убраны намеренно: шкала, падающая по таймеру, — это
@@ -2413,13 +2449,22 @@ function updatePhoto(){
   // прямоугольник поверх бодрой рыси больше не нужен — оставляем ему
   // только лёгкую подтемнёнку, и то лишь на младших стадиях, где
   // спящего кадра не снято.
+  // Подтемнёнка нужна была там, где ночного кадра не сняли: у младших
+  // стадий ночью показывался дневной снимок. Теперь ночные кадры есть
+  // у всех десяти, и затемнять настоящую ночную фотографию незачем.
+  const наФотоНочь=(photoBaseKey||"").includes("night");
   const night=document.getElementById("totem-night");
-  if(night) night.style.opacity=(timeKey()==="night"&&stageNow()<PHOTO_FRAMES)?"1":"0";
+  if(night) night.style.opacity=(timeKey()==="night"&&!наФотоНочь)?"1":"0";
   // Звёзды — только когда она дома: над пейзажем чужой земли им не место,
   // там своё небо. День закончился, мир затих.
   // Приехал настоящий ночной снимок — рисованные звёзды гасим: на фото
   // своё небо, и два слоя звёзд разной яркости спорят друг с другом.
-  const своёНебо=(photoBaseKey||"").startsWith("10-night");
+  // Раньше здесь стояло startsWith("10-night") — так было написано, когда
+  // ночной кадр существовал у одной взрослой стадии. Кадры приехали на все
+  // десять, а проверка осталась старой: у рыси помладше поверх настоящего
+  // звёздного неба рисовались ещё и градиентные звёзды, и два слоя разной
+  // яркости спорили друг с другом ровно так, как обещал не делать комментарий.
+  const своёНебо=наФотоНочь;
   const stars=document.getElementById("totem-stars");
   if(stars) stars.classList.toggle("on",
     timeKey()==="night" && !isWalking() && !своёНебо);
@@ -2437,20 +2482,30 @@ function updatePhoto(){
 function preloadNextPhoto(){
   const stage=stageNow();
   if(stage<PHOTO_FRAMES) new Image().src=`pet/${stage+1}.jpg`;
-  const blink=BLINK_MAP[photoBaseKey];
+  const blink=blinkFor(photoBaseKey);
   if(blink) new Image().src=`pet/${blink}.jpg`;
 }
-// Раз в 7-10 секунд, если сейчас показана взрослая стадия — моргает и
-// возвращается к тому выражению, что было. Не мешает росту/смене настроения.
-// Кадры моргания есть не для всех состояний — только там, где перечислено.
-// Ключ слева — что сейчас показано, справа — на что мигнуть на 220мс.
-// «10-rest» (спит, глаза уже закрыты) сюда не входит — моргать нечем.
-const BLINK_MAP={"1":"1-blink","10-happy":"10-blink","10-curious":"10-blink"};
+// Раз в 7-10 секунд рысь моргает и возвращается к тому выражению, что было.
+// Не мешает росту и смене настроения.
+//
+// Раньше здесь лежала табличка на три строки:
+// {"1":"1-blink","10-happy":"10-blink","10-curious":"10-blink"} — её писали,
+// когда моргание было снято только для первой и десятой стадии. Кадры
+// приехали на все десять, а табличка осталась прежней, и рысь со второй
+// по девятую стадию не моргала ни разу за девять дней роста.
+//
+// Спящую не трогаем: у «rest» и ночного кадра глаза уже закрыты,
+// и мигать там нечем.
+function blinkFor(ключ){
+  if(!ключ) return null;
+  if(ключ.includes("rest")||ключ.includes("night")||ключ.includes("blink")) return null;
+  return (typeof blinkFrame==="function")?blinkFrame():null;
+}
 function startBlinkLoop(){
   setInterval(()=>{
     if(!PHOTO_MODE||document.hidden) return;
     if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const blinkFile=BLINK_MAP[photoBaseKey];
+    const blinkFile=blinkFor(photoBaseKey);
     if(!blinkFile) return;
     showPhoto(blinkFile);
     setTimeout(()=>showPhoto(photoBaseKey),220);
@@ -2760,7 +2815,7 @@ function greyRow(){
       box.id="grey-day";
       box.style.cssText="margin:18px 0 4px;text-align:center;cursor:pointer";
       document.getElementById("v-today").appendChild(box);
-      box.onclick=toggleGrey;
+      box.onclick=()=>toggleGrey(todayKey());
     }
     box.innerHTML=серый
       ? `<span class="dim" style="font-size:13px">Этот день не в счёт · <u>вернуть обычный</u></span>`
@@ -2882,7 +2937,10 @@ function save(){
     t:[...edit.touched],p:доп(edit.pulse,было.p),w:доп(edit.weight,было.w),
     st:доп(edit.steps,было.st),di:доп(edit.dist,было.di),
     pu:доп(edit.push,было.pu),sq:доп(edit.squat,было.sq),kb:доп(edit.kettle,было.kb),
-    dn:Math.max(было.dn||0,(PET.doneTasks||[]).length),
+    // Дела принадлежат тому дню, в который их отметили. Раньше сюда
+    // всегда попадало число сегодняшних дел — и при заполнении
+    // пропущенного дня они приписывались ему.
+    dn:key===todayKey()?Math.max(было.dn||0,(PET.doneTasks||[]).length):(было.dn||0),
     tr:было.tr,n:было.n,pt:got,
     // Отметка «день не в счёт» не должна слетать при сохранении чек-ина,
     // и она обязана уезжать боту явным нулём тоже: иначе снять её нечем —
@@ -2896,6 +2954,7 @@ function save(){
   DATA.today=todayState();
   // Пропущенный день сохраняем к себе и остаёмся — вдруг надо заполнить ещё
   if(key!==todayKey()){
+    sendDay();   // и отправляем сразу, а не ждём следующего сегодняшнего
     editDay=null;openCheckin();renderDays();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
     go("today");
@@ -2991,15 +3050,26 @@ let picked=null;
 
 
 // ── Динамика ─────────────────────────────────────────────────────────
+// День без замера — это дырка, а не ноль. Раньше сюда приезжал сырой массив
+// с null, Math.min превращал их в ноль, и линия ныряла в пол там, где человек
+// просто не мерился: график показывал провал веса, которого не было.
+// Пропуски выбрасываем, но место по горизонтали за ними оставляем — иначе
+// три замера за месяц выглядели бы как три дня подряд.
 function spark2(vals,color,goal,h=56){
-  const w=280,all=goal?vals.concat([goal]):vals,mn=Math.min(...all),mx=Math.max(...all),rng=(mx-mn)||1;
+  const w=280;
+  const есть=vals.map((v,i)=>[i,v]).filter(([,v])=>v!=null);
+  if(есть.length<2) return "";
+  const числа=есть.map(([,v])=>v);
+  const all=goal?числа.concat([goal]):числа;
+  const mn=Math.min(...all),mx=Math.max(...all),rng=(mx-mn)||1;
   const y=v=>h-8-((v-mn)/rng)*(h-18);
-  const pts=vals.map((v,i)=>[8+i*(w-16)/(Math.max(1,vals.length-1)),y(v)]);
+  const x=i=>8+i*(w-16)/(Math.max(1,vals.length-1));
+  const pts=есть.map(([i,v])=>[x(i),y(v)]);
   const line=pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
   return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">
     ${goal?`<line x1="8" y1="${y(goal).toFixed(1)}" x2="${w-8}" y2="${y(goal).toFixed(1)}" stroke="${color}"
       stroke-width="1" stroke-dasharray="4 4" opacity=".55"/>`:""}
-    <polygon points="8,${h-4} ${line} ${w-8},${h-4}" fill="${color}" fill-opacity=".14"/>
+    <polygon points="${pts[0][0].toFixed(1)},${h-4} ${line} ${pts[pts.length-1][0].toFixed(1)},${h-4}" fill="${color}" fill-opacity=".14"/>
     <polyline points="${line}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
     <circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="3" fill="${color}"/></svg>`;
 }
@@ -3074,9 +3144,15 @@ setInterval(applyTheme,60000);
 // Вехи пишутся в летопись сами, при заходе. Считаем от рождения зверя.
 (function вехи(){
   const д=daysWithMe();
-  [7,14,30,50,100,200,365].forEach(m=>{
-    if(д>=m) летопись(`${m} ${plural(m,"день","дня","дней")} вместе.`);
-  });
+  const было=new Set(PET.marks||[]);
+  const новые=[7,14,30,50,100,200,365].filter(m=>д>=m&&!было.has(m));
+  if(!новые.length) return;
+  PET.marks=[...было,...новые];
+  savePet();
+  // Пришёл после долгого перерыва — вех накопилось несколько. Отмечаем
+  // старшую: три строки подряд об одном и том же не праздник, а список.
+  const m=новые[новые.length-1];
+  летопись(`${m} ${plural(m,"день","дня","дней")} вместе.`);
 })();
 
 // Одно событие входа. Раньше здесь дрались за экран «один раз за всю
