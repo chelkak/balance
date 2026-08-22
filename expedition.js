@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым expedition.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.EXP_JS_VERSION="110 · 22.08.2026 03:29";
+window.EXP_JS_VERSION="111 · 22.08.2026 03:42";
 
 // ═══ ЭКСПЕДИЦИИ РЫСИ ═══════════════════════════════════════════════════
 //
@@ -819,10 +819,6 @@ function expShow(){
     ф.onerror = () => { ф.style.opacity = 0; };
     ф.src = landPhoto(э.land ?? 0);
   }
-  // Звук места — только по нажатию, как и везде. Сам не заводится никогда.
-  const зв = document.getElementById("exp-sound");
-  if(зв) зв.innerHTML = (PET.sound && typeof soundBtn === "function")
-    ? soundBtn(э.land ?? 0) : "";
   expDraw();
   m.style.display = "flex";
 }
@@ -882,9 +878,7 @@ function expSkipAll(){ expeditionSkip(); expDraw(); }
 // находок мы не заводим.
 function expFinish(){
   const з = closeExpedition();
-  if(typeof soundStop === "function") soundStop();
   document.getElementById("exp-modal").style.display = "none";
-  if(з && з.итог && з.итог.знание) летопись(з.итог.знание.t);
   if(typeof openWalk === "function") openWalk();
 }
 

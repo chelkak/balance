@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="110 · 22.08.2026 03:29";
+window.DATA_JS_VERSION="111 · 22.08.2026 03:42";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -189,91 +189,6 @@ const STORIES=[
 // Живёт здесь, а не в index.html, ровно поэтому: сто десять строк страховки
 // лежали посреди самой горячей функции главного экрана, и их приходилось
 // перечитывать при каждой правке. Файл data.js не запечатан, читать можно.
-// ── Звук места ────────────────────────────────────────────────────────
-// Девять профилей шума, по одному на землю: ни одного звукового файла,
-// всё считается на месте из коричневого шума и фильтров. Живёт здесь,
-// а не в index.html, потому что это самодостаточные данные плюс их
-// проигрыватель — ровно то, чему место рядом со сферами и цитатами.
-const SOUNDS=[
-  {f:600, q:0.7, lfo:0.08, d:220, g:0.16},              // ближний лес — листва
-  {f:1700,q:0.6, lfo:0.55, d:520, g:0.20, hp:320},      // река — вода
-  {f:450, q:0.7, lfo:0.05, d:120, g:0.13},              // старая просека
-  {f:300, q:0.8, lfo:0.03, d:80,  g:0.13},              // болото — глухо
-  {f:900, q:0.9, lfo:0.22, d:520, g:0.18},              // гряда — порывы
-  {f:250, q:0.8, lfo:0.04, d:60,  g:0.11},              // ночной лес
-  {f:700, q:0.7, lfo:0.12, d:250, g:0.14},              // поле на рассвете
-  {f:200, q:0.9, lfo:0.02, d:50,  g:0.10},              // первый снег — тише всего
-  {f:1100,q:1.0, lfo:0.35, d:700, g:0.21}               // перевал — ветер
-];
-const SOUND_MAX_MS=3*60*1000;      // забыл выключить — сам замолчит через три минуты
-let AC=null, SND=null, SNDLand=null, SNDTimer=null;
-
-function noiseBuffer(ac){
-  // Коричневый шум: белый, проинтегрированный. Он мягче белого и звучит
-  // как ветер и вода, а не как ненастроенное радио.
-  const n=ac.sampleRate*4, b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0);
-  let last=0;
-  for(let i=0;i<n;i++){ const w=Math.random()*2-1; last=(last+0.02*w)/1.02; d[i]=last*3.4; }
-  return b;
-}
-
-function soundStop(){
-  clearTimeout(SNDTimer);
-  if(!SND)return;
-  const s=SND; SND=null; SNDLand=null;
-  try{
-    s.gain.gain.setTargetAtTime(0,AC.currentTime,0.2);
-    setTimeout(()=>{try{s.src.stop();}catch(e){}},900);
-  }catch(e){}
-  soundButtons();
-}
-
-function soundPlay(i){
-  const p=SOUNDS[i]||SOUNDS[0];
-  try{
-    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
-    if(AC.state==="suspended") AC.resume();
-    const src=AC.createBufferSource();
-    src.buffer=noiseBuffer(AC); src.loop=true;
-    let node=src;
-    if(p.hp){ const hp=AC.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=p.hp;
-              node.connect(hp); node=hp; }
-    const lp=AC.createBiquadFilter(); lp.type="lowpass";
-    lp.frequency.value=p.f; lp.Q.value=p.q;
-    // Ветер не ровный: медленная волна водит частоту среза вверх-вниз.
-    // Без неё получается ровное шипение, и это слышно как брак.
-    const lfo=AC.createOscillator(), amp=AC.createGain();
-    lfo.frequency.value=p.lfo; amp.gain.value=p.d;
-    lfo.connect(amp); amp.connect(lp.frequency); lfo.start();
-    const gain=AC.createGain(); gain.gain.value=0;
-    node.connect(lp); lp.connect(gain); gain.connect(AC.destination);
-    src.start();
-    gain.gain.setTargetAtTime(p.g,AC.currentTime,0.9);   // вплывает, а не бьёт по ушам
-    SND={src,gain,lfo}; SNDLand=i;
-    SNDTimer=setTimeout(soundStop,SOUND_MAX_MS);
-    return true;
-  }catch(e){ return false; }
-}
-
-// Одна кнопка на все экраны: нажал на землю — слышно её, нажал ещё раз —
-// тихо. Другая земля переключает звук, а не запускает второй поверх.
-function soundToggle(i){
-  if(!PET.sound){ toast("Звук выключен в кабинете"); return; }
-  if(SND&&SNDLand===i){ soundStop(); return; }
-  soundStop();
-  if(!soundPlay(i)) toast("Звук здесь не заводится");
-  soundButtons();
-}
-const soundBtn=i=>`<div class="sound-btn" data-land="${i}" onclick="event.stopPropagation();soundToggle(${i})"
-   title="Звук места">${SND&&SNDLand===i?"◼":"▶"}</div>`;
-function soundButtons(){
-  document.querySelectorAll(".sound-btn").forEach(el=>{
-    el.textContent=(SND&&SNDLand===+el.dataset.land)?"◼":"▶";
-  });
-}
-// Свернул приложение — звук замолкает. Иначе он остаётся играть в кармане.
-
-
 // ── Темы оформления ───
 const THEMES={
  air:{n:"Воздух",light:1,ink:"#17231d",ink2:"rgba(23,35,29,.58)",card:"rgba(255,255,255,.6)",
@@ -309,7 +224,6 @@ const LANDS=[
 
 
 // ── Характер и ответы после прогулок ───
-const TRAITS={смелость:"смелая",нежность:"ласковая",любопытство:"любопытная",спокойствие:"спокойная"};
 const RESPONSES=[
   [{t:"Обнять её",k:"нежность"},{t:"Расспросить, как всё было",k:"любопытство"}],
   [{t:"Сказать, что гордишься",k:"нежность"},{t:"Спросить, не было ли страшно",k:"спокойствие"}],
@@ -317,19 +231,6 @@ const RESPONSES=[
   [{t:"Рассмотреть всё вместе",k:"любопытство"},{t:"Просто посидеть рядом",k:"спокойствие"}],
   [{t:"Похвалить за смелость",k:"смелость"},{t:"Погладить и ничего не говорить",k:"нежность"}]
 ];
-
-// ── Звук места ───────────────────────────────────────────────────────
-// Ни одного файла: звук считается на месте из шума и фильтров. Скачивать
-// чужие записи леса и реки — это и лишний вес, и чужие права; а разница
-// между землями всё равно не в записи, а в характере — как быстро ходит
-// ветер и насколько глухо. Девять профилей, по одному на землю.
-//
-// Два правила, и они важнее звучания: играет только по нажатию (само
-// никогда), и выключить можно навсегда — в кабинете. Звук в приложении,
-// которое открывают в транспорте, без выключателя — это грубость.
-// Звук места (SOUNDS, soundPlay, soundToggle, soundBtn) живёт в data.js
-document.addEventListener("visibilitychange",()=>{ if(document.hidden) soundStop(); });
-
 
 // ── Удача дня: три состояния ───
 
@@ -448,9 +349,6 @@ function exportText(){
   L.push("Выгружено "+new Date().toLocaleString("ru-RU"));
   L.push("Зверь: "+(PET.name||"без имени")+", дней вместе: "+daysWithMe());
   L.push("");
-  L.push("═══ ЛЕТОПИСЬ ═══");
-  (PET.chronicle||[]).forEach(z=>L.push(дата(z.d)+" — "+z.t));
-  L.push("");
   L.push("═══ ПОПЫТКИ ═══");
   SPHERES.forEach(s=>{const n=triesOf(s.code);if(n)L.push(s.name+": "+n);});
   L.push("");
@@ -527,32 +425,6 @@ function openEvent(k){
   // сон уже прочитан на самом конверте, открывать нечего
 }
 function closeEvent(){ document.getElementById("event-modal").style.display="none"; }
-
-
-// ── Летопись на экране ───
-function renderChronicle(){
-  const box=document.getElementById("chronicle");
-  if(!box)return;
-  const все=(PET.chronicle||[]).slice().reverse();
-  const пусто=!все.length;
-  ["h-chron","h-chron-sub"].forEach(id=>{const e=document.getElementById(id);
-    if(e)e.style.display=пусто?"none":"";});
-  box.style.display=пусто?"none":"";
-  if(пусто)return;
-  const месяц=["января","февраля","марта","апреля","мая","июня","июля",
-               "августа","сентября","октября","ноября","декабря"];
-  box.innerHTML=все.slice(0,40).map(z=>{
-    // Одна запись без даты не должна ронять весь экран. Такие приезжают
-    // из старого облака и от механик, которые писали в летопись раньше,
-    // чем у записей появилось поле дня.
-    const дн=(typeof z.d==="string"&&z.d.includes("-"))?z.d.split("-"):null;
-    const когда=дн?`${+дн[2]} ${месяц[+дн[1]-1]||""}`.trim():"";
-    return `<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)">`+
-      (когда?`<div class="dim" style="font-size:11px">${когда}</div>`:"")+
-      `<div style="margin-top:3px;line-height:1.4">${z.t||""}</div></div>`;
-  }).join("")+
-  (все.length>40?`<div class="dim" style="margin-top:10px">И ещё ${все.length-40} записей раньше.</div>`:"");
-}
 
 
 // ── Рысь держит день ──────────────────────────────────────────────────
@@ -703,7 +575,6 @@ function renderLands(){
         `<img src="${landPhoto(i)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;
            object-fit:cover;${открыта?"":"filter:blur(5px) saturate(.85) brightness(.8);transform:scale(1.06)"}">`+
         `<div style="position:absolute;inset:0;background:linear-gradient(transparent 30%,rgba(6,8,14,.82))"></div>`+
-        (открыта&&PET.sound?soundBtn(i):"")+
         `<div style="position:absolute;left:14px;right:14px;bottom:11px;display:flex;
            justify-content:space-between;align-items:flex-end;gap:10px">`+
           `<div>`+
@@ -889,7 +760,6 @@ function openFind(i){
         `</div>`
       : "";
   }
-  document.getElementById("find-sound").innerHTML=PET.sound?soundBtn(где):"";
   denButton();
   document.getElementById("find-modal").style.display="flex";
 }
@@ -942,17 +812,6 @@ function forkToday(){
   let h=(PET.deckSeed||1)>>>0;
   for(let i=0;i<d.length;i++){h=(h^d.charCodeAt(i))>>>0;h=Math.imul(h,0x01000193)>>>0;}
   return FORKS[(h>>>0)%FORKS.length];
-}
-
-// Тропа долгих сфер. Раньше «долгая сфера» была числом попыток, которое
-// нигде не показывалось. Теперь это след в мире: чем дольше человек ходит
-// в одну сферу без видимого результата, тем заметнее протоптана тропа.
-// Порога нет, награды нет, обнуления нет — только строка о том, что видно.
-function trailWords(){
-  const долгие=SPHERES.filter(s=>isSlow(s.code));
-  if(!долгие.length) return "";
-  const имена=долгие.slice(0,2).map(s=>s.name.toLowerCase()).join(" и ");
-  return `В одну сторону тропа протоптана заметнее других — ${имена}. Она ходит туда чаще всего.`;
 }
 
 
@@ -1242,46 +1101,27 @@ function renderWheel(){
 // Здесь только рисование экранов, ядро осталось на месте.
 
 function renderFinds(){
-  const слов=natureWords();
+  // Раньше здесь были черты характера, число прогулок, тропа долгих сфер
+  // и счёт легендарных. Убрано 22 августа — осталось то, ради чего сюда
+  // заходят: сколько камней и на что копим.
   document.getElementById("nature").innerHTML=
-    `<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Какая она растёт</div>`+
-    `<div class="fname" style="margin-top:6px">`+
-      (слов.length?`${PET.name||"Рысь"} — ${слов.join(" и ")}`
-                  :`${PET.name||"Рысь"} ещё только начинает`)+`</div>`+
-    `<div class="dim" style="margin-top:6px">`+
-      (слов.length?`Характер складывается из твоих ответов после прогулок. Их было ${PET.walks||0}.`
-                  :"Отпусти её побродить и ответь, когда вернётся, — характер начнёт складываться.")+
-    `</div>`+
-    // Тропа долгих сфер: то, что раньше было невидимым числом попыток,
-    // теперь видно как след в мире. Ни порога, ни награды, ни обнуления.
-    (trailWords()?`<div class="dim" style="margin-top:10px">${trailWords()}</div>`:"")+
-    (legendCount()
-      ? `<div class="dim" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--brd)">`+
-        `<b>Легендарных: ${legendCount()} из ${LEGENDS().length}</b><br>`+
-        `Каждая находится один раз и больше не повторяется.</div>`
-      : "")+
-    `<div style="margin-top:12px;font:600 15px var(--fu)">${PET.stones||0} 💎 камней</div>`+
-    // На что копим — вслух и с конкретной землёй. Раньше здесь стояло общее
-    // «тратятся на новые земли», и человек справедливо спрашивал, зачем они
-    // вообще нужны: цель была где-то в другом разделе и без цифры.
-    ближайшаяЗемля()+
-    `<div class="dim" style="margin-top:3px">Копятся с прогулок и за записанный день. Чем реже находка, тем больше.</div>`;
+    `<div style="font:600 15px var(--fu)">${PET.stones||0} 💎 камней</div>`+
+    ближайшаяЗемля();
 
   // Первый день не должен выглядеть складом пустых полок: пока рысь никуда
   // не ходила, показываем одну строчку о том, что здесь будет, и прячем
   // земли с витриной. Появится первая прогулка — разделы возникнут сами.
   const новичок=!(PET.walks||0)&&!(PET.finds||[]).length;
-  ["h-lands","h-lands-sub","h-grid"].forEach(id=>{const e=document.getElementById(id);
+  ["h-lands","h-grid"].forEach(id=>{const e=document.getElementById(id);
     if(e)e.style.display=новичок?"none":"";});
-  document.getElementById("lands").style.display=новичок?"none":"";
-  document.getElementById("finds-grid").style.display=новичок?"none":"";
   const intro=document.getElementById("finds-intro");
   intro.style.display=новичок?"":"none";
   if(новичок)intro.innerHTML=
     `<div class="fname">Здесь будет то, что она приносит</div>`+
     `<div class="dim" style="margin-top:6px">Отпусти её побродить — кнопка на вкладке «Тотем». Вернётся с находкой, историей или просто довольная.</div>`;
 
-  renderLands();renderChronicle();
+  renderLands();
+  if(typeof рисоватьСкладки==="function") рисоватьСкладки(новичок);
 
   const мои=new Set(PET.finds||[]);
   document.getElementById("finds-sub").textContent=
@@ -1339,7 +1179,6 @@ function renderPuzzle(){
       // больше, чем за «позвонил отцу». Теперь арифметика — приятная мелочь.
       PET.bonus+=5;
       PET.stones=(PET.stones||0)+4;        // и камни на земли
-      if(PET.puzzleDone>=PUZZLES_PER_DAY)летопись("Все три задачки дня решены.");
       savePet();
       setTimeout(()=>{PZ=null;renderPuzzle();renderWalk();},700);
     }
@@ -1375,8 +1214,6 @@ function renderMe(){
         :`Последняя копия — ${дней} ${plural(дней,"день","дня","дней")} назад.`;
     }
   }
-  const sw=document.getElementById("sound-switch");
-  if(sw) sw.textContent=PET.sound?"Звук мест включён — выключить":"Звук мест выключен — включить";
 }
 
 // Что впереди. Только то, что придёт само: даты солнцестояний, начало
@@ -1386,7 +1223,4 @@ function renderMe(){
 // что время всё-таки к чему-то идёт.
 
 
-// Выключатель насовсем: вместе со звуком исчезают и кнопки со снимков.
-// Полумеры вроде «тише» тут не нужны — либо человеку это интересно,
-// либо он не хочет видеть даже предложения.
 

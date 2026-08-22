@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=110"></script>
-<script src="data.js?v=110"></script>
-<script src="deck.js?v=110"></script>
-<script src="expedition.js?v=110"></script>
+<script src="photos/list.js?v=111"></script>
+<script src="data.js?v=111"></script>
+<script src="deck.js?v=111"></script>
+<script src="expedition.js?v=111"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -32,6 +32,12 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
   text-transform:uppercase;letter-spacing:.14em}
 .sub{font-size:13px;color:var(--ink2);margin-top:4px}
 .head{margin-bottom:14px}
+h2.складка{display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;user-select:none}
+.уголок{flex:none;width:9px;height:9px;margin-left:10px;border-right:2px solid var(--ink2);
+  border-bottom:2px solid var(--ink2);transform:rotate(45deg);transform-origin:60% 60%;
+  transition:transform .2s ease}
+h2.складка.on .уголок{transform:rotate(-135deg)}
 #daybtn{flex:none;width:44px;height:44px;border-radius:13px;cursor:pointer;position:relative;
   background:var(--card);border:1px solid var(--brd);color:var(--ink2);
   display:flex;align-items:center;justify-content:center;transition:background .2s,color .2s}
@@ -82,12 +88,6 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
 @media (prefers-reduced-motion: reduce){#totem-stars.on{animation:none}}
 .aim-r{background:var(--card);transition:border-color .2s}
 .aim-r.sel{border-color:var(--accent)!important}
-/* Кнопка звука лежит поверх снимка земли, в правом верхнем углу. Маленькая
-   и полупрозрачная: звук здесь не главное, а предложение. */
-.sound-btn{position:absolute;top:10px;right:10px;z-index:3;width:34px;height:34px;
-  border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;
-  font-size:12px;color:#fff;background:rgba(6,8,14,.55);border:1px solid rgba(255,255,255,.22);
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);user-select:none}
 .quote .q{font:400 18.5px/1.45 var(--fd)}
 .quote .a{font-size:12.5px;color:var(--ink2);margin-top:9px}
 .quote .tag{font-size:11px;color:var(--ink2);opacity:.8;margin-top:11px}
@@ -284,7 +284,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <div id="walk-card" style="border-radius:20px;overflow:hidden;background:var(--card);
          border:1px solid var(--brd)">
       <div style="position:relative;height:196px;background:#0b1014">
-        <div id="walk-sound"></div>
         <img id="walk-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
         <div style="position:absolute;inset:0;background:linear-gradient(transparent 30%,rgba(6,8,14,.92))"></div>
         <div style="position:absolute;left:16px;right:16px;bottom:13px">
@@ -336,7 +335,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div style="width:100%;max-width:360px;border-radius:20px;overflow:hidden;
        background:var(--card);border:1px solid var(--brd)">
     <div style="position:relative;height:186px;background:#0b1014">
-      <div id="find-sound"></div>
       <img id="find-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
       <div style="position:absolute;inset:0;background:linear-gradient(transparent 32%,rgba(6,8,14,.92))"></div>
       <div style="position:absolute;left:16px;right:16px;bottom:13px">
@@ -368,7 +366,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
     <div style="position:absolute;inset:0;background:linear-gradient(rgba(4,6,10,.55),rgba(4,6,10,.94))"></div>
   </div>
   <div style="position:relative;z-index:2;width:100%;max-width:360px;padding:24px;text-align:center">
-    <div id="exp-sound"></div>
     <div id="exp-step" class="dim" style="letter-spacing:.14em;text-transform:uppercase;font-size:10.5px"></div>
     <div id="exp-title" style="font:600 21px var(--fu);color:#fff;margin-top:10px;line-height:1.3"></div>
     <div id="exp-text" style="font-size:14px;color:rgba(255,255,255,.78);margin-top:10px;line-height:1.5"></div>
@@ -455,7 +452,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
         <div id="away-fallback" style="position:absolute;inset:0;z-index:0"></div>
         <img id="away-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;
           z-index:1;transition:opacity 1.2s ease">
-        <div id="away-sound"></div>
         <div style="position:absolute;left:0;right:0;bottom:0;padding:16px;z-index:2;
           background:linear-gradient(transparent,rgba(6,8,14,.72))">
           <div id="away-where" style="font:600 15px var(--fu);color:#fff"></div>
@@ -475,16 +471,11 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="head"><h1>Кабинет</h1><div class="sub" id="me-sub"></div></div>
   <h2>Мои цели</h2>
   <div class="g" id="goals"></div>
-  <h2>Оформление</h2>
+  <h2>Тема</h2>
   <div class="themes" id="themes"></div>
   <div class="g" id="me-info"></div>
   <h2>Что впереди</h2>
   <div class="g" id="ahead"></div>
-  <h2>Звук мест</h2>
-  <div class="g">
-    <div class="dim">У каждой земли свой звук — ветер, вода, глухая тишина. Он не включается сам никогда: только когда нажмёшь ▶ на снимке. Здесь можно убрать и саму кнопку.</div>
-    <button class="btn ghost" style="margin-top:12px" id="sound-switch" onclick="toggleSound()"></button>
-  </div>
   <h2>Начать заново</h2>
   <div class="g">
     <div class="dim">Стереть всё и начать с чистого листа: новый зверь, пустая летопись, ноль находок. Отменить будет нельзя — сначала выгрузи копию себе.</div>
@@ -493,7 +484,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   </div>
   <h2>Сохранить себе</h2>
   <div class="g">
-    <div class="dim">Летопись, находки и цифры живут в облаке Телеграма. Облако можно потерять, а копию у себя — нет. Забирай её когда захочешь.</div>
+    <div class="dim">Находки и цифры живут в облаке Телеграма. Облако можно потерять, а копию у себя — нет. Забирай её когда захочешь.</div>
     <button class="btn" style="margin-top:12px" onclick="exportAll()">Выгрузить всё</button>
     <div class="dim" id="export-note" style="margin-top:8px"></div>
     <div class="dim" id="export-when" style="margin-top:6px;font-size:12px"></div>
@@ -506,15 +497,16 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="g" id="den-box"></div>
   <div class="g" id="nature" style="margin-top:12px"></div>
   <div class="g" id="finds-intro"></div>
-  <h2 id="h-lands">Земли</h2>
-  <div class="sub" id="h-lands-sub" style="margin-bottom:10px">Куда она может уходить. Новые открываются за камни</div>
-  <div class="g" id="plan-box" style="margin-bottom:12px"></div>
-  <div id="lands"></div>
-  <h2 id="h-grid">Что принесла</h2>
-  <div id="finds-grid"></div>
-  <h2 id="h-chron">Летопись</h2>
-  <div class="sub" id="h-chron-sub" style="margin-bottom:10px">Пишется сама. Вести ничего не надо</div>
-  <div class="g" id="chronicle"></div>
+  <h2 id="h-lands" class="складка" onclick="складка('lands')">Земли<span class="уголок"></span></h2>
+  <div id="lands-body" style="display:none">
+    <div class="sub" id="h-lands-sub" style="margin-bottom:10px">Куда она может уходить. Новые открываются за камни</div>
+    <div class="g" id="plan-box" style="margin-bottom:12px"></div>
+    <div id="lands"></div>
+  </div>
+  <h2 id="h-grid" class="складка" onclick="складка('grid')">Что принесла<span class="уголок"></span></h2>
+  <div id="grid-body" style="display:none">
+    <div id="finds-grid"></div>
+  </div>
 </section>
 
 
@@ -595,7 +587,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="110 · 22.08.2026 03:29";
+const APP_VERSION="111 · 22.08.2026 03:42";
 
 let toastTimer=null;
 function toast(text){
@@ -995,16 +987,12 @@ function cloudLoad(done){
             const было=new Set((своё||[]).map(ключ));
             return [...(своё||[]),...(чужое||[]).filter(x=>!было.has(ключ(x)))];
           };
-          PET.chronicle=слить(PET.chronicle,cp.chronicle).slice(-500);
-          // Звук: выключенный побеждает. Ноль здесь не пустота, а решение
-          // человека, и общее правило ниже приняло бы его за «не заполнено».
-          if(PET.sound===0||cp.sound===0) PET.sound=0;
 
           // Всё остальное — общим правилом, а не списком. Список полей
           // приходилось дописывать руками при каждой новой механике, и
           // 20 августа выяснилось, что двенадцать полей его не дождались:
           // при переезде на другой телефон терялись память характера,
-          // услышанные истории, показанные сны и выключенный звук.
+          // услышанные истории и показанные сны.
           // Теперь любое новое поле подхватывается само.
           // Правило прежнее: своё сильнее облачного, облачное берётся
           // только туда, где у себя пусто.
@@ -1179,8 +1167,6 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          lastExpedition:LS.lastExpedition??null,
          // где и когда нашлась каждая вещь: {номер:{d:день,l:земля}}
          findAt:LS.findAt||{},
-         // звук места: 1 — можно, 0 — выключен насовсем
-         sound:LS.sound??1,
          // когда колесо последний раз пересчитывалось само + что оно сдвинуло
          calibratedAt:LS.calibratedAt||"", wheelPrev:LS.wheelPrev||null,
          wheelSnapAt:LS.wheelSnapAt||"",
@@ -1405,7 +1391,6 @@ function addTry(code,тихо){
   PET.tries[code]=triesOf(code)+1;
   const n=PET.tries[code], s=byCode(code);
   if(TRY_MARKS.includes(n))
-    летопись(`${n} ${plural(n,"попытка","попытки","попыток")} — ${s.name.toLowerCase()}. Ни одна не пропала.`);
   savePet();
   if(тихо) return;
   renderWheel();
@@ -1629,7 +1614,6 @@ const onceDue=()=>!PET.once&&window.ONCE&&dayIndex()>=onceDay();
 function showOnce(){
   if(!onceDue())return;
   PET.once=Date.now();
-  летопись("Она привела кого-то. Это случилось один раз.");
   savePet();
   document.getElementById("once-title").textContent=window.ONCE.n;
   document.getElementById("once-text").textContent=window.ONCE.x;
@@ -1638,8 +1622,6 @@ function showOnce(){
 
 // Сколько их — считаем по колоде, а не пишем числом в тексте: колода
 // запечатана и может поменяться, а соврать в подписи легко.
-const LEGENDS=()=>FINDS.map((f,i)=>i).filter(i=>FINDS[i].r===2);
-const legendCount=()=>(PET.finds||[]).filter(i=>FINDS[i]&&FINDS[i].r===2).length;
 
 // ── Находка как сцена ────────────────────────────────────────────────
 // Раньше находка жила ровно одно мгновение: выпала после прогулки — и всё,
@@ -1669,7 +1651,6 @@ function denFromScene(){
 }
 function closeFind(){
   findOpen=null;
-  soundStop();
   document.getElementById("find-modal").style.display="none";
 }
 
@@ -1685,32 +1666,17 @@ function toggleDen(i){
   else{
     if((PET.den||[]).length>=DEN_SLOTS){toast(`На полке только ${DEN_SLOTS} мест`);return;}
     PET.den=[...(PET.den||[]),i];
-    if((PET.den||[]).length===1)летопись("Ты обустроил ей логово — на полке появилась первая вещь.");
   }
   savePet();renderFinds();renderDen();
   toast(есть?"Убрал с полки":"Поставил в логово");
 }
 
 
-function toggleSound(){
-  PET.sound=PET.sound?0:1;
-  if(!PET.sound) soundStop();
-  savePet(); renderMe(); renderTotem();
-  toast(PET.sound?"Звук мест включён":"Звук мест выключен");
-}
 
 // ── Летопись ─────────────────────────────────────────────────────────
 // Книга, которая пишется сама. Ничего не надо вести руками: заметное
 // событие ложится строкой с датой. Через год это документ прожитого года —
 // не графики, а история. Повторы за один день не пишутся.
-function летопись(текст){
-  PET.chronicle=PET.chronicle||[];
-  const d=todayKey();
-  if(PET.chronicle.some(z=>z.d===d&&z.t===текст))return;
-  PET.chronicle.push({d,t:текст});
-  if(PET.chronicle.length>500)PET.chronicle=PET.chronicle.slice(-500);
-  savePet();
-}
 // ── Прогулка ─────────────────────────────────────────────────────────
 // Энергия копится сама от зажжённых сфер (те же баллы) и от карт. Порог
 // растёт вместе со зверем: маленькой рыси хватает малого, взрослой нужно
@@ -1803,7 +1769,6 @@ function maybeGrowOvernight(){
   if(new Date().getHours()<5||PET.stageSeenOn===todayKey()) return;
   const шаг=PET.stageSeen+1;
   PET.stageSeen=шаг; PET.stageSeenOn=todayKey(); savePet();
-  летопись(`За ночь она подросла — стадия ${шаг} из ${PHOTO_FRAMES}.`);
   setTimeout(()=>toast("За ночь она подросла"),900);
 }
 // Было 40+стадия*6 — на третьей стадии 58, а за обычный день капает 20-30.
@@ -1841,7 +1806,6 @@ function openLand(i){
   if(landOpen(i)||(PET.stones||0)<LANDS[i].c)return;
   PET.stones-=LANDS[i].c;
   PET.lands=[...(PET.lands||[0]),i];
-  летопись(`Открыта новая земля: ${LANDS[i].n.toLowerCase()}.`);
   savePet();renderFinds();toast("Земля открыта");
 }
 
@@ -1885,7 +1849,6 @@ function startWalk(куда){
   if(typeof startExpedition==="function")
     startExpedition(PET.walkLand,(PET.nextPlan&&PET.nextPlan.route)||"тихая");
   savePet(true);renderTotem();
-  if(!PET.walks)летопись("Она впервые ушла бродить одна.");
   toast(PET.walkAim!=null&&PET.walkLand!==PET.walkAim
     ? "Ушла своей дорогой" : "Ушла бродить");
 }
@@ -2156,7 +2119,6 @@ function openWalk(){
   document.getElementById("walk-sign").innerHTML=
     `<span>${PET.name||"Рысь"} · ${земля.n.toLowerCase()}</span>`+
     `<span>${датаСловами(todayKey())}</span>`;
-  document.getElementById("walk-sound").innerHTML=PET.sound?soundBtn(PET.walkLand??0):"";
   // Новая вещь сразу сравнивается с полкой: что изменится, если поставить
   // её сейчас, и вместо чего. Без этого находка остаётся картинкой.
   const срав=document.getElementById("walk-swap");
@@ -2206,13 +2168,11 @@ function answerWalk(trait){
   let камни=2;                                   // за саму прогулку, всегда
   if(лут&&лут.trace){
     камни+=4;
-    летопись(`Она нашла след — ${LANDS[PET.walkLand??0].n.toLowerCase()}.`);
   }else if(лут&&лут.see){
     камни+=3;
   }else if(лут&&лут.story){
     камни+=6;
     rememberStory(лут.storyIndex);
-    летопись(`С прогулки она принесла историю — ${лут.story.name}.`);
   }else if(лут){
     PET.finds=PET.finds||[];
     const новая=!PET.finds.includes(лут.i);
@@ -2222,17 +2182,12 @@ function answerWalk(trait){
     PET.findAt=PET.findAt||{};
     if(новая)PET.findAt[лут.i]={d:todayKey(),l:PET.walkLand??0};
     камни+=stonesFor(лут.f.r);
-    if(новая&&лут.f.r>0)
-      летопись(`${лут.f.r===2?"Легендарная находка":"Редкая находка"}: ${лут.f.n.toLowerCase()} — ${LANDS[PET.walkLand??0].n.toLowerCase()}.`);
-    if(новая&&лут.f.r===2&&legendCount()===1)
-      летопись(`Первая легендарная. Всего их ${LEGENDS().length}, и каждая находится один раз.`);
   }
   PET.stones=(PET.stones||0)+камни;
   PET.walks=(PET.walks||0)+1;
   PET.walkStart=0;PET.walkRoll=null;PET.walkRoll2=null;PET.walkPick=null;PET.walkBack=0;PET.walkNight=0;
   PET.traceStep=0;
   savePet(true);
-  soundStop();
   document.getElementById("walk-modal").style.display="none";
   document.getElementById("legend-modal").style.display="none";
   // Подрост показываем сразу после встречи, а не пока её нет дома: смысл
@@ -2243,11 +2198,6 @@ function answerWalk(trait){
 }
 
 // ── Характер и витрина ───────────────────────────────────────────────
-function natureWords(){
-  const t=PET.traits||{};
-  const есть=Object.entries(t).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  return есть.slice(0,2).map(([k])=>TRAITS[k]).filter(Boolean);
-}
 function mode(){
   // Серый день человек сам пометил как выпавший — он не должен решать,
   // в каком режиме приложение. Иначе неделя болезни включает красный.
@@ -2385,8 +2335,6 @@ function updateAway(){
     сцена.style.transform=`scale(${[1,1.03,1.07][этап]})`;
     сцена.style.filter=этап?`brightness(${[1,1.04,1.1][этап]})`:"none";
   }
-  const зв=document.getElementById("away-sound");
-  if(зв) зв.innerHTML=PET.sound?soundBtn(i):"";
   // Пока снимков земель нет — рисуем пейзаж градиентом по времени суток.
   // Небо сверху, земля снизу, зверя нет. Это не заглушка «серый квадрат»,
   // а нормальный вид, который сам сменится на фото, когда оно появится.
@@ -2620,7 +2568,6 @@ function savePetName(){
   const v=((el&&el.value)||"").trim().slice(0,20);
   if(!v){toast("Впиши имя");return;}
   PET.name=v; savePet();
-  летопись(`Ты дал ей имя — ${v}.`);
   renderTotem();
   toast(v+" — теперь у неё есть имя");
   if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
@@ -2807,6 +2754,24 @@ function pills(box,values,cur,key,labels,subs){
 function lastKnown(field){
   for(let i=DAYS.length-1;i>=0;i--){const v=DAYS[i][field];if(v)return v;}
   return null;
+}
+// Раскрывающийся раздел «Находок». Что открыто — помним у зверя: иначе
+// раздел захлопывался бы при каждой перерисовке, а она случается часто.
+function складка(имя){
+  PET.open={...(PET.open||{})};
+  PET.open[имя]=!PET.open[имя];
+  savePet();
+  рисоватьСкладки();
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+}
+function рисоватьСкладки(скрытьВсё){
+  [["lands","h-lands"],["grid","h-grid"]].forEach(([имя,шапка])=>{
+    const тело=document.getElementById(имя+"-body");
+    const h=document.getElementById(шапка);
+    const открыт=!скрытьВсё&&!!((PET.open||{})[имя]);
+    if(тело) тело.style.display=открыт?"":"none";
+    if(h) h.classList.toggle("on",открыт);
+  });
 }
 function toggleDaybar(){
   const bar=document.getElementById("daybar");
@@ -3125,20 +3090,6 @@ mergeLog();
 DATA.today=todayState();     // новый день начинается с чистого листа
 go("totem");
 setInterval(applyTheme,60000);
-
-// Вехи пишутся в летопись сами, при заходе. Считаем от рождения зверя.
-(function вехи(){
-  const д=daysWithMe();
-  const было=new Set(PET.marks||[]);
-  const новые=[7,14,30,50,100,200,365].filter(m=>д>=m&&!было.has(m));
-  if(!новые.length) return;
-  PET.marks=[...было,...новые];
-  savePet();
-  // Пришёл после долгого перерыва — вех накопилось несколько. Отмечаем
-  // старшую: три строки подряд об одном и том же не праздник, а список.
-  const m=новые[новые.length-1];
-  летопись(`${m} ${plural(m,"день","дня","дней")} вместе.`);
-})();
 
 // Одно событие входа. Раньше здесь дрались за экран «один раз за всю
 // жизнь» и созревшая капсула, а отложенная история выскакивала отдельно
