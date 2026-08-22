@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=127"></script>
-<script src="data.js?v=127"></script>
-<script src="deck.js?v=127"></script>
-<script src="expedition.js?v=127"></script>
+<script src="photos/list.js?v=128"></script>
+<script src="data.js?v=128"></script>
+<script src="deck.js?v=128"></script>
+<script src="expedition.js?v=128"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -633,7 +633,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="127 · 22.08.2026 14:27";
+const APP_VERSION="128 · 22.08.2026 14:35";
 
 let toastTimer=null;
 function toast(text){
@@ -904,9 +904,16 @@ function showDemo(on){
 }
 // Есть ли вообще что показывать
 const hasData=()=>DAYS.length>0;
+// Форматов посылки от бота два, и приложение обязано понимать оба.
+// «1» — прежний, без даты последнего дня. «2» — с датой седьмым полем.
+// Бот перешёл на «2», а здесь проверка так и осталась на «1», и всё, что
+// он присылал, отбрасывалось целиком: колесо, цели и последние дни просто
+// не доезжали. Заметить было нечем — приложение и так живёт на телефоне.
+// Старые ссылки с «1» из истории переписки должны работать и дальше.
+const ФОРМАТЫ=["1","2"];
 function decode(raw){
   const p=decodeURIComponent(raw).split("|");
-  if(p[0]!=="1"||p.length<6)return null;
+  if(!ФОРМАТЫ.includes(p[0])||p.length<6)return null;
   const num=s=>(s===""||s===undefined)?null:parseFloat(s);
   const bits=m=>SPHERES.filter((s,i)=>(m>>i)&1).map(s=>s.code);
   const wheel={};(p[1].split(",")).forEach((v,i)=>{if(SPHERES[i])wheel[SPHERES[i].code]=+v||0;});
