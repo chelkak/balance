@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=125"></script>
-<script src="data.js?v=125"></script>
-<script src="deck.js?v=125"></script>
-<script src="expedition.js?v=125"></script>
+<script src="photos/list.js?v=126"></script>
+<script src="data.js?v=126"></script>
+<script src="deck.js?v=126"></script>
+<script src="expedition.js?v=126"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -633,7 +633,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="125 · 22.08.2026 13:47";
+const APP_VERSION="126 · 22.08.2026 13:58";
 
 let toastTimer=null;
 function toast(text){
@@ -2069,6 +2069,14 @@ function походПричина(){
     ? `Одну встречу обошла стороной — ${узел}. В следующий раз пригодится другая вещь.`
     : "Одну встречу обошла стороной. В следующий раз пригодится другая вещь.";
 }
+// Граница между находкой и историей — одно число, и оно одно на оба исхода
+// пути. Ниже него рысь приносит вещь (а если повернула с полдороги — след),
+// выше — историю про живого человека или знание про людей вообще.
+// 22 августа поднято с 0.55 до 0.42: историй стало 120 вместо 34, и они
+// оказались ценнее находок — «в отличие от находки тут есть практический
+// смысл». Платим долей находок: было 55%, стало 42%. История — 40%.
+const ИСТОРИЯ_ОТ=0.42;
+
 function walkLoot(){
   const п=PET.lastExpedition;
   const исход=походИсход();
@@ -2084,14 +2092,14 @@ function walkLoot(){
   // Дошла чисто — пороги сдвигаются в её пользу. Повернула — предмета нет,
   // но день не пустой: остаются след, наблюдение или история, и знание
   // земли, которое записала сама экспедиция. Наказания тут нет, есть разница.
-  if(исход==="отступление"&&r<=0.55) return {trace:TRACES[пик%TRACES.length]};
+  if(исход==="отступление"&&r<=ИСТОРИЯ_ОТ) return {trace:TRACES[пик%TRACES.length]};
   // Возвращение всегда имеет развязку, но не обязано давать предмет.
   // «Просто гуляла» осталось, но рядом встали след и наблюдение: они
   // ничего не кладут в витрину, а день не остаётся пустым.
   if(r>0.94)return null;                       // совсем ничего, редко
   if(r>0.88)return {trace:TRACES[пик%TRACES.length]};
   if(r>0.82)return {see:OBSERVE[пик%OBSERVE.length]};
-  if(r>0.55){
+  if(r>ИСТОРИЯ_ОТ){
     const выбор=pickStory(weakest().code,пик);
     return {story:выбор.s,storyIndex:выбор.i};
   }
