@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=114"></script>
-<script src="data.js?v=114"></script>
-<script src="deck.js?v=114"></script>
-<script src="expedition.js?v=114"></script>
+<script src="photos/list.js?v=115"></script>
+<script src="data.js?v=115"></script>
+<script src="deck.js?v=115"></script>
+<script src="expedition.js?v=115"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -106,7 +106,6 @@ h2.складка.on .уголок{transform:rotate(-135deg)}
 .pts{font-size:11px;font-weight:700;padding:5px 9px;border-radius:10px;white-space:nowrap;
   background:var(--accent);color:var(--aink)}
 
-.spheres{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
 .sp{border-radius:15px;padding:10px 3px;text-align:center;cursor:pointer;user-select:none;
   background:var(--card);border:1px solid var(--brd);transition:.15s}
 .sp.on{border-color:var(--accent);border-width:2px;padding:9px 2px}
@@ -114,7 +113,6 @@ h2.складка.on .уголок{transform:rotate(-135deg)}
 .sp .nm{font-size:9.5px;font-weight:500;line-height:1.2;margin-top:2px}
 .sp .bonus{font-size:9px;font-weight:700;margin-top:2px;color:var(--accent)}
 
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
 .stat{border-radius:16px;padding:13px 6px;text-align:center;background:var(--card);border:1px solid var(--brd)}
 .stat b{display:block;font:600 23px/1.2 var(--fd)}
 .stat span{font-size:10.5px;color:var(--ink2)}
@@ -143,9 +141,6 @@ textarea{width:100%;border:1px solid var(--brd);border-radius:14px;padding:12px;
   font:600 15.5px var(--fu);background:var(--accent);color:var(--aink)}
 .btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--brd);font-weight:500;margin-top:8px}
 .btn:disabled{opacity:.4;cursor:default}
-.pair{display:flex;gap:8px;margin-top:14px}
-.pair .btn{margin-top:0}
-.pair .back{flex:0 0 34%}
 
 .row{display:flex;align-items:center;gap:9px;margin-bottom:8px}
 .rlabel{width:98px;font-size:12.5px;flex:none}
@@ -186,11 +181,6 @@ textarea{width:100%;border:1px solid var(--brd);border-radius:14px;padding:12px;
   border:1px solid var(--brd);font-size:12.5px;cursor:pointer;color:var(--ink2)}
 .seg div.on{background:var(--accent);color:var(--aink);border-color:transparent;font-weight:600}
 
-.shop{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-.item{border-radius:15px;padding:12px 11px;background:var(--card);border:1px solid var(--brd);cursor:pointer}
-.item.locked{opacity:.4}
-.item .t{font-size:13px;font-weight:500}
-.item .p{font-size:11px;color:var(--ink2);margin-top:3px}
 .opts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
 .opt{padding:14px 4px;border-radius:14px;text-align:center;background:var(--card);border:1px solid var(--brd);
   font:600 17px var(--fd);cursor:pointer}
@@ -587,7 +577,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="114 · 22.08.2026 04:58";
+const APP_VERSION="115 · 22.08.2026 05:13";
 
 let toastTimer=null;
 function toast(text){
@@ -983,11 +973,6 @@ function cloudLoad(done){
           // Летопись и письма — по одной записи, без повторов. Это то, что
           // терялось больнее всего: письмо на год не восстановить ничем.
           const ключ=x=>JSON.stringify(x);
-          const слить=(своё,чужое)=>{
-            const было=new Set((своё||[]).map(ключ));
-            return [...(своё||[]),...(чужое||[]).filter(x=>!было.has(ключ(x)))];
-          };
-
           // Всё остальное — общим правилом, а не списком. Список полей
           // приходилось дописывать руками при каждой новой механике, и
           // 20 августа выяснилось, что двенадцать полей его не дождались:
@@ -1419,7 +1404,6 @@ function countTries(key,сферы){
 }
 
 
-const strongest=()=>SPHERES.reduce((m,s)=>DATA.wheel[s.code]>DATA.wheel[m.code]?s:m,SPHERES[0]);
 function dormant(c){let n=0;for(let i=DAYS.length-1;i>=0;i--){if(DAYS[i].touched.includes(c))break;n++;}return n;}
 const BASE=10;
 const ptsFor=c=>BASE;                 // одна цена: сферу задели — десять
@@ -1563,6 +1547,25 @@ const READY_MIN_DAYS=7;
 function personalNorm(field,дней=28){
   const все=свежие(дней).filter(d=>!d.grey).map(d=>d[field]).filter(v=>v!=null&&v>0);
   return все.length>=3?avg(все):null;
+}
+// Темп веса и срок до цели. Считаем по настоящим взвешиваниям (weight0),
+// а не по протянутым значениям: между замерами вес «остаётся прежним»
+// только для графика, а для темпа это выдуманные точки.
+function весЦель(){
+  const точки=DAYS.filter(d=>d.weight0!=null);
+  const сейчас=точки.length?точки[точки.length-1].weight0:0;
+  const цель=(DATA.goals||{}).weight||0;
+  const осталось=сейчас-цель;
+  if(точки.length<14) return {сейчас,осталось,вНеделю:0,недель:null};
+  const н=точки.slice(0,7), к=точки.slice(-7);
+  // Среднее семи замеров относится к середине этой семёрки, а не к её
+  // краю. Расстояние между двумя серединами и есть срок, за который вес
+  // изменился, — его и берём делителем.
+  const мс=к[Math.floor(к.length/2)].date-н[Math.floor(н.length/2)].date;
+  const недель=мс/(7*864e5);
+  const вНеделю=недель>0?(avg(н.map(d=>d.weight0))-avg(к.map(d=>d.weight0)))/недель:0;
+  return {сейчас,осталось,вНеделю,
+          недель:вНеделю>0.05?Math.ceil(осталось/вНеделю):null};
 }
 function readiness(){
   const заПолмесяца=свежие(14).filter(d=>!d.grey&&(d.sleep!=null||d.energy!=null));
@@ -2238,7 +2241,8 @@ function daysWithMe(){
   if(!DAYS.length) return 0;
   const first=DAYS[0].date;
   const now=new Date(todayKey()+"T12:00:00");
-  return Math.max(0,Math.min(30,Math.round((now-first)/86400000)));
+  // Без потолка: рост зверя считает своя функция, а это просто срок.
+  return Math.max(0,Math.round((now-first)/86400000));
 }
 const GROWTH_STEP_H=6, GROWTH_STEPS=30*24/6;   // 120 шагов за 30 дней
 function growthStepsPassed(){
@@ -2483,7 +2487,7 @@ function renderTotem(){
     updatePhoto();
     return;
   }
-  const w=weakest(),str=strongest();
+  const w=weakest();
   const state=m==="red"?"Свернулась рядом с тобой"
     :m==="yellow"?"Притихла, но всё хорошо"
     :"Бодра и спокойна";
@@ -2598,18 +2602,6 @@ function pokeTotem(){
 // со зверем: на десятой стадии ряды с двумя правилами и умножение в столбик.
 const PUZZLES_PER_DAY=3;
 // ── Сегодня ──────────────────────────────────────────────────────────
-function spheresGrid(box,list,editable,showBonus){
-  box.innerHTML=SPHERES.map(s=>{
-    const on=list.includes(s.code),b=showBonus&&dormant(s.code)>=3;
-    return `<div class="sp ${on?"on":""}" data-c="${s.code}"><div class="ic">${s.ic}</div>
-      <div class="nm">${s.name}</div>${b?`<div class="bonus">+${BONUS}</div>`:""}</div>`;}).join("");
-  if(!editable)return;
-  box.querySelectorAll(".sp").forEach(el=>el.onclick=()=>{
-    const c=el.dataset.c,i=edit.touched.indexOf(c);
-    i<0?edit.touched.push(c):edit.touched.splice(i,1);
-    spheresGrid(box,edit.touched,true,showBonus);
-    if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
-}
 function tasksToday(){
   // Пока колесо ровное (данных нет), «самая слабая» выбирается наугад —
   // и человек получал бы три задачи из одной сферы. Даём разные.

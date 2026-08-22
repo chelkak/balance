@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="114 · 22.08.2026 04:58";
+window.DATA_JS_VERSION="115 · 22.08.2026 05:13";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -314,13 +314,6 @@ const CARD_LABEL={"в":"Вопрос дня","а":"Опора","д":"Мален�
 
 
 // ── Сезоны и отметки настоящего календаря ───
-const SEASONS=[
-  {m:[12,1,2], n:"Зима",  s:"Снег держится, следы видно целиком."},
-  {m:[3,4,5],  n:"Весна", s:"Земля оттаивает, в лесу громко от птиц."},
-  {m:[6,7,8],  n:"Лето",  s:"Светло допоздна, она возвращается затемно."},
-  {m:[9,10,11],n:"Осень", s:"Пахнет мокрым листом, добычи много."}
-];
-const seasonNow=()=>SEASONS.find(s=>s.m.includes(new Date().getMonth()+1))||SEASONS[0];
 
 // Особые дни настоящего календаря — не праздники-поздравления, а отметки
 // того, что год повернулся. Их видит и тот, кто открывает приложение раз в месяц.
@@ -840,9 +833,7 @@ function renderGoals(){
       сначала нужно, с чем сравнивать.</div>`;
     return;
   }
-  const g=DATA.goals,wl=DAYS.map(d=>d.weight).filter(v=>v),cur=wl.length?wl[wl.length-1]:0;
-  const first=wl.length>=7?avg(wl.slice(0,7)):cur,perWeek=wl.length>=14?(first-avg(wl.slice(-7)))/2:0;
-  const left=cur-g.weight,weeks=perWeek>.05?Math.ceil(left/perWeek):null;
+  const g=DATA.goals,в=весЦель(),cur=в.сейчас,perWeek=в.вНеделю,left=в.осталось,weeks=в.недель;
   const сИсторией=DAYS.filter(d=>d.sleep!=null);
   const nights=сИсторией.filter(d=>d.sleep>=g.sleep).length;
   box.innerHTML=`
@@ -895,9 +886,7 @@ function renderTrend(){
         сначала нужно, с чем сравнивать.</div></div>`;
     return;
   }
-  const g=DATA.goals,wl=DAYS.map(d=>d.weight).filter(v=>v),cur=wl.length?wl[wl.length-1]:0;
-  const first=wl.length>=7?avg(wl.slice(0,7)):cur,perWeek=wl.length>=14?(first-avg(wl.slice(-7)))/2:0;
-  const left=cur-g.weight,weeks=perWeek>.05?Math.ceil(left/perWeek):null;
+  const g=DATA.goals,в=весЦель(),cur=в.сейчас,perWeek=в.вНеделю,left=в.осталось,weeks=в.недель;
   const сИсторией=DAYS.filter(d=>d.sleep!=null);
   const nights=сИсторией.filter(d=>d.sleep>=g.sleep).length;
   document.getElementById("trend-sub").textContent=
@@ -927,7 +916,11 @@ function renderTrend(){
         <div class="dim" style="font-size:11px;margin-top:6px">
           Записано впервые. График появится со второго дня.</div></div>`;
     const v=DAYS.map(d=>d[s.k]);
-    const первые=все.slice(0,7), последние=все.slice(-7);
+    // Половины должны не пересекаться, иначе на коротком ряду сдвиг
+    // выходит нулём: два среза по семь на десяти точках — это почти
+    // один и тот же набор. Делим пополам, сколько бы точек ни было.
+    const серед=Math.floor(все.length/2);
+    const первые=все.slice(0,серед||1), последние=все.slice(-(все.length-серед)||-1);
     const diff=avg(последние)-avg(первые);
     return `<div class="chart"><div class="ctitle"><span>${s.l}</span>
       <span>сейчас ${все[все.length-1].toLocaleString("ru-RU")} · сдвиг ${diff>=0?"+":""}${diff.toFixed(s.f)}</span></div>
