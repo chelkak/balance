@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=108"></script>
-<script src="data.js?v=108"></script>
-<script src="deck.js?v=108"></script>
-<script src="expedition.js?v=108"></script>
+<script src="photos/list.js?v=109"></script>
+<script src="data.js?v=109"></script>
+<script src="deck.js?v=109"></script>
+<script src="expedition.js?v=109"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -32,6 +32,13 @@ h2{font-size:11px;font-weight:600;margin:24px 0 10px;color:var(--ink2);
   text-transform:uppercase;letter-spacing:.14em}
 .sub{font-size:13px;color:var(--ink2);margin-top:4px}
 .head{margin-bottom:14px}
+#daybtn{flex:none;width:44px;height:44px;border-radius:13px;cursor:pointer;position:relative;
+  background:var(--card);border:1px solid var(--brd);color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;transition:background .2s,color .2s}
+#daybtn.on{background:var(--accent);border-color:transparent;color:var(--aink)}
+#daydot{position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:50%;
+  background:var(--accent);display:none}
+#daybtn.on #daydot{background:var(--aink)}
 
 .themes{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px}
 .th{font-size:11.5px;padding:7px 12px;border-radius:20px;border:1px solid var(--brd);
@@ -519,8 +526,19 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 </section>
 
 <section id="v-checkin" class="hidden">
-  <div class="head"><h1>Записать день</h1><div class="sub" id="checkin-sub"></div></div>
-  <div class="days" id="daybar"></div>
+  <div class="head" style="display:flex;align-items:center;gap:12px">
+    <div style="flex:1;min-width:0">
+      <h1>Записать день</h1><div class="sub" id="checkin-sub"></div>
+    </div>
+    <div id="daybtn" role="button" tabindex="0" aria-label="Выбрать другой день"
+      onclick="toggleDaybar()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+      <span id="daydot"></span>
+    </div>
+  </div>
+  <div class="days" id="daybar" style="display:none"></div>
 
   <h2>Сколько спал</h2><div class="pills" id="p-sleep"></div>
   <h2>Настроение</h2><div class="pills" id="p-mood"></div>
@@ -575,7 +593,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="108 · 22.08.2026 03:12";
+const APP_VERSION="109 · 22.08.2026 03:20";
 
 let toastTimer=null;
 function toast(text){
@@ -2788,6 +2806,19 @@ function lastKnown(field){
   for(let i=DAYS.length-1;i>=0;i--){const v=DAYS[i][field];if(v)return v;}
   return null;
 }
+function toggleDaybar(){
+  const bar=document.getElementById("daybar");
+  if(!bar) return;
+  const открыт=bar.style.display!=="none";
+  показатьДни(открыт?false:true);
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+}
+function показатьДни(открыть){
+  const bar=document.getElementById("daybar"), кн=document.getElementById("daybtn");
+  if(!bar) return;
+  bar.style.display=открыть?"":"none";
+  if(кн) кн.classList.toggle("on",!!открыть);
+}
 function renderDays(){
   const box=document.getElementById("daybar"),now=new Date();
   const назад=Object.keys(LOG).length?6:0;   // нет записей — не показываем неделю пустых кружков
@@ -2807,6 +2838,11 @@ function renderDays(){
     openCheckin();
     if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();});
   const прошлый=dayKey()!==todayKey();
+  const точка=document.getElementById("daydot");
+  if(точка) точка.style.display=прошлый?"block":"none";
+  // Ходишь по прошлым дням — полоса остаётся открытой. Вернулся на
+  // сегодня — сворачивается, и экран снова начинается с вопросов.
+  if(прошлый) показатьДни(true); else показатьДни(false);
   const выбран=new Date(dayKey()+"T12:00:00");
   // Дата вместо слогана — как на «Сегодня». Слоган читается один раз,
   // а дата нужна каждый день: по ней видно, какой именно день заполняешь.
