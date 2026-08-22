@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=111"></script>
-<script src="data.js?v=111"></script>
-<script src="deck.js?v=111"></script>
-<script src="expedition.js?v=111"></script>
+<script src="photos/list.js?v=112"></script>
+<script src="data.js?v=112"></script>
+<script src="deck.js?v=112"></script>
+<script src="expedition.js?v=112"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -587,7 +587,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="111 · 22.08.2026 03:42";
+const APP_VERSION="112 · 22.08.2026 04:48";
 
 let toastTimer=null;
 function toast(text){
@@ -1150,7 +1150,7 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          // прогулка
          walkStart:LS.walkStart||0, walkRoll:LS.walkRoll??null, walkPick:LS.walkPick??null,
          walkSpent:LS.walkSpent||0, walks:LS.walks||0, walkLand:LS.walkLand||0,
-         walkTold:LS.walkTold||0, walkBack:LS.walkBack||0, walkNight:LS.walkNight||0,
+         walkTold:LS.walkTold||0, walkBack:LS.walkBack||0,
          walkAim:LS.walkAim??null, traceStep:LS.traceStep||0,
          // сны: что снилось и когда показали, чтобы не повторять
          // одно событие входа: в какой день его уже показали
@@ -1819,7 +1819,6 @@ function startWalk(куда){
   PET.walkSpent=(PET.walkSpent||0)+energyNow();
   PET.walkStart=Date.now();
   PET.walkBack=PET.walkStart+walkHoursFor(stageNow())*3600*1000;
-  PET.walkNight=0;
   PET.walkTold=0;
   PET.walkRoll=Math.random();          // что она принесёт — решается на выходе
   PET.walkRoll2=Math.random();         // запасное — для правила Старой просеки
@@ -2185,7 +2184,7 @@ function answerWalk(trait){
   }
   PET.stones=(PET.stones||0)+камни;
   PET.walks=(PET.walks||0)+1;
-  PET.walkStart=0;PET.walkRoll=null;PET.walkRoll2=null;PET.walkPick=null;PET.walkBack=0;PET.walkNight=0;
+  PET.walkStart=0;PET.walkRoll=null;PET.walkRoll2=null;PET.walkPick=null;PET.walkBack=0;
   PET.traceStep=0;
   savePet(true);
   document.getElementById("walk-modal").style.display="none";
@@ -2228,7 +2227,6 @@ const rated=()=>scores().filter(v=>v>0);                 // сколько сф�
 // тридцати. Считаем по календарю, не по активности: пропуски не откатывают
 // назад. Это не таймер-рост (совет его отклонял) — просто тихая метка
 // «сколько мы вместе», ничего не требует и никогда не убывает.
-const MILESTONES=[7,14,21,30];
 function daysWithMe(){
   if(!DAYS.length) return 0;
   const first=DAYS[0].date;
@@ -2840,10 +2838,6 @@ function openCheckin(){
 // и добавление поля требовало помнить про оба.
 const ПОЛЯ_ТЕЛА=[["pulse","f-pulse"],["weight","f-weight"],["steps","f-steps"],
   ["dist","f-dist"],["push","f-push"],["squat","f-squat"],["kettle","f-kettle"]];
-const СИЛОВЫЕ=["push","squat","kettle"];
-// Личный рекорд — единственное сравнение, где соперник ты сам. Ни среднего
-// по неделе, ни чужой нормы: только «сегодня больше, чем когда-либо было».
-const КЛЮЧ_В_ЛОГ={push:"pu",squat:"sq",kettle:"kb",steps:"st",dist:"di"};
 // Пределы по каждому полю. Разметка их тоже несёт, но телефонные
 // клавиатуры позволяют вставить что угодно мимо ограничений браузера.
 const ПРЕДЕЛЫ={pulse:[20,250], weight:[20,400], steps:[0,200000],
