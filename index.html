@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=113"></script>
-<script src="data.js?v=113"></script>
-<script src="deck.js?v=113"></script>
-<script src="expedition.js?v=113"></script>
+<script src="photos/list.js?v=114"></script>
+<script src="data.js?v=114"></script>
+<script src="deck.js?v=114"></script>
+<script src="expedition.js?v=114"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -587,7 +587,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="113 · 22.08.2026 04:53";
+const APP_VERSION="114 · 22.08.2026 04:58";
 
 let toastTimer=null;
 function toast(text){
@@ -1172,10 +1172,19 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          wheelSnapAt:LS.wheelSnapAt||"",
          // какие истории про людей уже слышал — чтобы не повторялись
          storiesSeen:LS.storiesSeen||[], pendingStoryIndex:LS.pendingStoryIndex??null,
-         // земли, камни, летопись, задачки
+         // земли, камни, задачки
          stones:LS.stones||0, lands:LS.lands||[0],
-         chronicle:LS.chronicle||[], questOn:LS.questOn||"",
-         den:LS.den||[], heard:LS.heard||0, tries:LS.tries||{}, exportedAt:LS.exportedAt||0, once:LS.once||0, seasonSeen:LS.seasonSeen||"", puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0,
+         // Эти четыре терялись при каждом закрытии, и каждое по-своему:
+         // dayStonesOn — защита от повторной выдачи камней за день, без неё
+         //   восемь камней капали заново после каждого сохранения;
+         // pendingStory — отложенная история про живого человека, она
+         //   выпадает при чек-ине и показывается при следующем заходе,
+         //   то есть ровно после перезапуска, которого не переживала;
+         // walkRoll2 — второе число для правила «Старой просеки»;
+         // open — какие разделы «Находок» человек развернул.
+         dayStonesOn:LS.dayStonesOn||"", pendingStory:LS.pendingStory??null,
+         walkRoll2:LS.walkRoll2??null, open:LS.open||{},
+         den:LS.den||[], heard:LS.heard||0, tries:LS.tries||{}, exportedAt:LS.exportedAt||0, once:LS.once||0, puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0,
          puzzleKinds:(LS.puzzleOn===todayKey()?LS.puzzleKinds:[])||[]};
 // Обычное сохранение откладывает запись в облако на две секунды: чек-ин
 // дёргает его десятки раз подряд. Но у редких и необратимых событий —
