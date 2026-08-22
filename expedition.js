@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым expedition.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.EXP_JS_VERSION="117 · 22.08.2026 06:20";
+window.EXP_JS_VERSION="118 · 22.08.2026 06:49";
 
 // ═══ ЭКСПЕДИЦИИ РЫСИ ═══════════════════════════════════════════════════
 //
@@ -722,43 +722,26 @@ function walkPath(){
     return `<span style="opacity:.65">${имя}</span>`;
   }).join(`<span style="opacity:.3"> → </span>`);
 }
-
-// ── Вечерний разбор ───────────────────────────────────────────────────
-// Один узел на нажатие. Видно, что произошло, какая вещь сработала
-// и чего не хватило. Есть «показать сразу» для повторных экспедиций.
-function expeditionStep(){
+// Особая концовка Хозяина места, если поход был к нему. Пустая строка,
+// если это обычный путь.
+function концовкаПути(){
   const э = PET.expedition;
-  if(!э) return null;
+  if(!э || э.route !== "хозяин") return "";
   if(!э.result) э.result = resolveExpedition(э);
-  const шаги = э.result.шаги;
-  const k = э.seen || 0;
-  if(k >= шаги.length) return {конец:true, исход:э.result.исход, запас:э.result.запас};
-  const ш = шаги[k];
-  const n = NODE_BY_ID[ш.id] || {};
-  return {
-    конец:false, номер:k + 1, всего:шаги.length,
-    t:n.t, д:n.д, итог:ш.итог,
-    помощь:ш.помощь,
-    нехватка: ш.итог === "обошла" && !ш.помощь
-      ? `${STATS[n.s].n} ${ш.было} из ${ш.нужно}. Пришлось обходить.` : null
-  };
+  return э.result.исход === "отступление" ? MASTER_SCENE.мимо : MASTER_SCENE.победа;
 }
-function expeditionNext(){
+function путьСтроками(){
   const э = PET.expedition;
-  if(!э) return;
-  э.seen = (э.seen || 0) + 1;
-  savePet();
-}
-function expeditionSkip(){
-  const э = PET.expedition;
-  if(!э) return;
+  if(!э) return [];
   if(!э.result) э.result = resolveExpedition(э);
-  э.seen = э.result.шаги.length;
-  savePet();
+  return э.result.шаги.map(ш => {
+    const n = NODE_BY_ID[ш.id] || {};
+    const чем = ш.помощь
+      ? (ш.помощь.вещь != null ? "сработало: " + ш.помощь.t : ш.помощь.t)
+      : (ш.итог === "обошла" ? "обошла" : "прошла");
+    return `${n.t} · ${STATS[n.s].n.toLowerCase()} ${ш.было} из ${ш.нужно} · ${чем}`;
+  });
 }
-
-// Закрыть экспедицию: записать знание, мастерство, знание земли.
-// Ничего не отнимаем: предметы, камни, земли и статистика на месте.
 function closeExpedition(){
   const э = PET.expedition;
   if(!э) return null;
@@ -803,83 +786,6 @@ function swapIntoShelf(новая, старая){
   if(!PET.den.includes(новая)) PET.den = [...PET.den, новая].slice(0, 6);
   savePet();
   if(typeof renderShelf === "function") renderShelf();
-}
-
-// ── Экран вечернего разбора ───────────────────────────────────────────
-// Полноэкранный снимок земли, один узел на нажатие, две строки текста.
-// Никакого боя с полосками здоровья: чувство пути создаётся тем, что
-// сработало и чего не хватило.
-function expShow(){
-  const э = PET.expedition;
-  if(!э) return;
-  const m = document.getElementById("exp-modal");
-  if(!m) return;
-  const ф = document.getElementById("exp-photo");
-  if(ф && typeof landPhoto === "function"){
-    ф.onerror = () => { ф.style.opacity = 0; };
-    ф.src = landPhoto(э.land ?? 0);
-  }
-  expDraw();
-  m.style.display = "flex";
-}
-
-function expDraw(){
-  const ш = expeditionStep();
-  if(!ш) return;
-  const шапка = document.getElementById("exp-step");
-  const загл  = document.getElementById("exp-title");
-  const текст = document.getElementById("exp-text");
-  const помощь= document.getElementById("exp-help");
-  const кн    = document.getElementById("exp-next");
-  const пропуск = document.getElementById("exp-skip");
-
-  if(ш.конец){
-    const земля = (typeof LANDS !== "undefined" && LANDS[PET.expedition.land])
-      ? LANDS[PET.expedition.land].n : "";
-    шапка.textContent = земля.toLowerCase();
-    загл.textContent =
-      ш.исход === "чисто"       ? "Прошла чисто" :
-      ш.исход === "обход"       ? "Дошла, но в обход" :
-                                  "Повернула назад";
-    const хозяин = PET.expedition.route === "хозяин";
-    текст.textContent = хозяин
-      ? (ш.исход === "отступление" ? MASTER_SCENE.мимо : MASTER_SCENE.победа)
-      : ш.исход === "чисто"       ? "Ни одной встречи, которую пришлось бы обходить." :
-        ш.исход === "обход"       ? "Где-то не хватило, и она пошла кругом. Но дошла." :
-                                    "Запас кончился. Она цела и дома — просто путь остался непройденным.";
-    if(хозяин && ш.исход !== "отступление")
-      загл.textContent = "Хозяин места";
-    помощь.innerHTML = "";
-    пропуск.style.display = "none";
-    кн.textContent = "Что она принесла";
-    кн.onclick = expFinish;
-    return;
-  }
-
-  шапка.textContent = `встреча ${ш.номер} из ${ш.всего}`;
-  загл.textContent = ш.t || "";
-  текст.textContent = ш.д || "";
-  помощь.innerHTML =
-    ш.помощь
-      ? `<span style="color:#8fd3a0">${
-          ш.помощь.вещь != null ? "Сработало: " + ш.помощь.t : ш.помощь.t}</span>`
-      : ш.нехватка
-        ? `<span style="color:rgba(255,255,255,.62)">${ш.нехватка}</span>`
-        : `<span style="color:rgba(255,255,255,.62)">Прошла спокойно.</span>`;
-  пропуск.style.display = "";
-  кн.textContent = "Дальше";
-  кн.onclick = () => { expeditionNext(); expDraw(); };
-}
-
-function expSkipAll(){ expeditionSkip(); expDraw(); }
-
-// Итог: закрываем экспедицию, записываем знание и мастерство, дальше
-// отдаём управление обычной открытке возвращения — второго источника
-// находок мы не заводим.
-function expFinish(){
-  const з = closeExpedition();
-  document.getElementById("exp-modal").style.display = "none";
-  if(typeof openWalk === "function") openWalk();
 }
 
 // ── Хозяин места ──────────────────────────────────────────────────────

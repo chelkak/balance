@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=117"></script>
-<script src="data.js?v=117"></script>
-<script src="deck.js?v=117"></script>
-<script src="expedition.js?v=117"></script>
+<script src="photos/list.js?v=118"></script>
+<script src="data.js?v=118"></script>
+<script src="deck.js?v=118"></script>
+<script src="expedition.js?v=118"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -38,10 +38,10 @@ h2.складка{display:flex;align-items:center;justify-content:space-between;
   border-bottom:2px solid var(--ink2);transform:rotate(45deg);transform-origin:60% 60%;
   transition:transform .2s ease}
 h2.складка.on .уголок{transform:rotate(-135deg)}
-#daybtn{flex:none;width:44px;height:44px;border-radius:13px;cursor:pointer;position:relative;
+#calibbtn,#daybtn{flex:none;width:44px;height:44px;border-radius:13px;cursor:pointer;position:relative;
   background:var(--card);border:1px solid var(--brd);color:var(--ink2);
   display:flex;align-items:center;justify-content:center;transition:background .2s,color .2s}
-#daybtn.on{background:var(--accent);border-color:transparent;color:var(--aink)}
+#calibbtn.on,#daybtn.on{background:var(--accent);border-color:transparent;color:var(--aink)}
 #daydot{position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:50%;
   background:var(--accent);display:none}
 #daybtn.on #daydot{background:var(--aink)}
@@ -288,6 +288,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
              border-top:1px solid var(--brd);display:flex;justify-content:space-between;
              gap:10px;font-size:12px"></div>
         <div id="walk-swap"></div>
+        <div id="walk-path"></div>
       </div>
     </div>
     <div id="walk-answers" style="margin-top:14px"></div>
@@ -349,21 +350,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
      не случилось, конверт не показывается вовсе. -->
 <!-- Вечерний разбор экспедиции: один узел на нажатие. Главный игровой
      момент дня — видно, как сработала собранная утром полка. -->
-<div id="exp-modal" style="display:none;position:fixed;inset:0;z-index:76;background:#05070c;
-     align-items:center;justify-content:center;padding:0">
-  <div style="position:absolute;inset:0;overflow:hidden">
-    <img id="exp-photo" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55">
-    <div style="position:absolute;inset:0;background:linear-gradient(rgba(4,6,10,.55),rgba(4,6,10,.94))"></div>
-  </div>
-  <div style="position:relative;z-index:2;width:100%;max-width:360px;padding:24px;text-align:center">
-    <div id="exp-step" class="dim" style="letter-spacing:.14em;text-transform:uppercase;font-size:10.5px"></div>
-    <div id="exp-title" style="font:600 21px var(--fu);color:#fff;margin-top:10px;line-height:1.3"></div>
-    <div id="exp-text" style="font-size:14px;color:rgba(255,255,255,.78);margin-top:10px;line-height:1.5"></div>
-    <div id="exp-help" style="font-size:13.5px;margin-top:14px;min-height:20px"></div>
-    <button class="btn" id="exp-next" style="margin-top:20px"></button>
-    <div id="exp-skip" class="dim" style="margin-top:12px;font-size:12.5px;cursor:pointer"
-         onclick="expSkipAll()">Показать итог сразу</div>
-  </div>
 </div>
 <div id="event-modal" style="display:none;position:fixed;inset:0;z-index:75;
      background:#05070c;align-items:center;justify-content:center;padding:22px">
@@ -550,7 +536,17 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 </section>
 
 <section id="v-wheel" class="hidden">
-  <div class="head"><h1>Колесо</h1><div class="sub" id="wheel-sub"></div></div>
+  <div class="head" style="display:flex;align-items:center;gap:12px">
+    <div style="flex:1;min-width:0">
+      <h1>Колесо</h1><div class="sub" id="wheel-sub"></div>
+    </div>
+    <div id="calibbtn" role="button" tabindex="0" aria-label="Свериться сейчас"
+      onclick="сверитьСейчас()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 11A8 8 0 1 0 12 20"/><path d="M20 5v6h-6"/></svg>
+    </div>
+  </div>
   <div class="g" id="wheel-calib" style="margin-bottom:14px;display:none"></div>
   <div class="seg" id="period"></div>
   <div style="text-align:center;margin:6px 0 2px">
@@ -577,7 +573,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="117 · 22.08.2026 06:20";
+const APP_VERSION="118 · 22.08.2026 06:49";
 
 let toastTimer=null;
 function toast(text){
@@ -1155,7 +1151,8 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          // когда колесо последний раз пересчитывалось само + что оно сдвинуло
          calibratedAt:LS.calibratedAt||"", wheelPrev:LS.wheelPrev||null,
          // фокус недели: какие сферы и с какого понедельника
-         focus:LS.focus||[], focusAt:LS.focusAt||"",
+         focus:LS.focus||[], focusAt:LS.focusAt||"", сверкаНа:LS.сверкаНа||"",
+         сверено:LS.сверено||[],
          wheelSnapAt:LS.wheelSnapAt||"",
          // какие истории про людей уже слышал — чтобы не повторялись
          storiesSeen:LS.storiesSeen||[], pendingStoryIndex:LS.pendingStoryIndex??null,
@@ -1335,20 +1332,38 @@ function понедельник(д){
   t.setDate(t.getDate()-сдвиг);
   return t;
 }
+// Чему принадлежит открытая сейчас сверка: недельной или вызванной руками.
+// По этому ключу понимаем, снят ли уже снимок «как было».
+const сверкаКлюч=()=>PET.сверкаНа===todayKey()
+  ? "рука:"+todayKey() : keyOf(понедельник(new Date()));
+// Свериться раньше срока. Механика на автопилоте каждый понедельник,
+// а это ручной вызов: жизнь перевернулась — пересобрал неделю сегодня.
+function сверитьСейчас(){
+  if(!rated().length){ go("wheel"); toast("Сначала оцени сферы"); return; }
+  PET.сверкаНа=todayKey();
+  PET.сверено=[];        // проходим все восемь заново
+  savePet();
+  renderWheel();
+  const шапка=document.getElementById("wheel-calib");
+  if(шапка) шапка.scrollIntoView({behavior:"smooth",block:"center"});
+  if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+}
 function пораСверять(){
   // Сверка раз в календарную неделю, считая от понедельника. Пропустил
   // понедельник — сверишься в среду, но следующая всё равно с понедельника:
   // иначе «неделя фокуса» уползала бы по дням от раза к разу.
   const этотПн=понедельник(new Date());
   const было=PET.calibratedAt?new Date(PET.calibratedAt+"T00:00:00"):null;
-  const пора=rated().length>0 && (!было || было<этотПн);
+  const пора=rated().length>0 &&
+    (PET.сверкаНа===todayKey() || !было || было<этотПн);
   // Снимок «как было» делаем в момент, когда сверка открылась, а не когда
   // закрылась: иначе сравнивать нечего, человек уже всё поменял. Признак
   // снятого снимка — дата последней сверки, к которой он относится: так он
   // обновляется каждую неделю, а не остаётся с первого раза навсегда.
-  if(пора && PET.wheelSnapAt!==(PET.calibratedAt||"—")){
+  if(пора && PET.wheelSnapAt!==сверкаКлюч()){
     PET.wheelPrev={...DATA.wheel};
-    PET.wheelSnapAt=PET.calibratedAt||"—";
+    PET.сверено=[];      // новая сверка — все восемь сфер заново
+    PET.wheelSnapAt=сверкаКлюч();
     savePet();
   }
   return пора;
@@ -1369,6 +1384,7 @@ function завершитьСверку(){
   // wheelPrev не трогаем: он снят при открытии сверки и нужен, чтобы
   // показать «было → стало». Обнулится, когда придёт срок следующей.
   PET.calibratedAt=todayKey();
+  PET.сверкаНа="";        // ручной вызов отработал
   // Фокус недели решается здесь и держится до следующей сверки. Считать
   // его каждый день нельзя: оценки могут сравняться, и фокус переехал бы
   // посреди недели, а неделя должна быть про одно.
@@ -2096,8 +2112,13 @@ function openLegend(лут,пара){
 
 function openWalk(){
   if(!walkDone())return;
-  // Есть экспедиция — сначала разбор по узлам, открытка после него.
-  if(PET.expedition&&typeof expShow==="function"){ expShow(); return; }
+  // Возвращение — один экран. Раньше сначала шёл пошаговый разбор пути на
+  // отдельном полноэкранном окне, и только после него открытка с находкой:
+  // четыре-пять нажатий на одно событие, причём находка последней. Теперь
+  // разбор собирается строками и уезжает под открытку, за нажатие.
+  const путь=(PET.expedition&&typeof путьСтроками==="function")?путьСтроками():[];
+  const концовка=(PET.expedition&&typeof концовкаПути==="function")?концовкаПути():"";
+  if(PET.expedition&&typeof closeExpedition==="function") closeExpedition();
   const лут=walkLoot();
   const пара=RESPONSES[(PET.walkPick||0)%RESPONSES.length];
   if(лут&&лут.f&&лут.f.r===2){ openLegend(лут,пара); return; }
@@ -2142,6 +2163,25 @@ function openWalk(){
   // что именно сработало, стоит дороже любой новой механики.
   const почему=походПричина();
   if(почему) текст=текст+" "+почему;
+  // Хозяин места — не деталь пути, а событие: его слова идут в самой
+  // открытке, а не прячутся под «Как прошёл путь».
+  if(концовка) текст=текст+" "+концовка;
+  // Как прошёл путь — списком, свёрнуто. Никого не заставляем читать.
+  const разбор=document.getElementById("walk-path");
+  if(разбор) разбор.innerHTML=путь.length
+    ? `<div id="walk-path-btn" style="margin-top:12px;padding-top:12px;
+         border-top:1px solid var(--brd);cursor:pointer;font-size:12.5px"
+         class="dim">Как прошёл путь ▾</div>
+       <div id="walk-path-body" style="display:none;margin-top:8px;font-size:12.5px;
+         line-height:1.75" class="dim">${путь.join("<br>")}</div>`
+    : "";
+  const пкн=document.getElementById("walk-path-btn");
+  if(пкн) пкн.onclick=()=>{
+    const т=document.getElementById("walk-path-body");
+    const открыт=т.style.display!=="none";
+    т.style.display=открыт?"none":"";
+    пкн.textContent=открыт?"Как прошёл путь ▾":"Как прошёл путь ▴";
+  };
   document.getElementById("walk-rare").textContent=шапка;
   document.getElementById("walk-title").textContent=имя;
   document.getElementById("walk-text").textContent=текст;
@@ -3019,6 +3059,7 @@ function savedTick(){
 // ── Колесо: неделя / месяц / год ─────────────────────────────────────
 // Знакомство начинается с первой неоценённой сферы, а не с общего вида колеса
 function закрытьСверку(){
+  PET.сверено=[];        // следующая сверка начинается с чистого листа
   завершитьСверку();
   renderWheel();
   toast("Сверено. Фокус недели обновлён");

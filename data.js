@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="117 · 22.08.2026 06:20";
+window.DATA_JS_VERSION="118 · 22.08.2026 06:49";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -985,16 +985,46 @@ function renderWheel(){
   const шапка=document.getElementById("wheel-calib");
   if(шапка){
     if(пораСверять()){
-      const сколько=SPHERES.length-оценено;
       шапка.style.display="";
+      // Какую сферу спрашиваем сейчас: первую, которую на этой сверке ещё
+      // не трогали. Порядок обычный, как в колесе.
+      const очередь=SPHERES.filter(sp=>!(PET.сверено||[]).includes(sp.code));
+      const сп=очередь[0];
+      if(!сп){ закрытьСверку(); return; }
+      const было=(PET.wheelPrev||{})[сп.code]||0;
+      const сейчас=DATA.wheel[сп.code]||0;
+      const шаг=SPHERES.length-очередь.length;
       шапка.innerHTML=
-        `<div class="lead">Сверка недели</div>`+
-        `<div style="margin-top:6px;font:600 16px var(--fu)">Где ты сейчас?</div>`+
-        `<div class="dim" style="margin-top:5px;font-size:12.5px">`+
-          `Пройди по восьми сторонам и поставь оценку — как чувствуешь сегодня, `+
-          `без подсчётов. Займёт минуту. Из этого соберётся фокус недели.</div>`+
-        (сколько?`<div class="dim" style="margin-top:8px">Осталось: ${сколько} из ${SPHERES.length}</div>`
-                :`<button class="btn" style="margin-top:12px" onclick="закрытьСверку()">Готово</button>`);
+        `<div style="display:flex;justify-content:space-between;align-items:baseline">`+
+          `<div class="lead">Сверка недели</div>`+
+          `<div class="dim" style="font-size:12px">${шаг+1} из ${SPHERES.length}</div></div>`+
+        `<div style="margin-top:8px;font:600 19px var(--fu)">${сп.ic} ${сп.name}</div>`+
+        // Состав сферы: без него человек оценивает слово, а не свою жизнь.
+        `<div class="dim" style="margin-top:7px;font-size:12.5px">Что сюда входит</div>`+
+        `<div class="parts" style="margin-top:4px">${
+          сп.parts.map(p=>`<span class="part">${p}</span>`).join("")}</div>`+
+        `<div class="dim" style="margin-top:12px;font-size:12.5px">`+
+          `Насколько эта часть жизни тебя сейчас держит</div>`+
+        `<div class="scale" id="calib-scale" style="margin-top:8px"></div>`+
+        `<div style="display:flex;gap:10px;align-items:center;margin-top:12px">`+
+          `<div style="flex:1;height:4px;border-radius:2px;background:var(--brd);overflow:hidden">`+
+            `<div style="height:100%;width:${шаг/SPHERES.length*100}%;background:var(--accent)"></div></div>`+
+          (было?`<div class="dim" style="font-size:12px">было ${было}</div>`:"")+
+        `</div>`;
+      const шк=document.getElementById("calib-scale");
+      if(шк){
+        шк.innerHTML=[1,2,3,4,5,6,7,8,9,10].map(n=>
+          `<div class="sn ${n===сейчас?"on":""}" data-n="${n}">${n}</div>`).join("");
+        шк.querySelectorAll(".sn").forEach(el=>el.onclick=()=>{
+          DATA.wheel[сп.code]=+el.dataset.n;
+          lsSet("wheel",JSON.stringify(DATA.wheel));
+          PET.сверено=[...(PET.сверено||[]),сп.code];
+          savePet();
+          cloudSave();
+          if(tg&&tg.HapticFeedback)tg.HapticFeedback.selectionChanged();
+          renderWheel();
+        });
+      }
     } else {
       const итоги=итогиСверки(DATA.wheel);
       шапка.style.display=итоги.length?"":"none";
