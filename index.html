@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=121"></script>
-<script src="data.js?v=121"></script>
-<script src="deck.js?v=121"></script>
-<script src="expedition.js?v=121"></script>
+<script src="photos/list.js?v=122"></script>
+<script src="data.js?v=122"></script>
+<script src="deck.js?v=122"></script>
+<script src="expedition.js?v=122"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -207,12 +207,61 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   box-shadow:0 6px 24px rgba(0,0,0,.28);max-width:86vw;text-align:center}
 #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* Окно с находкой. display держим в классе, а не в теге: инлайновый стиль
+/* Страница с историей. display держим в классе, а не в теге: инлайновый стиль
    сильнее класса, и «hidden» его не перебивал — окно висело поверх всего
-   с самого запуска и съедало все нажатия. */
-#story-modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;
-  justify-content:center;padding:20px;background:rgba(8,10,14,.6)}
-#story-modal.on{display:flex}
+   с самого запуска и съедало все нажатия.
+
+   Раньше это была карточка на три предложения посреди затемнённого экрана.
+   Истории стали длинными, и теперь это отдельная страница во весь экран:
+   рассказ про живого человека весит больше, чем найденная шишка, а до сих
+   пор целый экран с медленным проявлением получала только легендарная
+   находка. Оформления два, переключаются в кабинете. */
+#story-modal{position:fixed;inset:0;z-index:200;display:none;overflow-y:auto;
+  -webkit-overflow-scrolling:touch}
+#story-modal.on{display:block}
+#story-wrap{min-height:100%;display:flex;align-items:center;justify-content:center;
+  padding:24px 16px 34px}
+#story-hold{width:100%;max-width:380px}
+#story-sheet{padding:32px 26px 28px;position:relative}
+.st-cap{font-size:10.5px;letter-spacing:.17em;text-transform:uppercase}
+.st-name{font:500 26px/1.15 var(--fd);margin-top:11px}
+.st-rule{height:1px;margin:16px 0 18px}
+.st-text p{font:16px/1.75 var(--fd);margin:0 0 13px}
+.st-text p:last-child{margin-bottom:0}
+.st-sign{margin-top:22px;padding-top:13px;display:flex;justify-content:space-between;
+  gap:10px;font-size:11.5px}
+#story-actions{margin-top:16px}
+#story-path-btn{margin-top:14px;font-size:12.5px;cursor:pointer;
+  color:rgba(255,255,255,.5);text-align:center}
+#story-path-body{margin-top:8px;font-size:12.5px;line-height:1.75;
+  color:rgba(255,255,255,.5)}
+
+/* Папирус: старая страница на тёмном. Края рваные, но без завитушек и
+   позолоты — иначе получается бутафория рядом с настоящими фотографиями. */
+#story-modal.pap{background:#0a0806}
+#story-modal.pap #story-sheet{color:#3a2c18;
+  background:linear-gradient(160deg,#e8d7b4 0%,#dfcba3 38%,#e5d3ae 62%,#d6bf95 100%);
+  box-shadow:0 24px 60px rgba(0,0,0,.6);
+  clip-path:polygon(0% 2%,4% 0%,20% 1.5%,40% .3%,62% 1.8%,82% .2%,96% 1.6%,100% 3%,
+    99% 20%,100% 42%,98.6% 66%,100% 84%,99% 97%,94% 100%,74% 98.4%,52% 100%,30% 98.2%,
+    9% 99.6%,2% 98%,.6% 78%,0% 56%,1.2% 33%)}
+#story-modal.pap .st-cap{color:#7a6238}
+#story-modal.pap .st-name{color:#2e2210}
+#story-modal.pap .st-rule{background:#a8905f;opacity:.5}
+#story-modal.pap .st-sign{color:#7a6238;border-top:1px solid rgba(122,98,56,.35)}
+
+/* Лампа: та же страница без бумаги — чёрный экран и тёплый свет текста. */
+#story-modal.lamp{background:radial-gradient(120% 80% at 50% 34%,
+  #12100d 0%,#07070a 58%,#04050a 100%)}
+#story-modal.lamp #story-sheet{padding:8px 6px}
+#story-modal.lamp .st-cap{color:#8d7a55}
+#story-modal.lamp .st-name{color:#f3ead8}
+#story-modal.lamp .st-rule{width:46px;background:#8d7a55;opacity:.75}
+#story-modal.lamp .st-text p{color:#ded3c0;font-size:16.5px;line-height:1.8}
+#story-modal.lamp .st-sign{color:#8d7a55;border-top:1px solid rgba(180,160,120,.22)}
+#story-modal .btn{background:rgba(240,232,214,.92);color:#1a1712}
+#story-modal .btn.ghost{background:transparent;color:rgba(240,232,214,.62);
+  border:1px solid rgba(240,232,214,.22)}
 
 /* Зверь живой: едва заметно дышит сам по себе */
 #totem-wrap .breathe{animation:breathe 4.6s ease-in-out infinite;transform-origin:center;width:100%;height:100%}
@@ -255,12 +304,19 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <body>
 <div id="bg"></div><div id="scrim"></div>
 <div id="toast"></div>
-<div id="story-modal" onclick="if(event.target===this)closeStory()">
-  <div class="g" style="max-width:360px;padding:22px" onclick="event.stopPropagation()">
-    <div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Кто-то уже прошёл через это</div>
-    <div class="fname" id="story-name" style="margin-top:6px"></div>
-    <div class="why" id="story-text" style="margin-top:10px"></div>
-    <button class="btn" style="margin-top:16px" onclick="closeStory()">Хорошо</button>
+<div id="story-modal">
+  <div id="story-wrap">
+    <div id="story-hold">
+      <div id="story-sheet">
+        <div class="st-cap" id="story-cap"></div>
+        <div class="st-name" id="story-name"></div>
+        <div class="st-rule"></div>
+        <div class="st-text" id="story-text"></div>
+        <div class="st-sign" id="story-sign" style="display:none"></div>
+      </div>
+      <div id="story-actions"></div>
+      <div id="story-path"></div>
+    </div>
   </div>
 </div>
 <!-- Открытка с прогулки. Девять снимков земель лежали готовыми, а встреча
@@ -449,6 +505,11 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   <div class="g" id="goals"></div>
   <h2>Тема</h2>
   <div class="themes" id="themes"></div>
+  <h2>Вид историй</h2>
+  <div class="g">
+    <div class="dim">Как выглядит страница, когда рысь приносит историю или что-нибудь про человека.</div>
+    <div class="themes" id="story-skins" style="margin:12px 0 0"></div>
+  </div>
   <div class="g" id="me-info"></div>
   <h2>Что впереди</h2>
   <div class="g" id="ahead"></div>
@@ -572,7 +633,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="121 · 22.08.2026 09:04";
+const APP_VERSION="122 · 22.08.2026 09:53";
 
 let toastTimer=null;
 function toast(text){
@@ -737,11 +798,60 @@ function applyTheme(){
 
 const byCode=c=>SPHERES.find(s=>s.code===c);
 
-function showStory(s){
-  if(!s||!s.name||!s.text) return;      // пустое окно показывать нечего
+// Вид страницы с историей. Папирус по умолчанию, лампа для тех,
+// кому бумага мешает. Живёт в кабинете рядом с темой.
+const STORY_SKINS={pap:"Папирус",lamp:"Лампа"};
+const storySkin=()=>STORY_SKINS[lsGet("storyskin")]?lsGet("storyskin"):"pap";
+function setStorySkin(k){
+  if(!STORY_SKINS[k])return;
+  lsSet("storyskin",k);
+  renderMe();
+}
+// Шапка над именем говорит, что именно принесли. У истории она про
+// человека, у знания — про то, чем это знание является.
+const ST_CAP={"история":"Кто-то уже прошёл через это",
+              "факт":"Что об этом известно",
+              "заблуждение":"А на самом деле",
+              "приём":"Что с этим делать"};
+
+// s — история или факт. Второй аргумент нужен, когда страницу открыла
+// прогулка: тогда внизу появляются подпись места и ответы рыси, а разбор
+// пути уезжает под страницу свёрнутым.
+function showStory(s,опции){
+  if(!s||!s.name||!s.text) return;      // пустую страницу показывать нечего
+  const о=опции||{};
+  const м=document.getElementById("story-modal");
+  м.className="on "+storySkin();
+  document.getElementById("story-cap").textContent=ST_CAP[s.kind||"история"]||ST_CAP["история"];
   document.getElementById("story-name").textContent=s.name;
-  document.getElementById("story-text").textContent=s.text;
-  document.getElementById("story-modal").classList.add("on");
+  // Текст приходит абзацами. Раньше он влезал в три предложения и ставился
+  // одной строкой; на всю страницу простыня без абзацев не читается.
+  document.getElementById("story-text").innerHTML=
+    String(s.text).split("\n\n").map(a=>{
+      const d=document.createElement("div"); d.textContent=a.trim();
+      return "<p>"+d.innerHTML+"</p>";
+    }).join("");
+  const подпись=document.getElementById("story-sign");
+  подпись.style.display=о.sign?"flex":"none";
+  подпись.innerHTML=о.sign||"";
+  document.getElementById("story-actions").innerHTML=
+    о.answers&&о.answers.length
+      ? о.answers.map((a,i)=>
+          `<button class="btn${i?" ghost":""}" style="margin-top:8px"
+             onclick="answerWalk('${a.k}')">${a.t}</button>`).join("")
+      : `<button class="btn" style="margin-top:8px" onclick="closeStory()">Хорошо</button>`;
+  const путь=document.getElementById("story-path");
+  путь.innerHTML=(о.path&&о.path.length)
+    ? `<div id="story-path-btn">Как прошёл путь ▾</div>
+       <div id="story-path-body" style="display:none">${о.path.join("<br>")}</div>` : "";
+  const пкн=document.getElementById("story-path-btn");
+  if(пкн) пкн.onclick=()=>{
+    const т=document.getElementById("story-path-body");
+    const открыт=т.style.display!=="none";
+    т.style.display=открыт?"none":"";
+    пкн.textContent=открыт?"Как прошёл путь ▾":"Как прошёл путь ▴";
+  };
+  м.scrollTop=0;
   if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred("success");
 }
 function closeStory(){
@@ -1291,14 +1401,20 @@ function toggleGrey(k){
   toast(было?"День снова обычный":"Хорошо. Этот день не в счёт");
 }
 
-// Истории про живых людей — самое сильное, что здесь написано, и их 22.
-// Но на сферу приходится одна-две, а берутся они под самую слабую сферу.
-// Пока колесо стояло, человек видел одну и ту же по кругу. Теперь помним
-// услышанное: сначала отдаём неслыханное из своей сферы, потом неслыханное
-// вообще, и только когда кончилось всё — начинаем по второму разу.
+// То, что рысь приносит вместо предмета: истории про живых людей и знание
+// про человека — проверенные факты, развенчанные заблуждения, рабочие приёмы.
+// И то и другое берётся под самую слабую сферу, поэтому приложение молча
+// уходит в фокус вместе с человеком. Из-за этого количество здесь — не
+// украшение: сидя месяц в одной слабой сфере, её запас выедаешь насухо.
+// По десять историй и по пять знаний на каждую из восьми сфер.
+const знанияВсе=()=>STORIES.map(s=>({...s,kind:"история"})).concat(FACTS||[]);
+// Помним услышанное по имени, а не по номеру: номера сдвигаются при каждом
+// добавлении текстов, и человек терял бы отсев или получал бы отметку
+// «слышал» на том, чего не видел. Старые числовые отметки просто перестают
+// совпадать и никому не мешают.
 function pickStory(sphere,seed){
   const слышал=new Set(PET.storiesSeen||[]);
-  const все=STORIES.map((s,i)=>({s,i}));
+  const все=знанияВсе().map(s=>({s,i:s.name}));
   const свои=все.filter(o=>o.s.sphere===sphere);
   let выбор=свои.filter(o=>!слышал.has(o.i));            // своя сфера, неслыханное
   if(!выбор.length) выбор=все.filter(o=>!слышал.has(o.i)); // любое неслыханное
@@ -2126,6 +2242,21 @@ function openWalk(){
   const лут=walkLoot();
   const пара=RESPONSES[(PET.walkPick||0)%RESPONSES.length];
   if(лут&&лут.f&&лут.f.r===2){ openLegend(лут,пара); return; }
+  // История уходит на свою страницу целиком, а не в карточку: она длинная,
+  // и в открытку размером с находку больше не помещается. Подпись места и
+  // ответы рыси там же, внизу, чтобы событие оставалось одним экраном.
+  if(лут&&лут.story){
+    const з=LANDS[PET.walkLand??0]||LANDS[0];
+    const разбор=путь.slice();
+    const п=походПричина();
+    if(п) разбор.push(п);
+    if(концовка) разбор.push(концовка);
+    showStory(лут.story,{
+      sign:`<span>${PET.name||"Рысь"} · ${з.n.toLowerCase()}</span>`+
+           `<span>${датаСловами(todayKey())}</span>`,
+      answers:пара, path:разбор});
+    return;
+  }
   const m=document.getElementById("walk-modal");
   let шапка,имя,текст;
   if(лут&&лут.trace){
@@ -2140,10 +2271,6 @@ function openWalk(){
     шапка="она просто была там";
     имя="Ничего не принесла";
     текст=лут.see;
-  }else if(лут&&лут.story){
-    шапка="она принесла историю";
-    имя=лут.story.name;
-    текст=лут.story.text;
   }else if(лут){
     шапка=["находка","редкая находка","легендарная находка"][лут.f.r];
     имя=лут.f.n;
@@ -2269,6 +2396,7 @@ function answerWalk(trait){
   savePet(true);
   document.getElementById("walk-modal").style.display="none";
   document.getElementById("legend-modal").style.display="none";
+  closeStory();     // историю тоже закрываем: ответ мог прийти с её страницы
   // Подрост показываем сразу после встречи, а не пока её нет дома: смысл
   // ночного цикла в том, чтобы разницу увидели глазами.
   maybeGrowOvernight();
