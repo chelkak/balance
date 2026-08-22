@@ -2,7 +2,7 @@
 // телеграм кэширует файлы по отдельности и до десяти минут может
 // отдать новый index.html со старым data.js. Приложение тогда
 // зовёт функции, которых в старом файле ещё нет.
-window.DATA_JS_VERSION="103 · 22.08.2026 00:43";
+window.DATA_JS_VERSION="104 · 22.08.2026 02:33";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Данные приложения: сферы, тело зверя, цитаты, истории про людей.
@@ -407,12 +407,9 @@ const BASICS=["Встать с кровати","Выпить воды и пое�
 
 
 // ── Подписи типов карт ───
-const CARD_LABEL={"в":"Вопрос дня","а":"Опора","д":"Маленькое дело","м":"Мысль","п":"Написать"};
-
-// Карта, которая просит написать, получает поле. Написанное запечатывается
-// и возвращается через месяцы — см. капсулы ниже. Сроки разные, выбирает
-// не человек: в этом вся штука, к дате нельзя подготовиться.
-const CAPSULE_TERMS=[30,90,365];
+// Тип «п» остался в запечатанной колоде, но карты этого типа больше не
+// показываются: механику запечатанных писем Александр убрал 22 августа.
+const CARD_LABEL={"в":"Вопрос дня","а":"Опора","д":"Маленькое дело","м":"Мысль"};
 
 
 // ── Сезоны и отметки настоящего календаря ───
@@ -451,16 +448,6 @@ function exportText(){
   L.push("Выгружено "+new Date().toLocaleString("ru-RU"));
   L.push("Зверь: "+(PET.name||"без имени")+", дней вместе: "+daysWithMe());
   L.push("");
-  L.push("═══ ПИСЬМА СЕБЕ ═══");
-  const кап=(PET.capsules||[]);
-  if(!кап.length)L.push("(пока ни одного)");
-  кап.forEach(k=>{
-    L.push("");
-    L.push("Написано: "+дата(k.d));
-    L.push("Открыть: "+new Date(k.open).toLocaleDateString("ru-RU")+(k.read?" (прочитано)":""));
-    L.push(k.t);
-  });
-  L.push("");
   L.push("═══ ЛЕТОПИСЬ ═══");
   (PET.chronicle||[]).forEach(z=>L.push(дата(z.d)+" — "+z.t));
   L.push("");
@@ -489,7 +476,7 @@ function exportText(){
 // ── Одно событие входа ────────────────────────────────────────────────
 // Первый заход за день показывает одно главное событие, а не сыплет
 // окнами вперемешку. Раньше при входе могли одновременно сработать
-// «один раз за всю жизнь», созревшая капсула и отложенная история —
+// «один раз за всю жизнь», находка и отложенная история —
 // они дрались за экран, и сильное перекрывалось случайным.
 //
 // Очередь жёсткая, от самого редкого к обычному. Нового контента здесь
@@ -498,9 +485,6 @@ function exportText(){
 // Ежедневного «она что-то оставила» тут не будет никогда.
 function dayEvent(){
   if(PET.eventOn===todayKey()) return null;      // одно событие в день
-  if(dueCapsules().length)
-    return {k:"capsule",c:"письмо вернулось",t:"Ты писал это себе",
-            h:"Оно ждало столько, сколько ты назначил.",b:"Прочитать"};
   if(walkDone())
     return {k:"walk",c:"она вернулась",t:(PET.name||"Рысь")+" дома",
             h:"Ходила, смотрела. Хочет что-то показать.",b:"Встретить"};
@@ -536,7 +520,6 @@ function showEvent(){
 // никакой новой сцены по дороге.
 function openEvent(k){
   document.getElementById("event-modal").style.display="none";
-  if(k==="capsule") return showCapsule();
   if(k==="walk")    { go("totem"); return openWalk(); }
   if(k==="once")    return showOnce();
   if(k==="grow")    { go("totem"); maybeGrowOvernight(); return renderTotem(); }
@@ -544,23 +527,6 @@ function openEvent(k){
   // сон уже прочитан на самом конверте, открывать нечего
 }
 function closeEvent(){ document.getElementById("event-modal").style.display="none"; }
-
-
-// ── Показ созревшего письма ───
-function showCapsule(){
-  const k=dueCapsules()[0];
-  if(!k)return;
-  const дней=Math.round((Date.now()-k.at)/86400000);
-  const д=new Date(k.at);
-  document.getElementById("cap-when").textContent=
-    `Письмо от ${д.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`;
-  document.getElementById("cap-ago").textContent=
-    `Ты писал это ${дней} ${plural(дней,"день","дня","дней")} назад.`;
-  document.getElementById("cap-text").textContent=k.t;
-  document.getElementById("cap-text").style.display="none";
-  document.getElementById("cap-open").style.display="";
-  document.getElementById("capsule-modal").style.display="flex";
-}
 
 
 // ── Летопись на экране ───
@@ -1221,13 +1187,6 @@ function renderAhead(){
     строки.push({к:через(дата),т:`${что} — ${дата.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`});
   });
 
-  // Запечатанные письма
-  (PET.capsules||[]).filter(k=>!k.read).forEach(k=>{
-    const д=new Date(k.open);
-    if(д>сейчас) строки.push({к:через(д),
-      т:`письмо вернётся ${д.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}`});
-  });
-
   // Следующий подрост зверя, пока он не вырос полностью
   if(growthStepsPassed()<GROWTH_STEPS){
     const перШаг=GROWTH_STEPS/PHOTO_FRAMES;
@@ -1497,13 +1456,11 @@ function renderMe(){
     `<div class="lead">Коротко</div>`+
     `<div class="dim" style="margin-top:8px">Прогулок: ${PET.walks||0} · находок: ${мои} из ${FINDS.length}</div>`+
     `<div class="dim">Земель открыто: ${земель} из ${LANDS.length} · камней: ${PET.stones||0}</div>`+
-    `<div class="dim">Запечатано писем: ${(PET.capsules||[]).length}</div>`+
     `<div class="dim" style="margin-top:10px">Версия ${APP_VERSION}</div>`;
   renderAhead();
   // Когда была последняя копия. Дата уже писалась в PET.exportedAt
-  // и не читалась нигде — то есть поле копилось впустую. Письмо,
-  // запечатанное на год, потерять нельзя, и одна строка тут стоит
-  // дешевле, чем разговор «а я думал, оно само сохранилось».
+  // и не читалась нигде — то есть поле копилось впустую. Одна строка
+  // тут стоит дешевле, чем разговор «а я думал, оно само сохранилось».
   {
     const w=document.getElementById("export-when");
     if(w){
@@ -1519,7 +1476,7 @@ function renderMe(){
 }
 
 // Что впереди. Только то, что придёт само: даты солнцестояний, начало
-// сезона, возвращение запечатанных писем, следующий подрост зверя.
+// сезона, следующий подрост зверя.
 // Ни одной задачи и ни одного напоминания — это горизонт, а не список дел.
 // Человеку, у которого впереди пока ничего не назначено, важно видеть,
 // что время всё-таки к чему-то идёт.

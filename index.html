@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баланс</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="photos/list.js?v=103"></script>
-<script src="data.js?v=103"></script>
-<script src="deck.js?v=103"></script>
-<script src="expedition.js?v=103"></script>
+<script src="photos/list.js?v=104"></script>
+<script src="data.js?v=104"></script>
+<script src="deck.js?v=104"></script>
+<script src="expedition.js?v=104"></script>
 <style>
 :root{
   --fd:Georgia,"Iowan Old Style","Palatino Linotype",Palatino,serif;
@@ -416,17 +416,6 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
       onclick="document.getElementById('once-modal').style.display='none'">Побыть с этим</button>
   </div>
 </div>
-<div id="capsule-modal" style="display:none;position:fixed;inset:0;z-index:60;background:rgba(6,8,14,.78);
-     align-items:center;justify-content:center;padding:18px">
-  <div class="g" style="max-width:360px;padding:22px">
-    <div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">Капсула времени</div>
-    <div class="fname" id="cap-when" style="margin-top:6px"></div>
-    <div class="dim" id="cap-ago" style="margin-top:6px"></div>
-    <div class="why" id="cap-text" style="margin-top:12px;white-space:pre-wrap"></div>
-    <button class="btn" id="cap-open" style="margin-top:14px" onclick="openCapsule()">Прочитать</button>
-    <button class="btn ghost" style="margin-top:8px" onclick="laterCapsule()">Пусть полежит ещё</button>
-  </div>
-</div>
 <div class="wrap">
 
 <section id="v-totem">
@@ -495,7 +484,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
   </div>
   <h2>Сохранить себе</h2>
   <div class="g">
-    <div class="dim">Капсулы, летопись, находки и цифры живут в облаке Телеграма. Облако можно потерять — письмо, запечатанное на год, потерять нельзя. Забирай копию себе когда захочешь.</div>
+    <div class="dim">Летопись, находки и цифры живут в облаке Телеграма. Облако можно потерять, а копию у себя — нет. Забирай её когда захочешь.</div>
     <button class="btn" style="margin-top:12px" onclick="exportAll()">Выгрузить всё</button>
     <div class="dim" id="export-note" style="margin-top:8px"></div>
     <div class="dim" id="export-when" style="margin-top:6px;font-size:12px"></div>
@@ -587,7 +576,7 @@ nav i{display:block;font-size:17px;font-style:normal;margin-bottom:3px}
 <script>
 // Подставляется при публикации. Видно на экране «Тотем» — сразу ясно,
 // доехало обновление или телеграм показывает старое из кэша.
-const APP_VERSION="103 · 22.08.2026 00:43";
+const APP_VERSION="104 · 22.08.2026 02:33";
 
 let toastTimer=null;
 function toast(text){
@@ -951,8 +940,7 @@ function cloudLoad(done){
           PET.spent=Math.max(PET.spent||0,cp.spent||0);
           // Раньше на этом всё и кончалось: на новом телефоне человек получал
           // зверя нужного возраста с пустой летописью, без находок, без
-          // открытых земель и без запечатанных писем. Обещание «письмо
-          // вернётся через год» держалось на памяти одного телефона.
+          // открытых земель. Всё это держалось на памяти одного телефона.
           // Правило: числа берём большее, списки объединяем без повторов,
           // свои записи сильнее облачных.
           const больше=(a,b)=>Math.max(a||0,b||0);
@@ -989,7 +977,6 @@ function cloudLoad(done){
             return [...(своё||[]),...(чужое||[]).filter(x=>!было.has(ключ(x)))];
           };
           PET.chronicle=слить(PET.chronicle,cp.chronicle).slice(-500);
-          PET.capsules=слить(PET.capsules,cp.capsules);
           // Звук: выключенный побеждает. Ноль здесь не пустота, а решение
           // человека, и общее правило ниже приняло бы его за «не заполнено».
           if(PET.sound===0||cp.sound===0) PET.sound=0;
@@ -1180,8 +1167,8 @@ let PET={puzzleOn:LS.puzzleOn||"", bonus:LS.bonus||0,
          wheelSnapAt:LS.wheelSnapAt||"",
          // какие истории про людей уже слышал — чтобы не повторялись
          storiesSeen:LS.storiesSeen||[], pendingStoryIndex:LS.pendingStoryIndex??null,
-         // земли, камни, капсулы, летопись, задачки
-         stones:LS.stones||0, lands:LS.lands||[0], capsules:LS.capsules||[],
+         // земли, камни, летопись, задачки
+         stones:LS.stones||0, lands:LS.lands||[0],
          chronicle:LS.chronicle||[], questOn:LS.questOn||"",
          den:LS.den||[], heard:LS.heard||0, tries:LS.tries||{}, exportedAt:LS.exportedAt||0, once:LS.once||0, seasonSeen:LS.seasonSeen||"", puzzleDone:(LS.puzzleOn===todayKey()?LS.puzzleDone:0)||0,
          puzzleKinds:(LS.puzzleOn===todayKey()?LS.puzzleKinds:[])||[]};
@@ -1250,7 +1237,10 @@ function renderCard(){
   if(!box) return;
   const c=cardToday();
   // Мысль из колоды и цитата под ней — один жанр, стояли вплотную.
-  if(!c||c.t==="м"||c.t==="в"||c.t==="д"){box.classList.add("hidden");return;}
+  // Тип «п» («Написать») спрятан вместе с механикой запечатанных писем:
+  // Александр убрал её 22 августа. Карты этого типа лежат в запечатанной
+  // колоде, удалить их оттуда нельзя, поэтому просто не показываем.
+  if(!c||c.t==="м"||c.t==="в"||c.t==="д"||c.t==="п"){box.classList.add("hidden");return;}
   box.classList.remove("hidden");
   const взял=PET.cardSeen===todayKey();
   const шапка=`<div class="dim" style="letter-spacing:.04em;text-transform:uppercase;font-size:11px">${CARD_LABEL[c.t]||"Карта"}</div>`+
@@ -1258,14 +1248,6 @@ function renderCard(){
 
   if(взял){box.innerHTML=шапка;return;}
 
-  if(c.t==="п"){
-    const срок=CAPSULE_TERMS[dayIndex()%CAPSULE_TERMS.length];
-    box.innerHTML=шапка+
-      `<textarea id="card-write" rows="3" style="margin-top:12px" placeholder="Пиши как есть, это никто не прочитает"></textarea>`+
-      `<div class="dim" style="margin-top:8px">Написанное запечатается и вернётся к тебе через ${срок} ${plural(срок,"день","дня","дней")}. Прочитать раньше нельзя.</div>`+
-      `<button class="btn" style="margin-top:10px" onclick="sealCapsule(${срок})">Запечатать</button>`;
-    return;
-  }
   box.innerHTML=шапка+`<button class="btn" style="margin-top:12px" onclick="takeCard()">Принял</button>`;
 }
 
@@ -1275,30 +1257,6 @@ function takeCard(){
   PET.cardEnergy=(PET.cardEnergy||0)+5;   // карта — тоже топливо для прогулки
   savePet();renderCard();renderTotem();toast("+5 к прогулке");
 }
-
-function sealCapsule(срок){
-  const поле=document.getElementById("card-write");
-  const текст=(поле&&поле.value||"").trim();
-  if(!текст){toast("Пустое запечатывать нечего");return;}
-  PET.capsules=PET.capsules||[];
-  PET.capsules.push({t:текст,at:Date.now(),open:Date.now()+срок*86400000,d:todayKey()});
-  летопись(`Ты запечатал письмо себе. Откроется через ${срок} ${plural(срок,"день","дня","дней")}.`);
-  takeCard();
-  toast("Запечатано");
-}
-
-// Капсулы, которым пришёл срок. Открываются не сами — приложение только
-// говорит, что письмо дозрело, а решает человек. Письмо из плохого дня
-// не должно разворачиваться внезапно.
-const dueCapsules=()=>(PET.capsules||[]).filter(k=>!k.read&&Date.now()>=k.open);
-
-function openCapsule(){
-  document.getElementById("cap-text").style.display="";
-  document.getElementById("cap-open").style.display="none";
-  const k=dueCapsules()[0];
-  if(k){k.read=1;savePet();летопись("Ты открыл письмо, написанное "+k.d+".");}
-}
-function laterCapsule(){document.getElementById("capsule-modal").style.display="none";}
 
 // ── Серый день ───────────────────────────────────────────────────────
 // Взято у Way of Life: у дня три состояния, а не два. Да, нет и «этот день
